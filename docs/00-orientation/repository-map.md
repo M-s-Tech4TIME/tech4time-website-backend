@@ -86,6 +86,7 @@ sections/
 ├── company.php         the company profile      → content/company.json
 ├── about.php           the about page editor    → content/about.json
 ├── home.php            the home page editor     → content/home.json
+├── certifications.php  the certifications page  → content/certifications.json
 ├── services.php        the services editor, and each service page beneath it
 │                                                → content/services.json
 └── account.php         password, second factor, recovery codes, the log

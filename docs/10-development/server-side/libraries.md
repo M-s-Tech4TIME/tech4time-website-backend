@@ -20,6 +20,7 @@ store they read from is outside the document root entirely.
 | [`contact.php`](#contactphp) | what this side does with the contact page | `contract`, `store` |
 | [`company.php`](#companyphp) | what this side does with the company profile | `contract`, `store` |
 | [`about.php`](#aboutphp) | what this side does with the about page | `contract`, `store` |
+| [`certifications.php`](#certificationsphp) | what this side does with the certifications page | `contract`, `store` |
 | [`home.php`](#homephp) | what this side does with the home page | `contract`, `store` |
 | [`services.php`](#servicesphp) | what this side does with the services document | `contract`, `store`, `publish_client` |
 | [`upload.php`](#uploadphp) *(backend)* | a file somebody chose, turned into a picture this site will show | `publish` |
@@ -239,6 +240,29 @@ arrives **hidden**, so an unfinished page is never live either way.
 headed once for the whole page, not per card — every card on the cloud page says *"What it
 includes"*. So a card that lists things on a page with no heading set for that list would render
 loose text with no explanation, and it is refused with the two ways out named.
+
+### `certifications.php`
+
+`certifications_load()` · `certifications_save()` · `certifications_validate()`
+
+**A list inside a list.** `content/certifications.json` holds four role groups; each group holds its
+own role names and its own certifications. All three levels add, remove, reorder and hide
+independently, and a group added in the editor arrives hidden so a half-filled category is never
+live.
+
+**It fits in one form, and that was measured.** `admin_form_truncated()` exists because
+`max_input_vars` defaults to 1000 and PHP drops the tail of a larger POST in silence. This page
+posts about 240 inputs — 54 certifications at three each is most of it — so unlike the services
+editor it is not split by row. Roughly 250 more certifications would be needed to reach the limit.
+
+**Validation counts the description AFTER the tokens are filled in.** `{certifications}` is fifteen
+characters that publish as two, so measuring the stored string would refuse a description that fits
+and accept one that does not.
+
+**A group's anchor is minted once and then frozen.** It comes from the first role name, because a
+group has no title of its own — it *is* its roles. Renaming a role afterwards does not move it: a
+link into the page is a promise. The one exception is a group still carrying the placeholder id it
+was created with, which has never been a real address and is still up for grabs.
 
 ### `upload.php`
 

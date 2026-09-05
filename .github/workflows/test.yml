@@ -112,6 +112,7 @@ jobs:
       - run: python3 tools/test_about_admin.py
       - run: python3 tools/test_home_admin.py
       - run: python3 tools/test_services_admin.py
+      - run: python3 tools/test_certifications_admin.py
 
   browser:
     name: firefox

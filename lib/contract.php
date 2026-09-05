@@ -53,7 +53,8 @@ require_once __DIR__ . '/html.php';
 const CONTRACT_VERSION = 1;
 
 /** Every document that is published, by name. The endpoint refuses any other. */
-const CONTRACT_DOCUMENTS = ['careers', 'contact', 'company', 'about', 'home', 'services'];
+const CONTRACT_DOCUMENTS = ['careers', 'contact', 'company', 'about', 'home', 'services',
+                            'certifications'];
 
 /**
  * Where a document's record lives, on either host.
@@ -2683,7 +2684,498 @@ function services_by_id(array $data, string $id): ?array
 }
 
 /* ==========================================================================
-   7. Revisions
+   7. Resource certifications — the shape of the certifications page
+   ========================================================================== */
+
+/**
+ * Icons a role group may carry.
+ *
+ * The four the page ships with are the first four; the rest are offered
+ * because a new role group needs something to wear and picking from a list is
+ * the only way to add one without a deploy.
+ *
+ * A certification does NOT choose an icon. All 54 on the page carry the same
+ * glyph and always did, so it is a constant in the renderer
+ * (CERTIFICATIONS_CERT_GLYPH) rather than 54 copies of one answer.
+ *
+ * tools/inject_icons.py scans the MARKUP for a literal href="#name", and a
+ * name chosen at run time is invisible to that scan. Every icon offered here
+ * is therefore also listed in a comment in the frontend's
+ * pages/resource-certifications/index.php, where the scanner can see it.
+ *
+ * Every name here must also be in ADMIN_ICONS in the backend's lib/admin.php,
+ * or the editor's live preview draws an empty box for it.
+ */
+const CERTIFICATIONS_ICONS = [
+    'shield-halved'  => 'Shield',
+    'crosshairs'     => 'Crosshairs',
+    'first-aid'      => 'First aid',
+    'cogs'           => 'Cogs',
+    'certificate'    => 'Certificate',
+    'users'          => 'People',
+    'server'         => 'Server',
+    'lock'           => 'Padlock',
+    'eye'            => 'Eye',
+    'graduation-cap' => 'Graduation cap',
+    'code'           => 'Code',
+    'cloud'          => 'Cloud',
+];
+
+/**
+ * The glyph every certification carries.
+ *
+ * Not a field. All 54 certifications on the page use #certificate, so storing
+ * it 54 times would be 54 chances for them to stop matching each other and no
+ * chance of the page looking better for it. The renderer emits it.
+ */
+const CERTIFICATIONS_CERT_GLYPH = 'certificate';
+
+/* Free-text single-line fields, by band. A group's own heading belongs to the
+   group, not to the band, so 'certs' carries only the band header. */
+const CERTIFICATIONS_TEXT_FIELDS = [
+    'meta'  => ['title', 'description', 'share_title'],
+    'hero'  => ['title', 'subtitle'],
+    'certs' => ['eyebrow', 'title', 'lead'],
+    'cta'   => ['title', 'text'],
+];
+
+/* Every band that can be hidden whole, in the order it renders. The hero is
+   not here, for the reason the about page's hero is not in ABOUT_BANDS: a page
+   with no title is not a page with a section switched off, it is a broken
+   page. */
+const CERTIFICATIONS_BANDS = ['certs', 'cta'];
+
+/**
+ * The bands that hold a list, and the function that fills one of its rows.
+ *
+ * 'certs' is not here. Its rows are role groups, which nest two further lists
+ * of their own, so they are normalised by certifications_group_defaults()
+ * rather than by a flat map — the same reason services.items is handled apart
+ * from SERVICES_LISTS.
+ */
+const CERTIFICATIONS_LISTS = [
+    'cta' => 'certifications_button_defaults',
+];
+
+/* What a row is called before it is called anything. Deliberately its own
+   constant: each document owns its id vocabulary, and one changing must not
+   move another. See certifications_identify(). */
+const CERTIFICATIONS_ID_PLACEHOLDER = 'row';
+
+/**
+ * The tokens any text field may carry, and what each counts.
+ *
+ * The page states its own totals in prose -- "54 certifications across the
+ * four specialist roles we staff" -- and a typed number is wrong the moment
+ * somebody adds a certification. Nothing on the page would notice, and no
+ * check could: it is a true sentence that has quietly stopped being true.
+ *
+ * So the numbers are not typed. A field holds a token, and the renderer puts
+ * the live figure in as it draws.
+ *
+ * WATCH THE ARITHMETIC. The page's "four specialist roles" is the number of
+ * GROUPS, not the number of role names -- there are ten of those, spread two,
+ * three, four and one across the four groups. Both counts are offered because
+ * the page's own copy means different things by "role" in different sentences,
+ * and the editor shows what each one resolves to so nobody has to guess.
+ */
+const CERTIFICATIONS_TOKENS = ['certifications', 'groups', 'roles'];
+
+/**
+ * The same three counts, spelled out.
+ *
+ * The page does not write its two numbers the same way. The lead says
+ * "54 certifications across the four specialist roles" -- a numeral and then a
+ * word, which is ordinary English and how a person would type it. A token that
+ * could only produce digits would quietly reword that sentence to "the 4
+ * specialist roles" the first time it rendered, and the page would have been
+ * edited by the migration rather than by anybody who meant to.
+ *
+ * So every token has a -word form: {groups} is 4 and {groups-word} is "four".
+ * Above twenty it gives up and returns the numeral, because "fifty-four
+ * certifications" is a style decision no one asked this file to make, and a
+ * count that far up is being read, not narrated.
+ */
+const CERTIFICATIONS_TOKEN_WORD_SUFFIX = '-word';
+
+const CERTIFICATIONS_NUMBER_WORDS = [
+    0  => 'no',       1  => 'one',      2  => 'two',       3  => 'three',
+    4  => 'four',     5  => 'five',     6  => 'six',       7  => 'seven',
+    8  => 'eight',    9  => 'nine',     10 => 'ten',       11 => 'eleven',
+    12 => 'twelve',   13 => 'thirteen', 14 => 'fourteen',  15 => 'fifteen',
+    16 => 'sixteen',  17 => 'seventeen',18 => 'eighteen',  19 => 'nineteen',
+    20 => 'twenty',
+];
+
+/**
+ * The page as it ships, and the fallback for anything missing from the file.
+ *
+ * Every scalar the renderer reads exists here, so a truncated or hand-edited
+ * certifications.json degrades to the shipped headings rather than emptying
+ * the page. The lists default to empty: the page keeps its shape and has
+ * nothing in it, which is the same bargain about and company make.
+ */
+function certifications_defaults(): array
+{
+    return [
+        'updated'  => '',
+        'revision' => 0,
+        'meta'     => [
+            'title'       => 'Resource Certifications | Tech4TIME',
+            'description' => 'The {certifications} security certifications our analysts, '
+                           . 'incident responders, threat hunters and security engineers hold, '
+                           . 'grouped by the role they are deployed in.',
+            'share_title' => 'Resource Certifications',
+        ],
+        'hero'     => [
+            'title'    => 'Resource Certifications',
+            'subtitle' => 'The Qualifications Our People Hold, by Role',
+        ],
+        'certs'    => [
+            'status'  => 'shown',
+            'eyebrow' => 'Our People',
+            'title'   => 'Certifications by Role',
+            'lead'    => '{certifications} certifications across the {groups-word} specialist '
+                       . 'roles we staff, from the vendors and standards bodies that set them.',
+            'items'   => [],
+        ],
+        'cta'      => [
+            'status' => 'shown',
+            'title'  => 'Need a certified resource on your team?',
+            'text'   => '',
+            'items'  => [],
+        ],
+    ];
+}
+
+/**
+ * Fill in everything the renderer reads, whatever the file happens to hold.
+ */
+function certifications_normalise(array $data): array
+{
+    $defaults = certifications_defaults();
+
+    foreach ($defaults as $key => $value) {
+        if ($key === 'revision') {
+            $data[$key] = max(0, (int)($data[$key] ?? 0));
+            continue;
+        }
+        if (!is_array($value)) {
+            $data[$key] = is_string($data[$key] ?? null) ? $data[$key] : $value;
+            continue;
+        }
+        $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
+    }
+
+    foreach (CERTIFICATIONS_BANDS as $band) {
+        $data[$band]['status'] =
+            ($data[$band]['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown';
+    }
+
+    foreach (CERTIFICATIONS_LISTS as $band => $filler) {
+        $rows = is_array($data[$band]['items'] ?? null) ? $data[$band]['items'] : [];
+        $data[$band]['items'] = array_map(
+            $filler,
+            array_values(array_filter($rows, 'is_array'))
+        );
+    }
+
+    $groups = is_array($data['certs']['items'] ?? null) ? $data['certs']['items'] : [];
+    $data['certs']['items'] = array_map(
+        'certifications_group_defaults',
+        array_values(array_filter($groups, 'is_array'))
+    );
+
+    return certifications_identify($data);
+}
+
+/**
+ * One role group: a <details> on the page, holding role names and the
+ * certifications the people in those roles hold.
+ *
+ * 'open' is the group that starts expanded. It is authored rather than
+ * derived -- the page ships with the first group open and the other three
+ * shut, and which one greets a visitor is an editorial decision, not an
+ * accident of ordering.
+ *
+ * 'slug' is the anchor the <details> carries. It is minted once from the
+ * first role name and then left alone, because a link into the page is a
+ * promise and renaming a role must not break it.
+ */
+function certifications_group_defaults(array $row): array
+{
+    $row += [
+        'id'     => '',
+        'slug'   => '',
+        'icon'   => '',
+        'blurb'  => '',
+        'status' => 'shown',
+        'open'   => false,
+    ];
+
+    $row['open'] = (bool)$row['open'];
+
+    $roles = is_array($row['roles'] ?? null) ? $row['roles'] : [];
+    $row['roles'] = array_map(
+        'certifications_role_defaults',
+        array_values(array_filter($roles, 'is_array'))
+    );
+
+    $certs = is_array($row['items'] ?? null) ? $row['items'] : [];
+    $row['items'] = array_map(
+        'certifications_cert_defaults',
+        array_values(array_filter($certs, 'is_array'))
+    );
+
+    return $row;
+}
+
+/** One role name inside a group. The page prints these separated by a slash. */
+function certifications_role_defaults(array $row): array
+{
+    return $row + [
+        'id'     => '',
+        'name'   => '',
+        'status' => 'shown',
+    ];
+}
+
+/**
+ * One certification.
+ *
+ * A name and nothing else. There is no icon field: see
+ * CERTIFICATIONS_CERT_GLYPH.
+ */
+function certifications_cert_defaults(array $row): array
+{
+    return $row + [
+        'id'     => '',
+        'name'   => '',
+        'status' => 'shown',
+    ];
+}
+
+/** One button in the closing band. The page ships with two. */
+function certifications_button_defaults(array $row): array
+{
+    return $row + [
+        'id'     => '',
+        'label'  => '',
+        'href'   => '',
+        'icon'   => '',
+        'style'  => 'primary',
+        'status' => 'shown',
+    ];
+}
+
+/**
+ * Give every row an id, and every group a stable anchor.
+ *
+ * Group ids and slugs share the page's fragment namespace, because a group is
+ * a <details id="..."> a visitor can be linked straight to. Roles and
+ * certifications are numbered WITHIN their group: they are form handles and
+ * never fragment targets, so two groups may each hold a "cissp" without
+ * either having to be renamed.
+ */
+function certifications_identify(array $data): array
+{
+    foreach (CERTIFICATIONS_LISTS as $band => $_filler) {
+        $taken = [];
+        foreach ($data[$band]['items'] as $i => $row) {
+            $name = (string)($row['label'] ?? $row['title'] ?? '');
+            $id   = certifications_mint((string)($row['id'] ?? ''), $name, $taken);
+            $data[$band]['items'][$i]['id'] = $id;
+            $taken[] = $id;
+        }
+    }
+
+    $anchors = [];
+    foreach ($data['certs']['items'] as $g => $group) {
+        /* A group is named by its first role -- "Security Analyst / Threat
+           Analyst" is headed security-analyst -- because a group has no title
+           of its own. It is the roles, and the first one is the one that
+           names it. */
+        $first = '';
+        foreach ($group['roles'] as $role) {
+            $first = (string)($role['name'] ?? '');
+            if (trim($first) !== '') {
+                break;
+            }
+        }
+
+        $id = certifications_mint((string)($group['id'] ?? ''), $first, $anchors);
+        $data['certs']['items'][$g]['id'] = $id;
+        $anchors[] = $id;
+
+        /* The slug is the anchor. It follows the id until the id is a real
+           one, and is left alone from then on: changing it breaks every link
+           anyone has ever made into this page.
+
+           "Until the id is REAL" is the whole subtlety. A group added by the
+           Add button has no roles yet, so there is no name to mint from and
+           the id is the placeholder. Freezing the slug to that would leave a
+           group answering to #row for the rest of its life, named after
+           nothing, and the first person to add a second one would get #row-2.
+           A placeholder slug is therefore still up for grabs; a slug somebody
+           has actually been given is not. */
+        $slug = trim((string)($group['slug'] ?? ''));
+        $data['certs']['items'][$g]['slug'] =
+            ($slug !== '' && !certifications_provisional($slug)) ? $slug : $id;
+
+        foreach (['roles', 'items'] as $list) {
+            $taken = [];
+            foreach ($group[$list] as $i => $row) {
+                $rid = certifications_mint(
+                    (string)($row['id'] ?? ''), (string)($row['name'] ?? ''), $taken);
+                $data['certs']['items'][$g][$list][$i]['id'] = $rid;
+                $taken[] = $rid;
+            }
+        }
+    }
+
+    return $data;
+}
+
+/** An id nobody has chosen: empty, or the placeholder the Add button leaves. */
+function certifications_provisional(string $id): bool
+{
+    return $id === ''
+        || preg_match('/^' . CERTIFICATIONS_ID_PLACEHOLDER . '(-\d+)?$/', $id) === 1;
+}
+
+/** Keep a real id, replace a placeholder once there is a name to replace it with. */
+function certifications_mint(string $id, string $name, array $taken): string
+{
+    $id   = trim($id);
+    $name = trim($name);
+
+    if ((certifications_provisional($id) && $name !== '') || in_array($id, $taken, true)) {
+        return certifications_slug($name, $taken);
+    }
+    if ($id === '') {
+        return certifications_slug('', $taken);
+    }
+    return $id;
+}
+
+/** A URL-safe id from a name. */
+function certifications_slug(string $name, array $taken = []): string
+{
+    $slug = strtolower(trim($name));
+    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
+    $slug = trim($slug, '-') ?: CERTIFICATIONS_ID_PLACEHOLDER;
+
+    return certifications_unique($slug, $taken);
+}
+
+/** The same id, suffixed until nothing else in the list has it. */
+function certifications_unique(string $slug, array $taken): string
+{
+    $base = $slug;
+    $n    = 2;
+    while (in_array($slug, $taken, true)) {
+        $slug = $base . '-' . $n++;
+    }
+    return $slug;
+}
+
+/** Whether a band is shown at all. */
+function certifications_band_shown(array $data, string $band): bool
+{
+    return ($data[$band]['status'] ?? 'shown') !== 'hidden';
+}
+
+/** Only the rows of a list a visitor should see, wherever the list is. */
+function certifications_rows_shown(array $rows): array
+{
+    return array_values(array_filter(
+        is_array($rows) ? $rows : [],
+        static fn($row): bool => is_array($row) && ($row['status'] ?? 'shown') !== 'hidden'
+    ));
+}
+
+/** Every role group, hidden ones included. The editor lists these. */
+function certifications_groups(array $data): array
+{
+    return is_array($data['certs']['items'] ?? null) ? $data['certs']['items'] : [];
+}
+
+/**
+ * What the page currently holds, for the tokens to resolve to.
+ *
+ * SHOWN ROWS ONLY, and that is the whole point. A hidden certification is not
+ * on the page, so a sentence saying how many certifications there are must not
+ * count it -- and the "27 certifications" label the renderer puts on each
+ * group counts the same way. Two numbers on one page derived from two
+ * different rules is worse than no numbers at all.
+ *
+ * 'groups' and 'roles' are genuinely different figures: four groups, ten role
+ * names. The page's own lead means the first when it says "the four specialist
+ * roles we staff".
+ */
+function certifications_counts(array $data): array
+{
+    $groups = certifications_rows_shown(certifications_groups($data));
+
+    $certifications = 0;
+    $roles          = 0;
+
+    foreach ($groups as $group) {
+        $certifications += count(certifications_rows_shown($group['items'] ?? []));
+        $roles          += count(certifications_rows_shown($group['roles'] ?? []));
+    }
+
+    return [
+        'certifications' => $certifications,
+        'groups'         => count($groups),
+        'roles'          => $roles,
+    ];
+}
+
+/**
+ * Put the live figures into a piece of text.
+ *
+ * THIS LIVES HERE, IN THE SHARED FILE, ON PURPOSE. The public page renders it
+ * and the editor previews it, and lib/contract.php is byte-identical across
+ * both repositories -- checked by tools/check_shared_lib.py and
+ * tools/check_shared_repos.py. So the preview an editor is shown and the
+ * sentence a visitor reads cannot disagree about what a token means. Two
+ * copies of this function in two repositories could, and one day would.
+ *
+ * SUBSTITUTE FIRST, ESCAPE AFTER. Every value is a decimal integer, so the
+ * order is safe either way -- but one order has to be chosen, and this is it:
+ * callers pass the result through h() exactly as they would any other stored
+ * string, and nothing about a token changes that habit.
+ *
+ * An unknown token is left exactly as it was typed. Somebody experimenting
+ * with {certificates} gets their own text back rather than an empty space
+ * where a word used to be.
+ */
+function certifications_word(int $n): string
+{
+    return CERTIFICATIONS_NUMBER_WORDS[$n] ?? (string)$n;
+}
+
+function certifications_fill(string $text, array $counts): string
+{
+    foreach (CERTIFICATIONS_TOKENS as $token) {
+        $n = (int)($counts[$token] ?? 0);
+
+        /* The spelled form first. Replacing {groups} before
+           {groups-word} would leave the string holding "4-word". */
+        $text = str_replace(
+            '{' . $token . CERTIFICATIONS_TOKEN_WORD_SUFFIX . '}',
+            certifications_word($n),
+            $text
+        );
+        $text = str_replace('{' . $token . '}', (string)$n, $text);
+    }
+
+    return $text;
+}
+
+/* ==========================================================================
+   8. Revisions
    ========================================================================== */
 
 /**
@@ -2706,7 +3198,7 @@ function contract_next_revision(array $data): int
 }
 
 /* ==========================================================================
-   8. Normalising and re-sanitising on receipt
+   9. Normalising and re-sanitising on receipt
    ========================================================================== */
 
 /**
@@ -2733,6 +3225,7 @@ function contract_normalise(string $document, array $data): array
         'about'    => about_normalise($data),
         'home'     => home_normalise($data),
         'services' => services_normalise($data),
+        'certifications' => certifications_normalise($data),
         default    => throw new RuntimeException('Unknown document: ' . $document),
     };
 }
@@ -2818,6 +3311,21 @@ function contract_sanitise(string $document, array $data): array
        below is a refusal, and "nothing to sanitise" must not arrive at the same
        line as "document I do not know". */
     if ($document === 'services') {
+        return $data;
+    }
+
+    /* The certifications page has none either, and the check is easy to make:
+       there is not one <strong>, <em> or <br> anywhere in its body. It is a
+       hero, three headings, four short blurbs and fifty-four proper nouns.
+       The branch is still explicit, for the reason home's and services' are --
+       the default below is a refusal, and "nothing to sanitise" must not
+       arrive at the same line as "document I do not know".
+
+       The tokens are not an exception to this. {certifications} is stored as
+       the literal characters somebody typed and stays text all the way to
+       certifications_fill(), which puts a decimal integer in its place. There
+       is no markup in the substitution and nothing here to strip. */
+    if ($document === 'certifications') {
         return $data;
     }
 

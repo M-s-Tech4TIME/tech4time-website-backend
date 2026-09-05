@@ -95,6 +95,12 @@ const ADMIN_SECTIONS = [
         'desc'  => 'The story, specialities and why-us cards',
         'view'  => '/pages/about/',
     ],
+    'certifications' => [
+        'label' => 'Certifications',
+        'icon'  => 'certificate',
+        'desc'  => 'Role groups and the qualifications inside them',
+        'view'  => '/pages/resource-certifications/',
+    ],
     'account' => [
         'label' => 'Account',
         'icon'  => 'user-shield',
@@ -110,7 +116,8 @@ const ADMIN_SECTIONS = [
  * account — so anything counting or listing "the pages you can edit" asks here
  * rather than filtering the registry by hand in three places.
  */
-const ADMIN_PAGE_SECTIONS = ['home', 'careers', 'contact', 'company', 'about', 'services'];
+const ADMIN_PAGE_SECTIONS = ['home', 'careers', 'contact', 'company', 'about', 'services',
+                             'certifications'];
 
 /* The marker admin_form_tail() writes and admin_form_truncated() looks for. */
 const ADMIN_TAIL_FIELD = '__tail';

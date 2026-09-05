@@ -408,8 +408,53 @@
      back into its textarea — has already run by the time this reads the form.
      Binding per form would mean rebinding after each swap and would put this
      first. */
+  /* Put a count token into the field it belongs to.
+
+     An ENHANCEMENT, and only that: the token is printed on the button, so
+     with no JavaScript at all it can be read off the screen and typed. What
+     this removes is the typing, not the possibility.
+
+     It deliberately does NOT re-render the "Reads as" line beside it. Working
+     out what a token comes to is certifications_fill() in lib/contract.php,
+     which both halves of the project share so that the editor's preview and
+     the published page cannot disagree — and a second implementation of it
+     here, in another language, is exactly the disagreement that file exists to
+     prevent. The line refreshes on the next redraw, from the one function that
+     knows the answer. */
+  function insertToken(chip) {
+    var field = doc.querySelector('[name="' + chip.getAttribute("data-token-field") + '"]');
+    var token = chip.getAttribute("data-token-insert");
+
+    if (!field || !token) {
+      return;
+    }
+
+    var start = typeof field.selectionStart === "number" ? field.selectionStart : field.value.length;
+    var end = typeof field.selectionEnd === "number" ? field.selectionEnd : start;
+
+    field.value = field.value.slice(0, start) + token + field.value.slice(end);
+
+    /* Where the cursor was, plus what was just put there — so a second press
+       lands after the first rather than back at the start. */
+    field.focus();
+    if (field.setSelectionRange) {
+      field.setSelectionRange(start + token.length, start + token.length);
+    }
+
+    /* The form is watched for unsaved changes elsewhere; setting .value in
+       script fires nothing on its own. */
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
   function wire() {
     var pressed = null;
+
+    doc.addEventListener("click", function (event) {
+      var chip = event.target.closest && event.target.closest("[data-token-insert]");
+      if (chip) {
+        insertToken(chip);
+      }
+    });
 
     doc.addEventListener("click", function (event) {
       var button = event.target.closest && event.target.closest("button, input[type=submit]");

@@ -41,6 +41,7 @@ python3 tools/test_contact_admin.py     # the contact page editor
 python3 tools/test_home_admin.py        # the home page editor — six lists
 python3 tools/test_about_admin.py       # the about page editor
 python3 tools/test_services_admin.py    # the services editor — two screens, one document
+python3 tools/test_certifications_admin.py  # the certifications editor — three lists deep
 python3 tools/test_store.py             # the JSON store itself
 python3 tools/test_qr.py                # the pairing code, against libqrencode
 ```
@@ -121,6 +122,7 @@ These start a real PHP server on a spare port and drive it over HTTP.
 | `test_contact_admin.py` | the contact page editor, and the icon rail |
 | `test_home_admin.py` | the home page editor: **six** lists, so add, remove, hide and reorder are exercised across them rather than on one — the mechanics are shared, and a break in the shared part would otherwise surface only in whichever list happened to be tested. Also each terminal line's kind and colour, the light/dark picture pair on a card, and the accent phrase that has to appear in the headline |
 | `test_services_admin.py` | the services editor — the only one split across two screens, and the only one whose save **merges** rather than replaces. Both halves of that are covered: saving one service must not disturb another, saving the index must not write the six pages it never showed, and a service added on the list screen must survive the round trip. Plus add, remove, hide and reorder on the lists — including the **nested** one, a solution inside a group, which nothing else exercises — and that a hand-written solution id is kept rather than re-minted from its name |
+| `test_certifications_admin.py` | the certifications editor — the only one with a list **inside a list**, so add, remove, hide and reorder are exercised at all three levels and, more to the point, a button pressed on one role group is checked to have left the others alone. Also that a new group arrives hidden, that its web address is minted from its first role and then **survives that role being renamed**, and that the counts shown beside the prose are the live ones rather than anything stored |
 | `test_store.py` | `lib/store.php`: telling apart missing, unreadable and corrupt; the atomic write; and the rule that a damaged file is never copied over a good `.bak`, because the backup is what damage is recovered from |
 
 **The three that publish do so to a stub, and that is the point.** `tools/publish_stub.py`

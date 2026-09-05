@@ -162,6 +162,22 @@ COVERED_ELSEWHERE = {
         "through the editor and read back off the wire, plus add, remove, hide "
         "and reorder on all three lists.",
     ),
+    "certifications": (
+        "tools/test_certifications_admin.py" if SIDE in ("backend", "both")
+        else "tools/test_publish.py",
+        "The certifications page is a list inside a list: four role groups, "
+        "each walking its own roles and its own certifications. Both halves "
+        "loop over all three levels — the editor names its inputs "
+        "\"certs[items][<?= $g ?>][items][<?= $c ?>][name]\" and the page "
+        "renders with foreach over certifications_rows_shown() — so the "
+        "regexes below read the loop variables rather than the fields. The "
+        "same argument as the about page, one level deeper. It is proved by "
+        "round trip instead: every field set through the editor and read back "
+        "off the wire, add, remove, hide and reorder at all three levels, and "
+        "the two things the model deliberately does NOT store — the count on "
+        "each group heading and the totals filled into the prose — checked "
+        "against what the page actually renders.",
+    ),
     "home": (
         "tools/test_home_admin.py" if SIDE in ("backend", "both")
         else "tools/test_publish.py",

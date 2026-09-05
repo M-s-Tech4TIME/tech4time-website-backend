@@ -1,0 +1,412 @@
+{
+  "updated": "",
+  "revision": 0,
+  "meta": {
+    "title": "Resource Certifications | Tech4TIME",
+    "description": "The {certifications} security certifications our analysts, incident responders, threat hunters and security engineers hold, grouped by the role they are deployed in.",
+    "share_title": "Resource Certifications | Tech4TIME"
+  },
+  "hero": {
+    "title": "Resource Certifications",
+    "subtitle": "The Qualifications Our People Hold, by Role"
+  },
+  "certs": {
+    "status": "shown",
+    "eyebrow": "Our People",
+    "title": "Certifications by Role",
+    "lead": "{certifications} certifications across the {groups-word} specialist roles we staff, from the vendors and standards bodies that set them.",
+    "items": [
+      {
+        "id": "security-analyst",
+        "slug": "security-analyst",
+        "icon": "shield-halved",
+        "blurb": "Monitoring, triage and detection engineering — the roles that watch an estate day to day and decide what deserves attention.",
+        "open": true,
+        "status": "shown",
+        "roles": [
+          {
+            "id": "",
+            "name": "Security Analyst",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Threat Analyst",
+            "status": "shown"
+          }
+        ],
+        "items": [
+          {
+            "id": "",
+            "name": "Certified Cyber Defender",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Blue Team Level 1",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Blue Team Level 2",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Certified SOC Analyst",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Certified Ethical Hacker",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "CC – Certified in Cybersecurity",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "CompTIA Security+",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Security Analyst L1",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Certified Junior Detection Engineer",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Certified Information Systems Auditor",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "GIAC Security Operations Certified",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "GIAC Experienced Intrusion Analyst",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "GIAC Certified Detection Analyst",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "GIAC Continuous Monitoring Certification",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "GIAC Certified Intrusion Analyst",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "ISACA Certified Cybersecurity Operations Analyst",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "CompTIA CySA+",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "CompTIA Network+",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "CompTIA Linux+",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "eLearnSecurity eCDFP",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "eLearnSecurity eCTHPv2",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "PECB ISO/IEC 27001 Lead Auditor",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "CREST Registered Intrusion Analyst",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "HTB Certified Defensive Security Analyst",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Certified Blue Teamer",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "eLearnSecurity Junior Penetration Tester",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Offensive Security Certified Professional",
+            "status": "shown"
+          }
+        ]
+      },
+      {
+        "id": "incident-response",
+        "slug": "incident-response",
+        "icon": "first-aid",
+        "blurb": "Containment, evidence handling and analysis — the roles that take over once something has already happened.",
+        "open": false,
+        "status": "shown",
+        "roles": [
+          {
+            "id": "",
+            "name": "Incident Responder",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "First Responder",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Forensic Expert",
+            "status": "shown"
+          }
+        ],
+        "items": [
+          {
+            "id": "",
+            "name": "Certified Forensic Security Responder",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "GIAC Certified Forensics Responder",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "GIAC Certified Forensic Analyst",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "IACIS Certified Forensic Computer Examiner",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "GIAC Certified Incident Handler",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "GIAC Enterprise Incident Responder",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "GIAC Network Forensic Analyst",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Computer Hacking Forensic Investigator",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "OpenText Certified Forensic Security Responder",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "IACIS Certified Computer Forensic Examiner",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "PECB ISO/IEC 27035 Lead Incident Manager",
+            "status": "shown"
+          }
+        ]
+      },
+      {
+        "id": "offensive-security",
+        "slug": "offensive-security",
+        "icon": "crosshairs",
+        "blurb": "Looking for what monitoring has not caught yet, and proving what an attacker could reach.",
+        "open": false,
+        "status": "shown",
+        "roles": [
+          {
+            "id": "",
+            "name": "Threat Hunter",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Vulnerability Assessor",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Penetration Tester",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Threat Intelligence Expert",
+            "status": "shown"
+          }
+        ],
+        "items": [
+          {
+            "id": "",
+            "name": "GIAC Reverse Engineering Malware",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Certified Information Systems Security Professional",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "GIAC Cyber Threat Intelligence",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "GIAC Cloud Penetration Tester",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "GIAC Enterprise Vulnerability Assessor",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Mile2 Certified Vulnerability Assessor",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Offensive Security Certified Expert",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Offensive Security Exploitation Expert",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Certified in Risk and Information Systems Control",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Offensive Security Exploit Developer",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Licensed Penetration Tester",
+            "status": "shown"
+          }
+        ]
+      },
+      {
+        "id": "security-engineer",
+        "slug": "security-engineer",
+        "icon": "cogs",
+        "blurb": "Designing and building the controls the other three roles depend on.",
+        "open": false,
+        "status": "shown",
+        "roles": [
+          {
+            "id": "",
+            "name": "Security Engineer",
+            "status": "shown"
+          }
+        ],
+        "items": [
+          {
+            "id": "",
+            "name": "Information Systems Security Architecture Professional",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Information Systems Security Engineering Professional",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Certified Cloud Security Engineer",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Certified Application Security Engineer",
+            "status": "shown"
+          },
+          {
+            "id": "",
+            "name": "Certified Cybersecurity Engineer",
+            "status": "shown"
+          }
+        ]
+      }
+    ]
+  },
+  "cta": {
+    "status": "shown",
+    "title": "Need a certified resource on your team?",
+    "text": "Tell us the role and the engagement model, and we will match it against the people we have available.",
+    "items": [
+      {
+        "id": "",
+        "label": "Talk to Us",
+        "href": "/pages/contact/",
+        "icon": "",
+        "style": "primary",
+        "status": "shown"
+      },
+      {
+        "id": "",
+        "label": "HR Solutions",
+        "href": "/pages/services/hr-solutions/",
+        "icon": "",
+        "style": "ghost",
+        "status": "shown"
+      }
+    ]
+  }
+}

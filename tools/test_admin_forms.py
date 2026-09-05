@@ -365,7 +365,7 @@ def run(b: Browser, base: str, r: Results) -> None:
     for screen in ("/?s=overview", "/?s=careers", "/?s=careers&action=new",
                    "/?s=contact", "/?s=company", "/?s=about", "/?s=home",
                    "/?s=services", "/?s=services&service=cybersecurity",
-                   "/?s=account"):
+                   "/?s=certifications", "/?s=account"):
         b.go(base + screen)
         loud = b.js("""
         var out = [];
@@ -390,7 +390,7 @@ def run(b: Browser, base: str, r: Results) -> None:
     for screen in ("/?s=careers", "/?s=contact", "/?s=company", "/?s=about",
                    "/?s=home", "/?s=services",
                    "/?s=services&service=cybersecurity",
-                   "/?s=account"):
+                   "/?s=certifications", "/?s=account"):
         b.go(base + screen)
         counts = b.js(
             "var all = document.querySelectorAll('#admin-main form');"
@@ -519,7 +519,7 @@ def navigate(b: Browser, base: str, r: Results) -> None:
     for screen in ("/?s=overview", "/?s=careers", "/?s=careers&action=new",
                    "/?s=contact", "/?s=company", "/?s=about", "/?s=home",
                    "/?s=services", "/?s=services&service=cybersecurity",
-                   "/?s=account"):
+                   "/?s=certifications", "/?s=account"):
         b.go(base + screen)
         stragglers = b.js(STRAGGLERS)
         r.check(f"{screen}: no link falls through to a full page load",
@@ -547,7 +547,7 @@ def navigate(b: Browser, base: str, r: Results) -> None:
     for screen in ("/?s=overview", "/?s=careers", "/?s=contact",
                    "/?s=company", "/?s=about", "/?s=home", "/?s=services",
                    "/?s=services&service=cybersecurity",
-                   "/?s=account"):
+                   "/?s=certifications", "/?s=account"):
         b.go(base + screen)
         r.check(f"{screen}: there is somewhere to say it",
                 b.js(SHELL)["status"],
@@ -816,6 +816,7 @@ def improvements(b: Browser, base: str, r: Results) -> None:
         ("/?s=contact", "offices", "offices[items]"),
         ("/?s=company", "clients", "clients[items]"),
         ("/?s=about", "story", "story[items]"),
+        ("/?s=certifications", "certs", "certs[items]"),
         ("/?s=about", "whyus", "whyus[items]"),
         ("/?s=home", "tags", "tags[items]"),
         ("/?s=home", "destinations", "destinations[items]"),

@@ -98,6 +98,21 @@ jobs:
           php -r 'exit(extension_loaded("gd") ? 0 : 1);' \
             || { echo "php-gd did not load"; exit 1; }
 
+      # The hosts have ext-dom; ubuntu-24.04's php-cli does not. lib/svg.php is
+      # the security boundary for every vector file this site publishes — it is
+      # what turns "an SVG is a document that can carry script" into something
+      # that can be served at all — and without a parser it refuses everything,
+      # which would make tools/test_svg.py pass for the wrong reason. Installed
+      # here rather than left to skip in the one place a regression would be
+      # caught. Same bargain as php-gd.
+      - name: php-xml, so the SVG sanitiser is actually tested
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq php-xml
+          php -r 'exit(class_exists("DOMDocument") ? 0 : 1);' \
+            || { echo "php-xml did not load"; exit 1; }
+
+      - run: python3 tools/test_svg.py
       - run: python3 tools/test_store.py
       - run: python3 tools/test_upload.py
       - run: python3 tools/test_admin_auth.py
@@ -113,6 +128,7 @@ jobs:
       - run: python3 tools/test_home_admin.py
       - run: python3 tools/test_services_admin.py
       - run: python3 tools/test_certifications_admin.py
+      - run: python3 tools/test_branding_admin.py
 
   browser:
     name: firefox

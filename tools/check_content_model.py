@@ -178,6 +178,22 @@ COVERED_ELSEWHERE = {
         "each group heading and the totals filled into the prose — checked "
         "against what the page actually renders.",
     ),
+    "branding": (
+        "tools/test_branding_admin.py" if SIDE in ("backend", "both")
+        else "tools/test_publish.py",
+        "The branding page is a list inside a list: four logo variants, each "
+        "walking the files a visitor can download. Both halves loop over both "
+        "levels — the editor names its inputs "
+        "\"assets[items][<?= $a ?>][files][<?= $f ?>][label]\" and the page "
+        "renders with foreach over branding_rows_shown() — so the regexes "
+        "below read the loop variables rather than the fields. The same "
+        "argument as the certifications page. It is proved by round trip "
+        "instead: every field set through the editor and read back off the "
+        "wire, add, remove, hide and reorder at both levels, and the three "
+        "things the model deliberately does NOT store — the dimensions in a "
+        "meta line, the format on a download button and the glyph beside it — "
+        "checked against what the page actually renders.",
+    ),
     "home": (
         "tools/test_home_admin.py" if SIDE in ("backend", "both")
         else "tools/test_publish.py",

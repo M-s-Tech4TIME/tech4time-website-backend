@@ -12,9 +12,11 @@ Three independent things make that safe, and each is meant to hold on its own:
 
 | | |
 |---|---|
-| **the bytes are ours** | the backend decodes the upload with GD and re-encodes from the pixel data. What is sent is that library's output — never the file somebody chose |
+| **the bytes are ours** | the backend decodes the upload with GD and re-encodes from the pixel data — or, for a vector, parses it and re-serialises it through `lib/svg.php`. What is sent is that library's output — never the file somebody chose |
+| **the receiver proves it again** | the public site does not take the admin's word for any of that. It re-derives the type from the bytes, and for a vector re-runs the sanitiser and refuses anything that is not already its output |
 | **the name is ours** | sixteen hex characters of SHA-256 of those bytes, plus an extension read from the image header. The sender never sends a filename |
-| **the server serves nothing else** | an `.htaccess` allow-list on both hosts: `^/uploads/[0-9a-f]{16}\.(webp|jpe?g|png)$`, and everything else under `uploads/` is refused before a handler sees it |
+| **the server serves nothing else** | an `.htaccess` allow-list on both hosts: `^/uploads/[0-9a-f]{16}\.(webp|jpe?g|png|svg)$`, and everything else under `uploads/` is refused before a handler sees it |
+| **a vector is never a document here** | an `.svg` under `uploads/` is served `Content-Disposition: attachment` with `default-src 'none'; sandbox`, on both hosts. It downloads; it does not render |
 
 `uploads/` is on the deploy **protect list** in both repositories, for the same reason `content/`
 is — and it is the more dangerous of the two to get wrong.
@@ -47,10 +49,41 @@ An upload is not a file to be checked and then saved. It is untrusted input to b
 A validator can do none of that. It can only decide it did not find what it knew to look for. The
 list above is not the list of things checked; it is the list of things that stop existing.
 
-**SVG is refused outright**, and that is not an oversight. An SVG is a document: it can carry
-script, external references and entities, and re-encoding does not make it not a document. GIF and
-BMP are refused because nothing needs them, and a format nobody uses is an attack surface nobody
-watches.
+GIF and BMP are refused because nothing needs them, and a format nobody uses is an attack surface
+nobody watches.
+
+### SVG — refused when this was written, and now allowed under conditions
+
+**Amended 2026-09-05.** This record said, and meant:
+
+> SVG is refused outright, and that is not an oversight. An SVG is a document: it can carry script,
+> external references and entities, and re-encoding does not make it not a document.
+
+That reasoning was right and is not withdrawn. What changed is the requirement: the branding page
+exists to hand people usable logo files, and a branding page with no vector logo is a branding page
+designers cannot use. So the objection is answered rather than overruled, in two parts.
+
+**Re-encoding became re-serialising.** The rule above — untrusted input is *read and replaced*, not
+*checked and kept* — is not specific to pixels. `lib/svg.php` parses the file into a DOM, walks it
+against an allow-list of what a drawing may contain, and stores the serialiser's output. Script,
+event handlers, entity declarations, `<foreignObject>`, embedded rasters, SMIL animation and any
+reference that leaves the file are each **refused outright**, not stripped: silently dropping an
+element would hand somebody back different artwork than the one they published, which is its own
+kind of wrong. It is a shared file for the same reason `html.php` is — two sanitisers that disagree
+mean the second one is not a check.
+
+**And the remaining objection — that the result is still a document — is answered by never serving
+it as one.** `/uploads/*.svg` goes out with `Content-Disposition: attachment` and
+`Content-Security-Policy: default-src 'none'; sandbox` on both hosts. A file that always downloads
+and never renders in our origin cannot act in it, whatever it contains. No page draws one: the
+branding page's previews are raster, and the vector file is only ever the target of a link.
+
+**Two properties make this checkable rather than merely argued.** The sanitiser is *idempotent*, so
+the receiving host can prove bytes are clean by sanitising them again and finding nothing moved —
+without editing bytes whose SHA-256 is their filename. And it needs `ext-dom`, which
+`svg_problem()` reports plainly; a host without it refuses every vector file rather than guessing,
+while the byte-level refusals above still hold. `tools/test_svg.py`, in both repositories, is where
+all of that is asserted.
 
 ### Why the name is computed
 
@@ -87,6 +120,10 @@ ships with the public site and exists nowhere else, so `img-src` on `admin.tech4
 `https://tech4time.bd`. Images only — `script-src`, `style-src`, `connect-src`, `font-src` and
 `default-src` are still `'self'` and nothing else, and `check_secrets.py` asserts each of them
 individually so that this stays exactly as wide as it is.
+
+**`ext-dom` becomes a requirement of both hosts, for vector files only.** Both have it
+(`docs/40-reference/host-facts.md`). Ubuntu's `php-cli` does not, so CI installs `php-xml` rather
+than letting `tools/test_svg.py` skip the cases that matter — the same arrangement GD already has.
 
 **GD becomes a requirement of the admin host.** It is present on this one (8.2.33, with WebP).
 `upload_problem()` says so plainly when it is not, and the rest of the editor keeps working.

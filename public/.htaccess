@@ -110,8 +110,28 @@ Options -Indexes
     # Identical to the rule on the public site, and for the same reason: this
     # is the third of ADR 0019's three layers, and the only one that still
     # holds if the other two are wrong.
-    RewriteCond %{REQUEST_URI} !^/uploads/[0-9a-f]{16}\.(webp|jpe?g|png)$
+    RewriteCond %{REQUEST_URI} !^/uploads/[0-9a-f]{16}\.(webp|jpe?g|png|svg)$
     RewriteRule ^uploads/. - [F,L]
+
+    # THE FIFTH LAYER, AND THE ONE THAT MAKES A VECTOR FILE SAFE TO SERVE AT
+    # ALL. Sanitising an SVG leaves a document, and a document in this origin
+    # is a document that could act in it. So an .svg under uploads/ is never
+    # served as one: Content-Disposition makes a browser save it rather than
+    # render it, and the CSP is a second answer in case something navigates to
+    # it anyway — no scripts, no fetches, no same-origin anything.
+    #
+    # Nothing on this site draws these files. The branding page LINKS to them;
+    # its previews are raster. The download="" attribute names the file for the
+    # visitor; this is what makes the address itself harmless.
+    #
+    # expr= rather than <FilesMatch> so the PATH is matched and not just the
+    # name — the rule must apply under uploads/ and nowhere else. Same form as
+    # the /admin and /api rules further down.
+    <IfModule mod_headers.c>
+        Header always set Content-Disposition "attachment" "expr=%{REQUEST_URI} =~ m#^/uploads/[0-9a-f]{16}\.svg$#"
+        Header always set Content-Security-Policy "default-src 'none'; sandbox" "expr=%{REQUEST_URI} =~ m#^/uploads/[0-9a-f]{16}\.svg$#"
+    </IfModule>
+
 </IfModule>
 
 # --------------------------------------------------------------------------

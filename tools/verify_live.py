@@ -95,7 +95,8 @@ EXPECT = [
     ("/uploads/",             (403, 404),  "uploads/ does not list its contents"),
     ("/uploads/x.php",        (403, 404),  "and a .php there is refused before any handler sees it"),
     ("/uploads/notahexname.webp", (403, 404), "a name this host did not mint is refused"),
-    ("/uploads/0123456789abcdef.svg", (403, 404), "and so is an extension it does not serve"),
+    ("/uploads/0123456789abcdef.gif", (403, 404), "and so is an extension it does not serve"),
+    ("/uploads/0123456789abcdef.svg", (404,), "but a vector file is allowed through to be served"),
 ]
 
 # (path, header, what must be in its value)

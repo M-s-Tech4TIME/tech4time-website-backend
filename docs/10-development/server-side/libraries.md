@@ -21,6 +21,8 @@ store they read from is outside the document root entirely.
 | [`company.php`](#companyphp) | what this side does with the company profile | `contract`, `store` |
 | [`about.php`](#aboutphp) | what this side does with the about page | `contract`, `store` |
 | [`certifications.php`](#certificationsphp) | what this side does with the certifications page | `contract`, `store` |
+| [`branding.php`](#brandingphp) | what this side does with the branding page | `contract`, `store` |
+| [`svg.php`](#svgphp) **shared** | what a publishable vector file is | — |
 | [`home.php`](#homephp) | what this side does with the home page | `contract`, `store` |
 | [`services.php`](#servicesphp) | what this side does with the services document | `contract`, `store`, `publish_client` |
 | [`upload.php`](#uploadphp) *(backend)* | a file somebody chose, turned into a picture this site will show | `publish` |
@@ -264,12 +266,71 @@ group has no title of its own — it *is* its roles. Renaming a role afterwards 
 link into the page is a promise. The one exception is a group still carrying the placeholder id it
 was created with, which has never been a real address and is still up for grabs.
 
+### `branding.php`
+
+`branding_load()` · `branding_save()` · `branding_validate()`
+
+**A list inside a list.** `content/branding.json` holds the logo variants; each variant holds the
+files it offers for download. Both levels add, remove, reorder and hide independently, and a
+variant added in the editor arrives **hidden** so a half-filled card is never live.
+
+**Two pictures per variant, and they are not the same picture.** `image` is the preview drawn on
+the card; `files[].file` is what a visitor came for. On the page as it ships those are an 800px
+preview and a 1600px download of the same mark, so collapsing them would either serve the big file
+to everyone who merely looks at the page or hand out the small one to everyone who came for the
+logo.
+
+**A download may be a vector.** The download slots take an SVG and the preview slot does not,
+because the public page *links* to a vector file and never draws one. `svg.php` is what makes one
+publishable at all.
+
+**A download gets a bigger ceiling than a preview.** A preview is reduced to
+`UPLOAD_MAX_DIMENSION`, like every other picture on the site; a download is the deliverable, so it
+may be up to `UPLOAD_MAX_DOWNLOAD_DIMENSION` (3000). Nothing else about the path differs — both are
+still read and replaced rather than checked and kept.
+
+**The disclaimer is the page's only rich text**, and it carries a standing warning on the screen:
+it is legal text, and the person editing it is not necessarily the person who chose the words.
+
+**Validation refuses what would make the page wrong rather than merely empty** — a preview with no
+description, a download row with no file, a saved-as name with a separator in it, and an empty
+breadcrumb, which is what a search result calls this page in a trail.
+
+### `svg.php`
+
+**Shared — byte-identical in both repositories.**
+
+`svg_sanitise()` · `svg_problem()` · `svg_looks_like()`
+
+What a publishable vector file is. ADR 0019 refused SVG outright and its reasoning was right — an
+SVG is a document, and re-encoding does not make it not one. This answers that rather than avoiding
+it, twice over.
+
+**It is read and replaced, not checked and kept.** The same rule `upload.php` follows for a raster:
+the file is parsed into a DOM, walked against an allow-list, and re-serialised, and what is stored
+is *that* — never the bytes that arrived. Anything outside the list makes the whole file refused,
+with a sentence naming what was found, because silently dropping an element would hand somebody
+back a different logo than the one they published.
+
+**And it is never served as a document.** `/uploads/*.svg` goes out with `Content-Disposition:
+attachment` and `default-src 'none'; sandbox` on both hosts, so it downloads and never renders in
+either origin.
+
+**It is idempotent, and that is load-bearing.** `svg_sanitise(svg_sanitise(x))` equals
+`svg_sanitise(x)`. The receiving host relies on it: it sanitises what arrived and refuses anything
+that is not already its own output — proving the bytes are clean *without changing them*, which it
+could not do otherwise, because the file's name is a hash of its contents and both hosts compute it
+independently.
+
+**It needs `ext-dom`**, which the live hosts have and Ubuntu's `php-cli` does not. `svg_problem()`
+says so plainly and the byte-level refusals still hold without it; CI installs `php-xml`.
+
 ### `upload.php`
 
 **Backend only.** The frontend has no upload form and must never gain one.
 
 `upload_problem()` · `upload_accept()` · `upload_store()` · `upload_held()` ·
-`upload_unused()` · `upload_delete()`
+`upload_in_use()` · `upload_unused()` · `upload_delete()`
 
 The only code in either repository that takes a file from somebody's computer and puts it on a web
 server. **The rule it works to is that nothing the browser sent is ever written.** An upload is
@@ -280,13 +341,29 @@ That one step is what removes EXIF — including the coordinates a phone puts in
 anything appended after the image data, and a file that is a valid JPEG *and* a valid PHP script.
 A validator could do none of it: it can only decide it did not find what it knew to look for.
 
-JPEG, PNG and WebP, decided from the file's own header. **No SVG:** an SVG is a document, it can
-carry script, and re-encoding does not make it not a document. Full reasoning in
+JPEG, PNG and WebP, decided from the file's own header. **An SVG takes the other branch** — it has
+no pixels to re-encode, so it is parsed, allow-listed and re-serialised by [`svg.php`](#svgphp)
+instead, which is the same rule by a different route. Full reasoning in
 [0019](../../90-decisions/0019-uploaded-images-travel-their-own-channel.md); the proof is
-[`test_upload.py`](../../40-reference/tools.md).
+[`test_upload.py`](../../40-reference/tools.md) and [`test_svg.py`](../../40-reference/tools.md).
+
+**A picture is drawn from any of a dozen sizes, but the ceiling depends on what it is for.**
+`UPLOAD_MAX_DIMENSION` (1600) for something a page displays; `UPLOAD_MAX_DOWNLOAD_DIMENSION` (3000)
+for something a visitor takes away, which today is only the branding page's downloads. The caller
+says which.
+
+**`upload_in_use()` asks every document, not the one on screen — and that is a fix, not a
+nicety.** `public/uploads/` is one directory shared by every editor, but each editor used to pass
+only its own document's pictures to `upload_unused()`. So the about screen counted the home page's
+uploads as *"not used by any row"* and its sweep button offered to delete them: three editors, each
+able to delete the other two's artwork, and nothing anywhere said so. The set of pictures in use is
+a property of the site, so it is asked of the site. `contract_images()` is the per-document half,
+and a document it does not know answers with none — which is what stops a new document becoming a
+new way to lose files.
 
 `upload_unused()` never deletes anything on its own. A reference count taken from a document
-somebody is halfway through editing is not a fact.
+somebody is halfway through editing is not a fact — which is also why `upload_in_use()` takes the
+current screen's unsaved document rather than reading it back off disk.
 
 ### `publish.php`
 

@@ -30,9 +30,9 @@ its record before acting.
 5. **Never commit anything from the private store** (`t4t-private-admin/`, `*.key`, `admins.json`).
 6. **`content/` is the system of record.** Never overwrite it on a live server; the deploy seeds it
    with `--ignore-existing` and never syncs it.
-7. **`lib/html.php`, `lib/contract.php`, `lib/publish.php` and the icon sprite are byte-identical**
-   with `tech4time-website-frontend`. Change one and you change both, in the same breath, and bump
-   `CONTRACT_VERSION` if the *shape* of a document changed.
+7. **`lib/html.php`, `lib/contract.php`, `lib/publish.php`, `lib/svg.php` and the icon sprite
+   are byte-identical** with `tech4time-website-frontend`. Change one and you change both, in
+   the same breath, and bump `CONTRACT_VERSION` if the *shape* of a document changed.
 8. **Every save publishes.** The publish lives inside `careers_save()`, `contact_save()` and
    `company_save()`, not at the call sites — the careers editor alone has six of those.
 9. **`tools/` is never deployed.**

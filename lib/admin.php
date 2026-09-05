@@ -101,6 +101,12 @@ const ADMIN_SECTIONS = [
         'desc'  => 'Role groups and the qualifications inside them',
         'view'  => '/pages/resource-certifications/',
     ],
+    'branding' => [
+        'label' => 'Branding',
+        'icon'  => 'palette',
+        'desc'  => 'The logo files people download, and the terms of use',
+        'view'  => '/pages/branding-and-advertisement/',
+    ],
     'account' => [
         'label' => 'Account',
         'icon'  => 'user-shield',
@@ -117,7 +123,7 @@ const ADMIN_SECTIONS = [
  * rather than filtering the registry by hand in three places.
  */
 const ADMIN_PAGE_SECTIONS = ['home', 'careers', 'contact', 'company', 'about', 'services',
-                             'certifications'];
+                             'certifications', 'branding'];
 
 /* The marker admin_form_tail() writes and admin_form_truncated() looks for. */
 const ADMIN_TAIL_FIELD = '__tail';
@@ -553,12 +559,21 @@ function admin_preview_src(string $path): string
  */
 function admin_image_fields(string $field, string $upload, array $image,
                             string $noun = 'picture', string $empty = '',
-                            array $fallback = []): void
+                            array $fallback = [], bool $vector = false,
+                            int $maxSide = UPLOAD_MAX_DIMENSION): void
 {
     $image += ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0];
+
+    /* A vector file is not drawn here, and that is deliberate rather than a
+       limitation. /uploads/*.svg is served with Content-Disposition:
+       attachment on both hosts -- which is the thing that makes publishing one
+       safe at all -- so an <img> pointing at it is asking the browser to
+       render something the server has just said to download. It is a FILE on
+       this screen: its name, its size and how big it draws. */
+    $isVector = str_ends_with(strtolower((string)$image['src']), '.svg');
     ?>
         <div class="admin-card__media">
-<?php if ($image['src'] !== ''): ?>
+<?php if ($image['src'] !== '' && !$isVector): ?>
           <img class="admin-card__thumb" src="<?= h(admin_preview_src((string)$image['src'])) ?>"
                alt="" width="<?= (int)$image['width'] ?>" height="<?= (int)$image['height'] ?>"
                loading="lazy" decoding="async">
@@ -567,6 +582,14 @@ function admin_image_fields(string $field, string $upload, array $image,
             &middot; <?= (int)$image['width'] ?>&times;<?= (int)$image['height'] ?>
 <?php if ($image['webp'] !== ''): ?>
             &middot; with a WebP version
+<?php endif; ?>
+          </p>
+<?php elseif ($image['src'] !== ''): ?>
+          <p class="admin__fineprint">
+            <code><?= h(basename((string)$image['src'])) ?></code>
+            &middot; vector
+<?php if ((int)$image['width'] > 0 && (int)$image['height'] > 0): ?>
+            &middot; draws at <?= (int)$image['width'] ?>&times;<?= (int)$image['height'] ?>
 <?php endif; ?>
           </p>
 <?php elseif ($fallback !== []): ?>
@@ -608,13 +631,21 @@ function admin_image_fields(string $field, string $upload, array $image,
           </span>
           <input class="admin__input admin__file" type="file"
                  name="<?= h($upload) ?>"
-                 accept="image/jpeg,image/png,image/webp">
+                 accept="image/jpeg,image/png,image/webp<?= $vector ? ',image/svg+xml' : '' ?>">
           <span class="admin__hint">
-            JPEG, PNG or WebP, up to <?= (int)(UPLOAD_MAX_BYTES / 1048576) ?> MB.
+            JPEG, PNG or WebP<?= $vector ? ' or SVG' : '' ?>, up to
+            <?= (int)(UPLOAD_MAX_BYTES / 1048576) ?> MB.
             It is re-encoded here — which is what removes the location and the
             camera details a photograph carries — reduced to
-            <?= UPLOAD_MAX_DIMENSION ?> pixels on its longest side, given a WebP
+            <?= (int)$maxSide ?> pixels on its longest side, given a WebP
             version, and sent to the live site straight away.
+<?php if ($vector): ?>
+            An SVG is not re-encoded but rewritten: it is read, checked against
+            a list of what a drawing may contain, and saved as the result. Any
+            script, embedded picture, animation or reference to another file
+            makes it refused rather than quietly stripped, so what you publish
+            is the artwork you chose or nothing at all.
+<?php endif; ?>
           </span>
         </label>
 <?php endif; ?>

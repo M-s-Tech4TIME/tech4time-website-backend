@@ -54,7 +54,7 @@ const CONTRACT_VERSION = 1;
 
 /** Every document that is published, by name. The endpoint refuses any other. */
 const CONTRACT_DOCUMENTS = ['careers', 'contact', 'company', 'about', 'home', 'services',
-                            'certifications'];
+                            'certifications', 'branding'];
 
 /**
  * Where a document's record lives, on either host.
@@ -3175,7 +3175,515 @@ function certifications_fill(string $text, array $counts): string
 }
 
 /* ==========================================================================
-   8. Revisions
+   8. Branding & advertisement — the shape of the branding page
+   ========================================================================== */
+
+/**
+ * The plate a logo preview sits on.
+ *
+ * Not a theme token, and deliberately so. assets/css/pages/branding.css
+ * hard-codes the light and dark plates because the ink in a transparent logo
+ * does NOT change with the site's colour mode: put the light-theme mark on a
+ * dark plate in dark mode and it is black ink on black. Each preview shows the
+ * background the file is actually for, in both modes, which is what makes the
+ * preview honest -- you are seeing where it works.
+ *
+ * So this is an authored property of the artwork, not a display preference,
+ * and it belongs in the document.
+ */
+const BRANDING_PLATES = [
+    'light'   => 'Pale plate, for a mark in dark ink',
+    'dark'    => 'Dark plate, for a mark in pale ink',
+    'neutral' => 'Neutral, for a file that carries its own background',
+];
+
+/**
+ * The glyph on every download button.
+ *
+ * Not a field. All four buttons on the page carry #arrow-down and always did,
+ * so it is a constant in the renderer rather than four copies of one answer --
+ * the same call CERTIFICATIONS_CERT_GLYPH makes.
+ *
+ * Because it is constant it also stays a literal <use href="#arrow-down"> in
+ * pages/branding-and-advertisement/index.php, where tools/inject_icons.py can
+ * see it. Nothing on this page picks an icon at run time, so unlike the
+ * certifications page it needs no second sprite.
+ */
+const BRANDING_DOWNLOAD_GLYPH = 'arrow-down';
+
+/* Free-text single-line fields, by band. An asset's own heading belongs to the
+   asset, not to the band, so 'assets' carries only the band header; the legal
+   band carries only its title, because its paragraphs are rows. */
+const BRANDING_TEXT_FIELDS = [
+    'meta'   => ['title', 'description', 'share_title', 'breadcrumb'],
+    'hero'   => ['title', 'subtitle'],
+    'assets' => ['eyebrow', 'title', 'lead'],
+    'legal'  => ['title'],
+    'cta'    => ['title', 'text'],
+];
+
+/**
+ * Rich fields that live on a ROW rather than on a band.
+ *
+ * The disclaimer's paragraphs. They are plain prose today, but this is a legal
+ * notice: a bolded clause, or a link to the contact page from the sentence
+ * that asks a rights holder to get in touch, is exactly what someone will
+ * eventually want, and rt_sanitise_html() already decides what is allowed.
+ * Shaped like ABOUT_ROW_RICH_FIELDS, which contract_sanitise() already knows
+ * how to walk.
+ */
+const BRANDING_ROW_RICH_FIELDS = ['legal' => ['text']];
+
+/* Every band that can be hidden whole, in the order it renders. The hero is
+   not here, for the reason the about page's hero is not in ABOUT_BANDS: a page
+   with no title is not a page with a section switched off, it is a broken
+   page. */
+const BRANDING_BANDS = ['assets', 'legal', 'cta'];
+
+/**
+ * The bands that hold a list, and the function that fills one of its rows.
+ *
+ * 'assets' is not here. Its rows nest a further list of their own -- the files
+ * a visitor can download -- so they are normalised by branding_asset_defaults()
+ * rather than by a flat map, the same reason certifications.certs is handled
+ * apart from CERTIFICATIONS_LISTS.
+ */
+const BRANDING_LISTS = [
+    'legal' => 'branding_note_defaults',
+    'cta'   => 'branding_button_defaults',
+];
+
+/* What a row is called before it is called anything. Deliberately its own
+   constant: each document owns its id vocabulary, and one changing must not
+   move another. See branding_identify(). */
+const BRANDING_ID_PLACEHOLDER = 'row';
+
+/**
+ * The longest a download's saved-as name may be.
+ *
+ * It goes in a download="" attribute, which is a suggestion to the visitor's
+ * operating system rather than a path here, but a name of unbounded length is
+ * still a thing this document should not carry.
+ */
+const BRANDING_FILENAME_MAX = 120;
+
+/**
+ * The page as it ships, and the fallback for anything missing from the file.
+ *
+ * Every scalar the renderer reads exists here, so a truncated or hand-edited
+ * branding.json degrades to the shipped headings rather than emptying the
+ * page. The lists default to empty: the page keeps its shape and has nothing
+ * in it, which is the same bargain about and certifications make.
+ */
+function branding_defaults(): array
+{
+    return [
+        'updated'  => '',
+        'revision' => 0,
+        'meta'     => [
+            'title'       => 'Branding Assets & Guidelines | Tech4TIME',
+            'description' => 'Download the Tech4TIME logo in four variants for light and '
+                           . 'dark backgrounds, transparent or plated, with the terms '
+                           . 'covering their use.',
+            'share_title' => 'Branding Assets & Guidelines | Tech4TIME',
+
+            /* WHAT THE SITE CALLS THIS PAGE, WHICH IS NOT WHAT THE PAGE CALLS
+               ITSELF. The hero is titled "Branding Assets & Guidelines"; every
+               link to it -- the footer's, and this breadcrumb -- says
+               "Branding & Advertisement". That is a real distinction and an
+               authored one: a breadcrumb names a place in a hierarchy, and a
+               heading introduces a page.
+
+               The about, company and certifications pages let their breadcrumb
+               follow hero.title, because on those three the two strings are the
+               same and a second field would have been a second chance to
+               disagree. Here they differ, so following the hero would have
+               quietly renamed this page in every search result that shows a
+               breadcrumb trail. */
+            'breadcrumb'  => 'Branding & Advertisement',
+        ],
+        'hero'     => [
+            'title'    => 'Branding Assets & Guidelines',
+            'subtitle' => 'Our Logo, and How to Use It',
+        ],
+        'assets'   => [
+            'status'  => 'shown',
+            'eyebrow' => 'Downloads',
+            'title'   => 'Tech4TIME Logos for Branding & Advertisement',
+            'lead'    => 'Four variants of the mark. Pick the one that matches the '
+                       . 'background it will sit on.',
+            'items'   => [],
+        ],
+        'legal'    => [
+            'status' => 'shown',
+            'title'  => 'Disclaimer',
+            'items'  => [],
+        ],
+        'cta'      => [
+            'status' => 'shown',
+            'title'  => 'Need something not listed here?',
+            'text'   => '',
+            'items'  => [],
+        ],
+    ];
+}
+
+/**
+ * Fill in everything the renderer reads, whatever the file happens to hold.
+ */
+function branding_normalise(array $data): array
+{
+    $defaults = branding_defaults();
+
+    foreach ($defaults as $key => $value) {
+        if ($key === 'revision') {
+            $data[$key] = max(0, (int)($data[$key] ?? 0));
+            continue;
+        }
+        if (!is_array($value)) {
+            $data[$key] = is_string($data[$key] ?? null) ? $data[$key] : $value;
+            continue;
+        }
+        $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
+    }
+
+    foreach (BRANDING_BANDS as $band) {
+        $data[$band]['status'] =
+            ($data[$band]['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown';
+    }
+
+    foreach (BRANDING_LISTS as $band => $filler) {
+        $rows = is_array($data[$band]['items'] ?? null) ? $data[$band]['items'] : [];
+        $data[$band]['items'] = array_map(
+            $filler,
+            array_values(array_filter($rows, 'is_array'))
+        );
+    }
+
+    $assets = is_array($data['assets']['items'] ?? null) ? $data['assets']['items'] : [];
+    $data['assets']['items'] = array_map(
+        'branding_asset_defaults',
+        array_values(array_filter($assets, 'is_array'))
+    );
+
+    return branding_identify($data);
+}
+
+/**
+ * One logo variant: a card on the page, with a preview and the files to take.
+ *
+ * TWO PICTURES, AND THEY ARE NOT THE SAME PICTURE. 'image' is the preview
+ * drawn on the card -- small, lazy-loaded, with a WebP sibling, and never
+ * larger than it needs to be. The files under 'files' are what a visitor
+ * actually downloads, and on the page as it ships those are a different and
+ * much larger set: an 800px preview against a 1600px download.
+ *
+ * Collapsing the two would mean either serving the big file to everybody who
+ * merely looks at the page, or handing out the small one to everybody who came
+ * for the logo. Both are real losses, so both slots exist.
+ */
+function branding_asset_defaults(array $row): array
+{
+    $row += [
+        'id'     => '',
+        'title'  => '',
+        'text'   => '',
+        'alt'    => '',
+        'plate'  => 'neutral',
+        'status' => 'shown',
+    ];
+
+    $row['plate'] = isset(BRANDING_PLATES[$row['plate']]) ? $row['plate'] : 'neutral';
+    $row['image'] = contract_image_defaults($row['image'] ?? []);
+
+    $files = is_array($row['files'] ?? null) ? $row['files'] : [];
+    $row['files'] = array_map(
+        'branding_file_defaults',
+        array_values(array_filter($files, 'is_array'))
+    );
+
+    return $row;
+}
+
+/**
+ * One downloadable file belonging to a logo variant.
+ *
+ * A list rather than a single slot, so one mark can offer a raster AND a
+ * vector -- and, later, whatever else somebody needs -- without the page being
+ * rebuilt for it.
+ *
+ * 'label' is the adjective in the meta line, "Transparent PNG". The dimensions
+ * beside it are NOT stored: branding_meta_line() reads them off the file, so
+ * they cannot claim 1600 x 570 about a file that is no longer that size.
+ *
+ * 'filename' is the download="" attribute -- what the visitor's computer calls
+ * the file once it lands. Without it a browser saves an uploaded file under
+ * its content-addressed name, and somebody's Downloads folder fills up with
+ * a1b2c3d4e5f60718.png.
+ */
+function branding_file_defaults(array $row): array
+{
+    $row += [
+        'id'       => '',
+        'label'    => '',
+        'filename' => '',
+        'status'   => 'shown',
+    ];
+
+    $row['filename'] = branding_safe_filename((string)$row['filename']);
+    $row['file']     = contract_image_defaults($row['file'] ?? []);
+
+    return $row;
+}
+
+/** One paragraph of the disclaimer. 'text' is sanitised HTML; see BRANDING_ROW_RICH_FIELDS. */
+function branding_note_defaults(array $row): array
+{
+    return $row + [
+        'id'     => '',
+        'text'   => '',
+        'status' => 'shown',
+    ];
+}
+
+/** One button in the closing band. The page ships with one. */
+function branding_button_defaults(array $row): array
+{
+    return $row + [
+        'id'     => '',
+        'label'  => '',
+        'href'   => '',
+        'style'  => 'primary',
+        'status' => 'shown',
+    ];
+}
+
+/**
+ * A saved-as name, or '' if it is not one this page will offer.
+ *
+ * This never touches a filesystem on either host -- it is a hint to the
+ * visitor's browser -- but it is still author-supplied text that ends up in an
+ * attribute, so it is bounded here rather than trusted. A separator would let
+ * a name read as a path when it reaches the other end; a control character has
+ * no business in a filename anywhere.
+ */
+function branding_safe_filename(string $name): string
+{
+    $name = trim($name);
+
+    if ($name === '' || strlen($name) > BRANDING_FILENAME_MAX) {
+        return '';
+    }
+    if (preg_match('~[\x00-\x1f\x7f/\\\\]|\.\.~', $name)) {
+        return '';
+    }
+    if ($name === '.' || str_starts_with($name, '.')) {
+        return '';
+    }
+
+    return $name;
+}
+
+/**
+ * Give every row an id.
+ *
+ * Assets are numbered across the band; the files inside one are numbered
+ * WITHIN it, exactly as certifications numbers roles within a group. Nothing
+ * on this page is a fragment target -- an asset card carries no anchor -- so
+ * two variants may each offer a "png" without either being renamed.
+ */
+function branding_identify(array $data): array
+{
+    foreach (BRANDING_LISTS as $band => $_filler) {
+        $taken = [];
+        foreach ($data[$band]['items'] as $i => $row) {
+            $name = (string)($row['label'] ?? $row['title'] ?? '');
+            $id   = branding_mint((string)($row['id'] ?? ''), $name, $taken);
+            $data[$band]['items'][$i]['id'] = $id;
+            $taken[] = $id;
+        }
+    }
+
+    $taken = [];
+    foreach ($data['assets']['items'] as $a => $asset) {
+        $id = branding_mint((string)($asset['id'] ?? ''), (string)($asset['title'] ?? ''), $taken);
+        $data['assets']['items'][$a]['id'] = $id;
+        $taken[] = $id;
+
+        $held = [];
+        foreach ($asset['files'] as $f => $file) {
+            /* A file is named for the format it is, which is the one thing
+               about it that is always known -- the label may be empty on a row
+               somebody has only just added. */
+            $name = (string)($file['label'] ?? '');
+            if (trim($name) === '') {
+                $name = branding_file_ext($file);
+            }
+            $fid = branding_mint((string)($file['id'] ?? ''), $name, $held);
+            $data['assets']['items'][$a]['files'][$f]['id'] = $fid;
+            $held[] = $fid;
+        }
+    }
+
+    return $data;
+}
+
+/** An id nobody has chosen: empty, or the placeholder the Add button leaves. */
+function branding_provisional(string $id): bool
+{
+    return $id === ''
+        || preg_match('/^' . BRANDING_ID_PLACEHOLDER . '(-\d+)?$/', $id) === 1;
+}
+
+/** Keep a real id, replace a placeholder once there is a name to replace it with. */
+function branding_mint(string $id, string $name, array $taken): string
+{
+    $id   = trim($id);
+    $name = trim($name);
+
+    if ((branding_provisional($id) && $name !== '') || in_array($id, $taken, true)) {
+        return branding_slug($name, $taken);
+    }
+    if ($id === '') {
+        return branding_slug('', $taken);
+    }
+    return $id;
+}
+
+/** A URL-safe id from a name. */
+function branding_slug(string $name, array $taken = []): string
+{
+    $slug = strtolower(trim($name));
+    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
+    $slug = trim($slug, '-') ?: BRANDING_ID_PLACEHOLDER;
+
+    return branding_unique($slug, $taken);
+}
+
+/** The same id, suffixed until nothing else in the list has it. */
+function branding_unique(string $slug, array $taken): string
+{
+    $base = $slug;
+    $n    = 2;
+    while (in_array($slug, $taken, true)) {
+        $slug = $base . '-' . $n++;
+    }
+    return $slug;
+}
+
+/** Whether a band is shown at all. */
+function branding_band_shown(array $data, string $band): bool
+{
+    return ($data[$band]['status'] ?? 'shown') !== 'hidden';
+}
+
+/** Only the rows of a list a visitor should see, wherever the list is. */
+function branding_rows_shown(array $rows): array
+{
+    return array_values(array_filter(
+        is_array($rows) ? $rows : [],
+        static fn($row): bool => is_array($row) && ($row['status'] ?? 'shown') !== 'hidden'
+    ));
+}
+
+/** Every logo variant, hidden ones included. The editor lists these. */
+function branding_assets(array $data): array
+{
+    return is_array($data['assets']['items'] ?? null) ? $data['assets']['items'] : [];
+}
+
+/**
+ * Every picture this document points at, as web paths, without duplicates.
+ *
+ * BOTH SLOTS OF EVERY ROW. A card's preview and each of its downloads are
+ * separate files, and a hidden row's are counted too: hiding is not deleting,
+ * and a sweep that dropped the file the moment somebody hid the card would
+ * lose it for good.
+ */
+function branding_images(array $data): array
+{
+    $seen = [];
+
+    foreach ($data['assets']['items'] ?? [] as $asset) {
+        $paths = [$asset['image']['src'] ?? '', $asset['image']['webp'] ?? ''];
+
+        foreach ($asset['files'] ?? [] as $file) {
+            $paths[] = $file['file']['src'] ?? '';
+            $paths[] = $file['file']['webp'] ?? '';
+        }
+
+        foreach ($paths as $path) {
+            $path = trim((string)$path);
+            if ($path !== '') {
+                $seen[$path] = true;
+            }
+        }
+    }
+
+    return array_keys($seen);
+}
+
+/**
+ * The format a downloadable file is, in upper case, read from the file itself.
+ *
+ * From the stored path rather than from anything typed. Both hosts compute
+ * that path from the bytes -- publish_asset_name() gives it the extension the
+ * header said it was -- so the extension here is as trustworthy as the file.
+ */
+function branding_file_ext(array $file): string
+{
+    $src = (string)($file['file']['src'] ?? $file['src'] ?? '');
+    $ext = strtoupper(pathinfo($src, PATHINFO_EXTENSION));
+
+    return $ext === 'JPG' ? 'JPEG' : $ext;
+}
+
+/**
+ * The line above a download button: what the file is, and how big.
+ *
+ * DERIVED, and that is the point. The page says "Transparent PNG - 1600 x 570"
+ * today and the number is typed, so it is wrong the moment the file behind it
+ * is replaced -- and nothing on the page or in any check would notice. The
+ * adjective stays authored, because "Transparent" is editorial; the dimensions
+ * come off the record.
+ *
+ * They are omitted rather than guessed when the file does not carry them,
+ * which is the rule about_picture() already follows for width and height. A
+ * line that says less is better than one that says something untrue.
+ */
+function branding_meta_line(array $file): string
+{
+    $label = trim((string)($file['label'] ?? ''));
+    if ($label === '') {
+        $label = branding_file_ext($file);
+    }
+
+    $width  = (int)($file['file']['width'] ?? 0);
+    $height = (int)($file['file']['height'] ?? 0);
+
+    if ($width > 0 && $height > 0) {
+        $size = $width . ' × ' . $height;
+        return $label === '' ? $size : $label . ' · ' . $size;
+    }
+
+    return $label;
+}
+
+/**
+ * The words on a download button.
+ *
+ * Derived, not stored: "Download PNG" states the file's own format, and a
+ * stored copy is one more thing that can stop matching the file it describes.
+ */
+function branding_download_label(array $file): string
+{
+    $ext = branding_file_ext($file);
+
+    return $ext === '' ? 'Download' : 'Download ' . $ext;
+}
+
+/* ==========================================================================
+   9. Revisions
    ========================================================================== */
 
 /**
@@ -3198,7 +3706,7 @@ function contract_next_revision(array $data): int
 }
 
 /* ==========================================================================
-   9. Normalising and re-sanitising on receipt
+   10. Normalising and re-sanitising on receipt
    ========================================================================== */
 
 /**
@@ -3226,7 +3734,38 @@ function contract_normalise(string $document, array $data): array
         'home'     => home_normalise($data),
         'services' => services_normalise($data),
         'certifications' => certifications_normalise($data),
+        'branding' => branding_normalise($data),
         default    => throw new RuntimeException('Unknown document: ' . $document),
+    };
+}
+
+/**
+ * Every picture a document points at, whichever document it is.
+ *
+ * WHY THIS EXISTS, AND WHY IT IS NOT OPTIONAL. public/uploads/ is ONE
+ * directory shared by every editor, but each editor used to ask
+ * upload_unused() with only its own document's pictures — so the about screen
+ * counted the home page's uploads as "not used by any row" and its sweep
+ * button offered to delete them. Three editors, each able to delete the other
+ * two's artwork, and nothing anywhere said so.
+ *
+ * The set of pictures in use is a property of the SITE, not of one screen. So
+ * it is asked here, over every document, and a document with no pictures
+ * answers with none rather than being left out — which is what keeps a new
+ * document from being a new way to lose files.
+ */
+function contract_images(string $document, array $data): array
+{
+    return match ($document) {
+        'company'  => company_images($data),
+        'about'    => about_images($data),
+        'home'     => home_images($data),
+        'branding' => branding_images($data),
+        /* Nothing else carries a picture record today. Listed as a default
+           rather than omitted, because a document that grows one and is not
+           added here becomes a document whose artwork another screen offers
+           to delete. */
+        default    => [],
     };
 }
 
@@ -3326,6 +3865,25 @@ function contract_sanitise(string $document, array $data): array
        certifications_fill(), which puts a decimal integer in its place. There
        is no markup in the substitution and nothing here to strip. */
     if ($document === 'certifications') {
+        return $data;
+    }
+
+    /* The branding page's disclaimer is the one place on these three static
+       pages that genuinely wants markup: it is a legal notice, and the
+       sentence asking a rights holder to get in touch is a link waiting to
+       happen. Its paragraphs are rows rather than a band field, so this is the
+       same walk as the about page's -- see BRANDING_ROW_RICH_FIELDS. Nothing
+       else on the page is rich: an asset's title, blurb and meta label are all
+       plain text and go out through h(). */
+    if ($document === 'branding') {
+        foreach (BRANDING_ROW_RICH_FIELDS as $band => $fields) {
+            foreach ($data[$band]['items'] ?? [] as $i => $row) {
+                foreach ($fields as $field) {
+                    $data[$band]['items'][$i][$field] =
+                        rt_sanitise_html((string)($row[$field] ?? ''));
+                }
+            }
+        }
         return $data;
     }
 

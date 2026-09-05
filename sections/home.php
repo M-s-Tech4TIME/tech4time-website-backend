@@ -225,7 +225,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $data = $posted;
     } elseif ($do === 'sweep-uploads') {
         $gone = 0;
-        foreach (upload_unused(home_images($posted)) as $name) {
+        foreach (upload_unused(upload_in_use('home', $posted)) as $name) {
             $gone += upload_delete($name) ? 1 : 0;
         }
         $data = $posted;
@@ -928,7 +928,7 @@ if (!$errors && $pending !== '') {
   </fieldset>
 
   <!-- ========================== stored pictures ========================== -->
-<?php $unused = upload_problem() === '' ? upload_unused(home_images($data)) : []; ?>
+<?php $unused = upload_problem() === '' ? upload_unused(upload_in_use('home', $data)) : []; ?>
   <fieldset class="admin__block" id="band-uploads">
     <?php admin_band_head('Stored pictures',
         'Every picture uploaded through this page is kept here, named after '

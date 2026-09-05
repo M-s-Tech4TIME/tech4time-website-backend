@@ -316,7 +316,13 @@ function certifications_band_header(array $data, string $band, string $legend,
     admin_band_head(
         $legend,
         $blurb,
-        $add !== '' ? ['do' => $addverb . '-add:0', 'label' => $add] : [],
+        /* Same reason as the branding editor's: the button says "group-add"
+           and the fields are "certs[items][", so admin-forms.js cannot derive
+           one from the other and the cursor stayed where it was instead of
+           landing in the new group. */
+        $add !== '' ? ['do'    => $addverb . '-add:0',
+                       'label' => $add,
+                       'rows'  => $band . '[items]['] : [],
         ['name'  => $band . '[status]',
          'value' => (string)($data[$band]['status'] ?? 'shown'),
          'noun'  => 'this section']

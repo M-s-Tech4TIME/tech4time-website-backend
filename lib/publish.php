@@ -80,6 +80,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/private.php';
 require_once __DIR__ . '/contract.php';
+require_once __DIR__ . '/svg.php';
 
 /** How far apart the two clocks may be, in seconds, in either direction. */
 const PUBLISH_SKEW = 300;
@@ -307,12 +308,19 @@ function publish_check_envelope(mixed $envelope): string
 const PUBLISH_ASSET_MAX_BYTES = 2097152;
 
 /**
- * The three formats that may cross the wire, and the extension each is given.
+ * The three RASTER formats that may cross the wire, and the extension each gets.
  *
- * Raster only, and no SVG. An SVG is a document: it can carry script, external
- * references and entities, and no amount of re-encoding makes it not a
- * document. GIF and BMP are absent because nothing needs them, and a format
- * nobody uses is an attack surface nobody watches.
+ * GIF and BMP are absent because nothing needs them, and a format nobody uses
+ * is an attack surface nobody watches.
+ *
+ * A FOURTH FORMAT TRAVELS SEPARATELY. SVG used to be refused outright here,
+ * and the reason was right: an SVG is a document, it can carry script,
+ * external references and entities, and no amount of re-encoding makes it not
+ * a document. The branding page needs vector logos, so that is now answered
+ * rather than avoided -- see publish_asset_svg() below, lib/svg.php, and the
+ * amendment to ADR 0019. It is not in this list because getimagesizefromstring()
+ * cannot speak for it: a vector file has no header to read, so it is decided a
+ * different way and kept a different way.
  */
 const PUBLISH_ASSET_TYPES = [
     IMAGETYPE_WEBP => ['webp', 'image/webp'],
@@ -370,6 +378,64 @@ function publish_asset_type(string $bytes): ?array
     return [$ext, $mime, $width, $height];
 }
 
+/** The one vector format, and what it is called on the wire. */
+const PUBLISH_ASSET_SVG_TYPE = ['svg', 'image/svg+xml'];
+
+/**
+ * A vector file's type, or null if these bytes are not one this site publishes.
+ *
+ * THE RECEIVING HOST DOES NOT TRUST THE SENDING ONE. The backend sanitises an
+ * upload and sends its own output; this runs on what actually arrived and
+ * proves it independently. A signature says where bytes came from, not what is
+ * in them, and if the admin host is ever compromised the public site should
+ * still not be storing somebody's document.
+ *
+ * IT PROVES IT WITHOUT CHANGING ANYTHING, and that is the whole trick. The
+ * bytes are sanitised again and the result compared with what came in. Equal
+ * means they were already the sanitiser's own output; different means they
+ * were not, and they are refused rather than quietly cleaned -- because the
+ * name is computed from the bytes on BOTH hosts, so a host that stored
+ * something it had edited would file it under a name the document does not
+ * point at. svg_sanitise() is idempotent so that this comparison is possible;
+ * tools/test_svg.py asserts it directly.
+ *
+ * @return array{0:string,1:string,2:int,3:int}|null  ext, mime, width, height
+ */
+function publish_asset_svg(string $bytes): ?array
+{
+    if (!svg_looks_like($bytes)) {
+        return null;
+    }
+
+    $clean = svg_sanitise($bytes);
+    if (isset($clean['error']) || !isset($clean['svg'])) {
+        return null;
+    }
+    if (!hash_equals($clean['svg'], $bytes)) {
+        return null;
+    }
+
+    [$ext, $mime] = PUBLISH_ASSET_SVG_TYPE;
+
+    return [$ext, $mime, (int)$clean['width'], (int)$clean['height']];
+}
+
+/**
+ * What these bytes are, raster or vector, or null if they are neither.
+ *
+ * The one question both hosts ask. publish_asset_type() answers for the three
+ * raster formats from the image header; publish_asset_svg() answers for the
+ * one vector format by re-sanitising. Kept together so that a caller cannot
+ * accidentally ask only half the question, which is how a second format gets
+ * added and then silently refused everywhere that forgot about it.
+ *
+ * @return array{0:string,1:string,2:int,3:int}|null  ext, mime, width, height
+ */
+function publish_asset_any(string $bytes): ?array
+{
+    return publish_asset_type($bytes) ?? publish_asset_svg($bytes);
+}
+
 /**
  * The name these bytes get, on either host.
  *
@@ -379,8 +445,9 @@ function publish_asset_type(string $bytes): ?array
  * hundred pictures is not a collision anybody will see.
  *
  * The shape is also the .htaccess allow-list on both hosts: sixteen hex
- * characters, a dot, and one of three extensions. Nothing else under
- * /uploads/ is served at all.
+ * characters, a dot, and one of four extensions. Nothing else under
+ * /uploads/ is served at all — and an .svg among them is served as an
+ * attachment, sandboxed, so it downloads and never renders. See ADR 0019.
  */
 function publish_asset_name(string $bytes, string $ext): string
 {
@@ -390,7 +457,7 @@ function publish_asset_name(string $bytes, string $ext): string
 /** Whether a name is one this scheme could have produced. */
 function publish_asset_name_valid(string $name): bool
 {
-    return preg_match('/^[0-9a-f]{16}\.(webp|jpg|png)$/', $name) === 1;
+    return preg_match('/^[0-9a-f]{16}\.(webp|jpg|png|svg)$/', $name) === 1;
 }
 
 /**
@@ -425,7 +492,8 @@ const PUBLISH_REASONS = [
                              . 'content directory is writable.',
     'not-configured'        => 'Publishing is not set up on the live site.',
     'not-an-image'          => 'That file is not a picture the live site will accept. '
-                             . 'JPEG, PNG and WebP only.',
+                             . 'JPEG, PNG and WebP, or an SVG that is already '
+                             . 'the sanitiser\'s own output.',
     'asset-too-large'       => 'The picture was larger than the endpoint will accept, '
                              . 'even after being re-encoded.',
     'asset-write-failed'    => 'The live site could not save the picture. Check that its '

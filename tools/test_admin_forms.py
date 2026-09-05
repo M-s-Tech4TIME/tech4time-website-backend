@@ -365,7 +365,7 @@ def run(b: Browser, base: str, r: Results) -> None:
     for screen in ("/?s=overview", "/?s=careers", "/?s=careers&action=new",
                    "/?s=contact", "/?s=company", "/?s=about", "/?s=home",
                    "/?s=services", "/?s=services&service=cybersecurity",
-                   "/?s=certifications", "/?s=account"):
+                   "/?s=certifications", "/?s=branding", "/?s=account"):
         b.go(base + screen)
         loud = b.js("""
         var out = [];
@@ -386,11 +386,29 @@ def run(b: Browser, base: str, r: Results) -> None:
                 f"{loud} — each of these reloads the document and lands back "
                 f"at the top of it")
 
+        # AND THAT SOMETHING IS ACTUALLY READING THE ATTRIBUTE.
+        #
+        # data-async is a request, not a behaviour. The branding editor once
+        # carried it on a form whose page had no JavaScript on it at all: the
+        # section forgot to call admin_foot(), so the document ended after
+        # </form> and the nine scripts below it were never emitted. Every
+        # button on that screen was a full page load, and the check above
+        # passed the whole time, because the attribute was exactly where it
+        # should be.
+        #
+        # This asks the browser instead of the markup.
+        wired = b.js("return !!(window.Tech4Time && window.Tech4Time.adminForms "
+                     "&& window.Tech4Time.adminForms.wired);")
+        r.check(f"{screen}: and the script that honours it is loaded",
+                wired is True,
+                "Tech4Time.adminForms is not wired on this screen — the page's "
+                "scripts did not load. Does the section call admin_foot()?")
+
     r.section("every form in the shell asks to be sent this way")
     for screen in ("/?s=careers", "/?s=contact", "/?s=company", "/?s=about",
                    "/?s=home", "/?s=services",
                    "/?s=services&service=cybersecurity",
-                   "/?s=certifications", "/?s=account"):
+                   "/?s=certifications", "/?s=branding", "/?s=account"):
         b.go(base + screen)
         counts = b.js(
             "var all = document.querySelectorAll('#admin-main form');"
@@ -519,7 +537,7 @@ def navigate(b: Browser, base: str, r: Results) -> None:
     for screen in ("/?s=overview", "/?s=careers", "/?s=careers&action=new",
                    "/?s=contact", "/?s=company", "/?s=about", "/?s=home",
                    "/?s=services", "/?s=services&service=cybersecurity",
-                   "/?s=certifications", "/?s=account"):
+                   "/?s=certifications", "/?s=branding", "/?s=account"):
         b.go(base + screen)
         stragglers = b.js(STRAGGLERS)
         r.check(f"{screen}: no link falls through to a full page load",
@@ -547,7 +565,7 @@ def navigate(b: Browser, base: str, r: Results) -> None:
     for screen in ("/?s=overview", "/?s=careers", "/?s=contact",
                    "/?s=company", "/?s=about", "/?s=home", "/?s=services",
                    "/?s=services&service=cybersecurity",
-                   "/?s=certifications", "/?s=account"):
+                   "/?s=certifications", "/?s=branding", "/?s=account"):
         b.go(base + screen)
         r.check(f"{screen}: there is somewhere to say it",
                 b.js(SHELL)["status"],
@@ -817,6 +835,7 @@ def improvements(b: Browser, base: str, r: Results) -> None:
         ("/?s=company", "clients", "clients[items]"),
         ("/?s=about", "story", "story[items]"),
         ("/?s=certifications", "certs", "certs[items]"),
+        ("/?s=branding", "assets", "assets[items]"),
         ("/?s=about", "whyus", "whyus[items]"),
         ("/?s=home", "tags", "tags[items]"),
         ("/?s=home", "destinations", "destinations[items]"),
@@ -983,7 +1002,11 @@ def improvements(b: Browser, base: str, r: Results) -> None:
     # the file. Nothing errors: PHP simply finds nothing in $_FILES, and the
     # editor reports a save that worked while the picture never left the
     # machine. The contact editor was in exactly that state.
-    for screen in ("/?s=contact", "/?s=company", "/?s=account", "/?s=careers"):
+    # Every screen with a file input, not a sample of them: about, home and
+    # branding each carry one and were missing from this list, which is the
+    # same way the contact editor came to be in the state described above.
+    for screen in ("/?s=contact", "/?s=company", "/?s=account", "/?s=careers",
+                   "/?s=about", "/?s=home", "/?s=branding"):
         b.go(base + screen)
         bad = b.js("""
         var out = [];

@@ -275,6 +275,9 @@ def run(client, r, site):
     fields["meta[title]"] = "A Marked About Title"
     fields["meta[description]"] = "A marked description, long enough to be a real one and past the fifty characters a short one is refused under."
     fields["meta[breadcrumb]"] = "Marked Crumb"
+    # Deliberately untidy: a repeat in a different case, an empty entry, and
+    # runs of space. What comes back says whether contract_keywords() ran.
+    fields["meta[keywords]"] = "Marked Word,, marked word ,  second   keyword , Marked Word"
     fields["meta[changefreq]"] = "daily"
     fields["meta[priority]"] = "0.4"
     status, headers, _body = save(client, path, fields)
@@ -283,6 +286,10 @@ def run(client, r, site):
     after = stored("about")
     r.check("the title reached content/about.json",
             after["meta"]["title"] == "A Marked About Title", str(after["meta"]))
+    r.check("the keywords reached it, tidied into the one form the page emits",
+            after["meta"]["keywords"] == "Marked Word, second keyword",
+            f'{after["meta"]["keywords"]!r} — empties and repeats should be gone, '
+            f'one space after each comma, the first spelling kept')
     r.check("so did the breadcrumb", after["meta"]["breadcrumb"] == "Marked Crumb")
     r.check("and the sitemap settings",
             after["meta"]["changefreq"] == "daily" and after["meta"]["priority"] == "0.4",
@@ -501,7 +508,7 @@ def run(client, r, site):
     path = "/?s=seo&site=crawl"
     page, fields = open_screen(client, r, path, "the crawl screen")
 
-    for band in ("band-verify", "band-robots", "band-manifest"):
+    for band in ("band-verify", "band-analytics", "band-robots", "band-manifest"):
         r.check(f"it has {band}", f'id="{band}"' in page)
     r.check("it says why a search console matters",
             "Search Console" in page)
@@ -525,6 +532,36 @@ def run(client, r, site):
             "every other crawl control is unguarded; this one is the off switch")
     _s, _h, body = save(client, path, dict(fields, **{"crawl[robots_extra]": "admin"}))
     r.check("and a rule that is not a path is refused", "beginning with" in body)
+
+    # ------------------------------------------------------ google analytics
+    #
+    # THE ONE FIELD ON THIS SITE THAT REACHES ANOTHER COMPANY'S SERVERS. What
+    # is checked is the whole of that: that a real id is stored, that a wrong
+    # one is REFUSED OUT LOUD rather than quietly blanked, and that nothing
+    # shaped like an escape from the <script src> it lands in survives.
+    r.check("the screen says what turning analytics on costs",
+            "No cookies, no analytics, no tracking" in page and "EU" in page,
+            "the privacy policy says one thing and this would make it another; "
+            "the screen has to say so before somebody finds out later")
+
+    save(client, path, dict(fields, **{"crawl[analytics_id]": "G-ABC1234567"}))
+    r.check("a measurement id is stored",
+            stored("seo")["crawl"]["analytics_id"] == "G-ABC1234567",
+            str(stored("seo")["crawl"]["analytics_id"]))
+
+    for bad in ('G-A"onload=x', "https://evil.example/x", "G-<script>", "nonsense"):
+        _s, _h, body = save(client, path, dict(fields, **{"crawl[analytics_id]": bad}))
+        r.check(f"{bad!r} is refused, and said so",
+                "does not look like a Google measurement id" in body,
+                "a rejected id must not be swallowed in silence")
+        r.check(f"and {bad!r} did not reach the document",
+                stored("seo")["crawl"]["analytics_id"] == "G-ABC1234567",
+                "a refused save must leave what was there")
+
+    save(client, path, dict(fields, **{"crawl[analytics_id]": ""}))
+    r.check("and clearing it switches analytics off again",
+            stored("seo")["crawl"]["analytics_id"] == "",
+            "empty is the state the site ships in, and the way back to it")
 
     print("\nno OTHER editor writes the meta band any more")
     # THE FAILURE THIS PREVENTS IS SILENT AND TOTAL. Every *_from_post()

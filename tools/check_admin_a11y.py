@@ -1009,6 +1009,61 @@ def check_rail_labels(b: Browser, base: str, r: Results) -> None:
                     f"--rail-wide in public/assets/css/admin.css")
 
 
+def check_collapsed(b: Browser, base: str, screens, r: Results) -> None:
+    """Nothing in the editing column is squeezed to no width at all.
+
+    THE SHAPE OF A REAL BUG, NOT A TIDINESS RULE. admin_band_head() floats its
+    legend, because a <legend> is otherwise laid out on its fieldset's border.
+    A float escapes any ancestor that is not a block formatting context, and it
+    is 100% wide, so a field placed after one inside a plain <div> is laid out
+    BESIDE it with nothing left to occupy. On the privacy editor that field
+    measured 0px wide inside a 582px card: its label wrapped onto four lines,
+    the select under it was a stub, and the control still worked perfectly --
+    which is why no functional suite noticed and a person had to.
+
+    So the signature is measured rather than the cause: an element that is
+    displayed, has height, and has NO WIDTH. Nothing legitimate on these
+    screens is shaped like that, and anything that becomes so is either
+    unreachable or unreadable.
+
+    Hidden things are excluded by offsetParent, which is null for anything
+    display:none or inside it -- their boxes are zero by right and mean nothing.
+    """
+    for screen in screens:
+        b.size(1200)
+        b.go(base + screen)
+
+        found = b.js("""
+            const out = [];
+            const main = document.getElementById('admin-main');
+            if (!main) { return out; }
+            // <br> and <wbr> are zero-wide by definition -- they are line
+            // behaviour, not boxes, and they are not what this is looking for.
+            const shapeless = { BR: 1, WBR: 1 };
+            for (const el of main.querySelectorAll('*')) {
+                if (el.offsetParent === null || shapeless[el.tagName]) { continue; }
+                const box = el.getBoundingClientRect();
+                if (box.width >= 1 || box.height < 1) { continue; }
+                const parent = el.parentElement
+                    ? Math.round(el.parentElement.getBoundingClientRect().width) : 0;
+                if (parent < 40) { continue; }
+                out.push({
+                    tag: el.tagName.toLowerCase(),
+                    cls: (el.getAttribute('class') || '').split(' ')[0],
+                    height: Math.round(box.height),
+                    parent: parent,
+                });
+            }
+            return out;
+        """) or []
+
+        r.check(f"{screen}: nothing is collapsed to no width",
+                found == [],
+                "; ".join(
+                    f"{row['tag']}.{row['cls']} is 0x{row['height']}px inside a "
+                    f"{row['parent']}px parent" for row in found[:4]))
+
+
 def run(b: Browser, base: str, secret: str, r: Results) -> None:
     prove_reduced_motion(b, base)
 
@@ -1044,6 +1099,9 @@ def run(b: Browser, base: str, secret: str, r: Results) -> None:
 
     r.section("the rail's labels")
     check_rail_labels(b, base, r)
+
+    r.section("nothing is squeezed to nothing")
+    check_collapsed(b, base, SIGNED_IN_SCREENS, r)
 
     r.section("hover")
     walk_hover(b, base, SIGNED_IN_SCREENS, r)

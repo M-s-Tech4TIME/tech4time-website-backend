@@ -338,6 +338,34 @@
       }
     }
 
+    /* WHAT TO DO NEXT DEPENDS ON WHAT WENT WRONG, and this said "press again"
+       whatever had happened. It was reported from the live editor with four
+       identical 404 toasts stacked in the corner -- one per press, because the
+       message asked for each of them and none of them could ever have worked.
+
+       A 404 or a 405 is the server saying this address is not one it serves.
+       Repeating the request repeats the answer. A 403 here is a rejected CSRF
+       token, which a fresh page fixes and a retry does not. Only a 5xx and a
+       dropped connection are worth pressing again for. */
+    function whatNext(error) {
+      var code = error && error.status;
+
+      if (code === 404 || code === 405) {
+        return "Nothing was lost, and pressing again will not help: the " +
+               "address this form posts to is not one the server answers. " +
+               "Reload the page. If it happens again, the site is misconfigured.";
+      }
+      if (code === 403 || code === 419) {
+        return "Nothing was lost. Reload the page and try once more — the " +
+               "sign-in may have expired while this screen was open.";
+      }
+      if (code >= 400 && code < 500) {
+        return "Nothing was lost, but the server refused the request as it " +
+               "was made. Reload the page.";
+      }
+      return "Nothing was lost; press again.";
+    }
+
     global
       .fetch(form.action || global.location.href, {
         method: "POST",
@@ -358,7 +386,9 @@
         }
 
         if (!response.ok) {
-          throw new Error("The server answered " + response.status + ".");
+          var refused = new Error("The server answered " + response.status + ".");
+          refused.status = response.status;
+          throw refused;
         }
 
         return response.text().then(function (html) {
@@ -395,7 +425,7 @@
         idle();
         status(
           "Not sent — " + (error && error.message ? error.message : "the connection failed") +
-            " Nothing was lost; press again.",
+            " " + whatNext(error),
           BAD
         );
       });

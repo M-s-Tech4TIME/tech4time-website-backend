@@ -325,6 +325,7 @@ installing**.
 |---|---|
 | **Browser tab title** | what the tab says, and the blue heading in a Google result. Keep it under 65 characters or it is cut off |
 | **Search description** | the paragraph under that heading. Between 50 and 165; **150–160 reads best**, and the box tells you where you are |
+| **Keywords** | words this page is about, separated by commas. Worth knowing before you spend time on it: **Google has ignored this tag since 2009** and Bing treats a stuffed one as spam. A few true words help a handful of smaller engines and the site's own search; a long list helps nobody. Left empty, nothing is sent |
 | **Title on a shared link** | what Facebook, LinkedIn and WhatsApp show. Usually the title without the brand suffix |
 | **Share picture** | leave it empty and the page uses the site's own card, which is what every page does today |
 | **Name in a breadcrumb trail** | only a search engine sees this. There is no breadcrumb on the site itself |
@@ -378,6 +379,28 @@ refused to index something — the site is well built and invisible to you.
 
 **The app manifest** is what a phone uses when somebody adds the site to their home screen: the
 name, the short name, the colours.
+
+### Google Analytics
+
+Paste the measurement id from your Google Analytics property — it looks like `G-XXXXXXXXXX` — and
+every page starts reporting to it on the next load. Clear the field and it all stops, just as
+quickly. There is no deploy either way.
+
+**This is the only thing on the site that loads anything from another company's servers**, which is
+why it is off until you switch it on. An id that is not the shape Google issues is refused, and the
+screen says so rather than quietly emptying the box.
+
+**Two things change the moment you turn it on, and neither is automatic.**
+
+1. **The privacy policy stops being true.** It says today, in as many words, "No cookies, no
+   analytics, no tracking". That sentence has to be corrected on the Privacy Policy screen. It is
+   the page people and regulators read to find out what the site does.
+2. **EU visitors generally have to be asked first.** One of the three offices is in Brussels, and
+   European rules usually require consent *before* analytics runs. This screen turns the
+   measurement on; it does not ask anybody's permission, and nothing here can decide that for you.
+
+If you are not ready for either, leave the field empty — Search Console, on the same screen, tells
+you what people *searched* for without collecting anything from visitors at all.
 
 ### What none of this can do
 

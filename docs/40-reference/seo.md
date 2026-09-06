@@ -18,11 +18,12 @@ There are two places, and the split is not arbitrary.
 
 | | Lives in | Edited at |
 |---|---|---|
-| A page's title, search description, share title, breadcrumb, crawl setting, sitemap row, share-card override | **that page's own document** — `content/about.json`, `content/privacy.json`, … in the `meta` band every document has | `?s=seo&page=<key>` |
+| A page's title, search description, keywords, share title, breadcrumb, crawl setting, sitemap row, share-card override | **that page's own document** — `content/about.json`, `content/privacy.json`, … in the `meta` band every document has | `?s=seo&page=<key>` |
 | A service page's, which is a row rather than a file | the row, in `content/services.json` | `?s=seo&page=service:<id>` |
 | The 404's | `content/seo.json`, under `notfound` — it renders no content document | `?s=seo&page=notfound` |
 | The Organization graph, the default share card, the colours, `<html lang>`, the locale, the card shape | `content/seo.json` | `?s=seo&site=identity` |
 | `robots.txt`'s extra rules, the search-console tokens, the web manifest | `content/seo.json` | `?s=seo&site=crawl` |
+| **Whether Google Analytics runs, and against which property** | `content/seo.json`, `crawl.analytics_id` | `?s=seo&site=crawl` |
 | The offices' addresses and telephone numbers in the graph | `content/contact.json` | `?s=contact` |
 
 **A page's metadata did not move.** It has always been in that page's document, beside that page's
@@ -77,12 +78,14 @@ render its body. No second read, no second source.
 | | From |
 |---|---|
 | `<title>`, `description`, `og:title`, `og:description`, `twitter:*` | the page's `meta` |
+| `keywords` | the page's `meta.keywords` — **omitted entirely when empty**. Google has ignored this tag since 2009 and Bing treats a stuffed one as spam; it is emitted because it was asked for, and it is honest when it is short |
 | `canonical`, `og:url` | the address argument — **omitted entirely for the 404** |
 | `robots` | the page's `meta.robots`, expanded to the full directive by `seo_robots_directive()` |
 | `og:image`, `og:image:alt` | the page's `meta.share` override, or the site's default card |
 | `og:updated_time` | the document's `updated` stamp, or omitted when it has never been published |
 | `og:site_name`, `og:locale`, `og:type`, `twitter:card`, `theme-color`, `<html lang>` | `content/seo.json`, `site` band |
 | the search-console verification tags | `content/seo.json`, `crawl` band — omitted when empty |
+| Google's tag loader and `tech4time-website-frontend/assets/js/analytics.js` | `content/seo.json`, `crawl.analytics_id` — **the only thing on this site that reaches another origin, and only while that field holds an id**. [ADR 0021](../90-decisions/0021-analytics-is-off-until-somebody-turns-it-on.md) |
 | Organization / WebSite / ProfessionalService, and one `LocalBusiness` per office | `content/seo.json` plus `content/contact.json` |
 | `BreadcrumbList` | prefix match over `SEO_ROUTES`, using each ancestor's `meta.breadcrumb` |
 | `WebPage` | the address, the `meta`, the trail and the publish stamp |

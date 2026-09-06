@@ -109,8 +109,9 @@ const CONTRACT_BOOKKEEPING = ['updated', 'revision', 'footer_synced'];
 /** The band that belongs to the SEO screen rather than to the page's editor. */
 const CONTRACT_META_BAND = 'meta';
 
-/** Its free-text fields, the same four in every document. */
-const CONTRACT_META_TEXT = ['title', 'description', 'share_title', 'breadcrumb'];
+/** Its free-text fields, the same five in every document. */
+const CONTRACT_META_TEXT = ['title', 'description', 'share_title', 'breadcrumb',
+                            'keywords'];
 
 /**
  * What a page tells a crawler, as the two states somebody chooses between.
@@ -185,6 +186,9 @@ function careers_defaults(): array
                            . 'your CV for the roles we open next.',
             'share_title' => 'Careers | Tech4TIME',
             'breadcrumb'  => 'Careers',
+'keywords'    => 'IT jobs Bangladesh, cybersecurity careers, '
+               . 'software developer jobs Dhaka, IT recruitment, '
+               . 'Tech4TIME careers',
             'robots'      => 'index',
             'changefreq'  => 'weekly',
             'priority'    => '0.7',
@@ -377,6 +381,8 @@ function contact_defaults(): array
             'description' => 'Get in touch with Tech4TIME.',
             'share_title' => 'Ask for a quote or just contact us',
             'breadcrumb'  => 'Contact Us',
+'keywords'    => 'contact Tech4TIME, IT company Dhaka, IT support Bangladesh, '
+               . 'request a quote, IT services enquiry',
             'robots'      => 'index',
             'changefreq'  => 'yearly',
             'priority'    => '0.7',
@@ -810,6 +816,9 @@ function company_defaults(): array
             'description' => 'Our milestones, the clients we serve, and the technology our engagements are built on.',
             'share_title' => 'Milestones in Technological Excellence',
             'breadcrumb'  => 'Company Profile',
+'keywords'    => 'Tech4TIME company profile, IT company Bangladesh, '
+               . 'technology partners, corporate clients, '
+               . 'engineering capability',
             'robots'      => 'index',
             'changefreq'  => 'monthly',
             'priority'    => '0.7',
@@ -1284,6 +1293,13 @@ function contract_meta_defaults(mixed $meta, array $fallback): array
     $meta['priority'] = number_format(
         min(1.0, max(0.0, (float)($meta['priority'] ?? $fallback['priority'] ?? 0.5))), 1);
 
+    /* A comma-separated list, kept as the string it is edited and emitted as.
+       Turning it into an array here and back again in the form would be one
+       more shape for the two ends to disagree about, and there is nothing to
+       address a single keyword by. Tidied rather than validated: empties and
+       repeats dropped, one space after each comma. */
+    $meta['keywords'] = contract_keywords((string)($meta['keywords'] ?? ''));
+
     /* Empty means "use the site-wide share card", which is what all seventeen
        pages do today -- so a document that has never been given one renders
        exactly the bytes it renders now. */
@@ -1292,6 +1308,32 @@ function contract_meta_defaults(mixed $meta, array $fallback): array
         ? trim($meta['share_alt']) : '';
 
     return $meta;
+}
+
+/**
+ * A keyword list, tidied into the one form the page will emit.
+ *
+ * Case-insensitively de-duplicated, because "Cloud" and "cloud" in one list is
+ * a typo rather than two keywords, and the first spelling is the one kept.
+ *
+ * strtolower() and not mb_strtolower(), for the reason privacy_fold() already
+ * records further down: nothing in either repository requires mbstring, and it
+ * is not loaded where the tests run. Byte-wise folding leaves non-ASCII alone,
+ * and it leaves it alone identically for every entry in the list, which is all
+ * a de-duplication key asks of it.
+ */
+function contract_keywords(string $value): string
+{
+    $kept = [];
+    foreach (explode(',', $value) as $word) {
+        $word = trim((string)preg_replace('/\s+/', ' ', $word));
+        if ($word === '') {
+            continue;
+        }
+        $kept[strtolower($word)] ??= $word;
+    }
+
+    return implode(', ', $kept);
 }
 
 /**
@@ -1500,6 +1542,9 @@ function about_defaults(): array
             'description' => 'Founded in 2018, Tech4TIME delivers cybersecurity, software development, cloud infrastructure, HRaaS and IT training — orchestrating technology with time.',
             'share_title' => 'About Tech4TIME',
             'breadcrumb'  => 'About Us',
+'keywords'    => 'about Tech4TIME, IT company Bangladesh, '
+               . 'cybersecurity company Dhaka, managed IT services, '
+               . 'technology consultancy',
             'robots'      => 'index',
             'changefreq'  => 'monthly',
             'priority'    => '0.8',
@@ -1886,6 +1931,9 @@ function home_defaults(): array
             'description' => 'Enterprise-grade cybersecurity, software development, cloud infrastructure and HR solutions from Tech4TIME. Orchestrate, build, maintain and protect your business.',
             'share_title' => 'Tech4TIME | Orchestrating Technology with Time',
             'breadcrumb'  => 'Home',
+'keywords'    => 'IT services Bangladesh, cybersecurity, '
+               . 'software development, cloud infrastructure, HRaaS, '
+               . 'IT consultancy, Tech4TIME',
             'robots'      => 'index',
             'changefreq'  => 'weekly',
             'priority'    => '1.0',
@@ -2400,6 +2448,9 @@ function services_defaults(): array
             'description' => "Software development, cybersecurity and SOC build-out, private cloud on OpenStack, HRaaS, IT equipment supply, consultancy and training — Tech4TIME's six practices.",
             'share_title' => 'Our Comprehensive Technological Solutions',
             'breadcrumb'  => 'Services',
+'keywords'    => 'IT services, cybersecurity services, software development, '
+               . 'cloud infrastructure, HRaaS, IT consultancy and training, '
+               . 'IT equipment supply',
             'robots'      => 'index',
             'changefreq'  => 'weekly',
             'priority'    => '0.9',
@@ -2534,6 +2585,9 @@ function services_service_defaults(array $row): array
         'description' => '',
         'share_title' => '',
         'breadcrumb'  => (string)$row['name'],
+        /* Its own name, so a seventh service arrives with a keyword list that
+           says something rather than an empty field nobody will notice. */
+        'keywords'    => (string)$row['name'],
         'robots'      => 'index',
         'changefreq'  => 'monthly',
         'priority'    => '0.9',
@@ -3136,6 +3190,9 @@ function certifications_defaults(): array
                            . 'grouped by the role they are deployed in.',
             'share_title' => 'Resource Certifications',
             'breadcrumb'  => 'Resource Certifications',
+'keywords'    => 'security certifications, certified security analysts, '
+               . 'incident response, threat hunting, security engineering, '
+               . 'Tech4TIME',
             'robots'      => 'index',
             'changefreq'  => 'monthly',
             'priority'    => '0.6',
@@ -3592,6 +3649,7 @@ function branding_defaults(): array
                those three was seeded with the string it was already
                rendering. */
             'breadcrumb'  => 'Branding & Advertisement',
+'keywords'    => 'Tech4TIME logo, brand assets, logo download, brand guidelines, press kit',
             'robots'      => 'index',
             'changefreq'  => 'yearly',
             'priority'    => '0.4',
@@ -4074,6 +4132,7 @@ function privacy_defaults(): array
                            . 'tracking.',
             'share_title' => 'Privacy Policy | Tech4TIME',
             'breadcrumb'  => 'Privacy Policy',
+'keywords'    => 'privacy policy, data protection, personal data, GDPR, Tech4TIME privacy',
             'robots'      => 'index',
             'changefreq'  => 'yearly',
             'priority'    => '0.3',
@@ -4733,7 +4792,7 @@ const SEO_TEXT_FIELDS = [
                    'theme_light', 'theme_dark', 'share_alt'],
     'identity' => ['legal_name', 'alternate_name', 'slogan', 'description',
                    'founded', 'price_range', 'area_served'],
-    'crawl'    => ['verify_google', 'verify_bing'],
+    'crawl'    => ['verify_google', 'verify_bing', 'analytics_id'],
     'manifest' => ['short_name', 'background', 'theme', 'display'],
     'notfound' => ['title', 'description', 'share_title'],
 ];
@@ -4748,6 +4807,18 @@ const SEO_LINE_FIELDS = [
     'identity' => ['service_types', 'knows_about'],
     'crawl'    => ['robots_extra'],
 ];
+
+/**
+ * What a Google measurement id may look like.
+ *
+ * NARROW ON PURPOSE. This string is interpolated into the src of a <script>
+ * tag pointing at another origin, so it is the one editable value on this site
+ * that ends up inside a URL a browser will execute. Four prefixes Google
+ * actually issues, then letters, digits and dashes -- anything else is refused
+ * rather than escaped, because there is no legitimate id this rejects and no
+ * safe way to carry one that needs escaping into that position.
+ */
+const SEO_ANALYTICS_ID = '/^(G|GT|UA|AW)-[A-Z0-9][A-Z0-9-]{3,20}$/i';
 
 /** The bands that hold a list, and the function that fills one of their rows. */
 const SEO_LISTS = ['sameas' => 'seo_link_defaults', 'hours' => 'seo_hours_defaults'];
@@ -4980,6 +5051,11 @@ function seo_defaults(): array
         'crawl' => [
             'verify_google' => '',
             'verify_bing'   => '',
+            /* Google Analytics. Empty means no measurement code is emitted and
+               no external origin is reached at all, which is the state this
+               site shipped in and the state it returns to the moment this is
+               cleared. See ADR 0021. */
+            'analytics_id'  => '',
             /* The form endpoint has nothing to index. This is the one rule
                robots.txt carried before it was rendered. */
             'robots_extra'  => ['/contact-handler.php'],
@@ -5005,6 +5081,7 @@ function seo_defaults(): array
                            . "HR services, or contact our team.",
             'share_title' => 'Page Not Found',
             'breadcrumb'  => 'Page not found',
+'keywords'    => '',
             'robots'      => 'noindex',
             'changefreq'  => 'yearly',
             'priority'    => '0.0',
@@ -5043,6 +5120,15 @@ function seo_normalise(array $data): array
         foreach ($fields as $field) {
             $data[$band][$field] = seo_lines($data[$band][$field] ?? []);
         }
+    }
+
+    /* REFUSED HERE, NOT ONLY IN THE EDITOR. This value is interpolated into a
+       <script src> pointing at another origin, and contract_normalise() is what
+       every reader goes through -- the page, the publish endpoint, and the
+       editor alike. A malformed id therefore becomes no id at all rather than
+       a malformed URL, on both sides of the wire and however it got there. */
+    if (preg_match(SEO_ANALYTICS_ID, $data['crawl']['analytics_id']) !== 1) {
+        $data['crawl']['analytics_id'] = '';
     }
 
     $data['site']['share']     = contract_image_defaults($data['site']['share'] ?? []);

@@ -97,6 +97,13 @@ function seo_meta_from_post(array $current, bool $notfound): array
     $meta['description'] = seo_post_text($_POST['meta']['description'] ?? '');
     $meta['share_title'] = seo_post_text($_POST['meta']['share_title'] ?? '');
 
+    /* keywords, breadcrumb and the sitemap fields are written below, after the
+       404 has returned: it has no place in a hierarchy, is never in the
+       sitemap, and a page nobody may index has nothing to be found by. Its
+       screen does not render any of them either -- a field that is drawn and
+       then dropped on save is the trap tools/check_content_model.py exists
+       to catch. */
+
     if ($notfound) {
         /* No breadcrumb: it is a page with no place in a hierarchy. No
            changefreq or priority: it is never in the sitemap. No crawl
@@ -106,6 +113,7 @@ function seo_meta_from_post(array $current, bool $notfound): array
         return $meta;
     }
 
+    $meta['keywords']   = seo_post_text($_POST['meta']['keywords'] ?? '');
     $meta['breadcrumb'] = seo_post_text($_POST['meta']['breadcrumb'] ?? '');
     $meta['robots']     = seo_post_choice($_POST['meta']['robots'] ?? '',
                                           CONTRACT_ROBOTS, 'index');
@@ -567,6 +575,15 @@ if ($screen === 'page') {
           seo_length_hint(seo_effective_description($page['key'], (string)$meta['description']),
                           SEO_DESC_MIN, SEO_DESC_MAX)
           . ' Aim for ' . SEO_DESC_IDEAL[0] . '–' . SEO_DESC_IDEAL[1] . '.'); ?>
+
+<?php if (!$notfound): /* A page nobody may index has nothing to be found by. */ ?>
+      <?php seo_text_field('meta[keywords]', 'Keywords', (string)($meta['keywords'] ?? ''),
+          'Separated by commas. Google has ignored this tag since 2009 and Bing '
+          . 'treats a stuffed one as spam, so a handful of words this page is '
+          . 'genuinely about is worth more than a long list — some smaller and '
+          . 'regional engines do still read it. Left empty, the tag is not sent '
+          . 'at all.', true); ?>
+<?php endif; ?>
     </div>
   </fieldset>
 
@@ -847,9 +864,10 @@ if ($screen === 'identity') {
 admin_head('seo', $user,
     'What crawlers are told, and what an installed copy of the site is called. '
     . '<a href="' . h(admin_url('seo')) . '">All pages</a>.',
-    ['band-verify'   => 'Proving the site is yours',
-     'band-robots'   => 'What crawlers may not fetch',
-     'band-manifest' => 'The installed app'],
+    ['band-verify'    => 'Proving the site is yours',
+     'band-analytics' => 'Google Analytics',
+     'band-robots'    => 'What crawlers may not fetch',
+     'band-manifest'  => 'The installed app'],
     ['form' => 'seo-crawl-form', 'label' => 'Save these settings',
      'discard' => admin_url('seo', ['site' => 'crawl'])]);
 
@@ -882,6 +900,30 @@ $manifest = $data['manifest'];
       <?php seo_text_field('crawl[verify_bing]', 'Bing Webmaster Tools token',
           (string)$crawl['verify_bing'],
           'The content of the meta tag Bing offers, not the whole tag.', true); ?>
+    </div>
+  </fieldset>
+
+  <fieldset class="admin__block" id="band-analytics">
+    <?php admin_band_head('Google Analytics',
+        'Paste the measurement id from your Google Analytics property and every '
+        . 'page starts reporting to it. This is the only thing on this site that '
+        . 'loads anything from another company\'s servers, and it does so only '
+        . 'while this field has something in it.'); ?>
+
+    <?php admin_standing_notice(
+        'Turning this on changes two things beyond measurement. The site begins '
+        . 'sending visitors’ data to Google, so the privacy policy — which today '
+        . 'says “No cookies, no analytics, no tracking” — stops being true and '
+        . 'must be corrected on the Privacy Policy screen. And visitors in the EU, '
+        . 'which includes the Brussels office’s, generally have to be asked before '
+        . 'analytics runs. Clearing this field stops all of it on the next page load.'); ?>
+
+    <div class="admin__grid">
+      <?php seo_text_field('crawl[analytics_id]', 'Measurement id',
+          (string)($crawl['analytics_id'] ?? ''),
+          'Looks like G-XXXXXXXXXX. A property id from Google Analytics, a '
+          . 'GT- container, or an older UA- id. Anything that is not one of '
+          . 'those shapes is refused rather than sent.', true); ?>
     </div>
   </fieldset>
 

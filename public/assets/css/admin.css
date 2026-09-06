@@ -762,6 +762,25 @@
 
 .admin__notice--warn p + p { margin-block-start: var(--space-2xs); }
 
+/* A MESSAGE WITH AN ICON IN FRONT OF IT, in the notices and on the sign-in.
+   Centred, so the icon sits with the sentence rather than above it -- the same
+   decision as .admin-tile__warn and .toast, and made in one place so every box
+   that carries an icon carries it the same way.
+
+   Applied by class rather than to every <p> in a notice: some of those are
+   ordinary sentences with a link in the middle, and laying one of those out as
+   a flex row would break the sentence into pieces with gaps between them. */
+.admin__notice-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+
+.admin__notice-line .icon {
+  flex: none;
+  fill: currentColor;
+}
+
 .admin__notice--warn .icon {
   fill: currentColor;
   vertical-align: -0.15em;
@@ -1121,7 +1140,12 @@
 
 .admin-tile__warn {
   display: flex;
-  align-items: flex-start;
+  /* Centred, not flex-start. The icon is taller than the line it sits beside,
+     so aligning their tops left it visibly high -- measured 4.7px above the
+     box's centre against text that was centred in it. These messages are one
+     or two lines; there is no long paragraph for the icon to need to align
+     with the first line of. */
+  align-items: center;
   gap: var(--space-3xs);
   padding: var(--space-2xs) var(--space-sm);
   font-size: var(--text-xs);
@@ -1194,6 +1218,48 @@
   float: left;
   width: 100%;
   padding-inline: 0;
+}
+
+/* A CARD NESTED INSIDE A CARD -- privacy's blocks inside a section,
+   certifications' qualifications inside a role group, branding's files inside
+   a logo variant. It had NO RULE AT ALL, which stayed invisible until one of
+   them held a band with a field under it.
+
+   THE BAND IS FLOATED, AND HERE IT MUST NOT BE. The float above exists for one
+   reason: a <legend> is laid out on its <fieldset>'s top border. Every one of
+   these nested cards is a <div>, so there is no border to sit on and nothing
+   for the float to fix -- but the base .admin__band rule floats it anyway, and
+   a 100%-wide float leaves no room beside itself. The field after it was
+   shrunk to fit that nothing: measured at 0px wide inside a 582px card, with
+   its label wrapped onto four lines and the select under it a stub.
+
+   float:none rather than clear or flow-root on the parent. Clearing treats the
+   symptom, and flow-root only makes the parent contain the float -- neither
+   stops the next element being laid out beside it. */
+.admin-card__nested > .admin__band {
+  float: none;
+  width: auto;
+}
+
+/* A select with a live preview of what it has chosen -- the certifications
+   editor's icon picker. Both this and .admin__icon-preview were hooks with no
+   rule: the <span> around them computed to a block, .admin__input is full
+   width, and the preview was pushed onto its own line 4px underneath the
+   control it is supposed to be previewing. */
+.admin__icon-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.admin__icon-row .admin__input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.admin__icon-preview {
+  display: inline-flex;
+  flex: none;
 }
 
 /* The size a heading has inside one of these cards. .admin__section-title on
@@ -1733,7 +1799,10 @@ html { scroll-padding-block-start: var(--admin-bar-h); }
 
 .toast {
   display: flex;
-  align-items: flex-start;
+  /* Centred for the same reason .admin-tile__warn is: the dismiss button was
+     7.4px above the centre of a two-line toast, which reads as a misplaced
+     control rather than a deliberate one. */
+  align-items: center;
   gap: var(--space-2xs);
   max-width: min(24rem, calc(100vw - 2 * var(--space-lg)));
   padding: var(--space-xs) var(--space-sm);

@@ -395,6 +395,19 @@ function seo_validate(array $data): array
         }
     }
 
+    /* SAID, NOT SWALLOWED. contract_normalise() drops a measurement id that is
+       not the shape Google issues, which is the right thing for the renderer to
+       do and the wrong thing to do in silence: somebody pastes an id with a
+       stray character, saves, and finds the field empty with nothing to explain
+       it. Checked against the raw value, before normalising has had its say. */
+    $analytics = trim((string)($data['crawl']['analytics_id'] ?? ''));
+    if ($analytics !== '' && preg_match(SEO_ANALYTICS_ID, $analytics) !== 1) {
+        $errors[] = 'That does not look like a Google measurement id. They begin '
+                  . 'G-, GT-, UA- or AW- and carry only letters, digits and '
+                  . 'dashes — for example G-XXXXXXXXXX. Leave it empty to switch '
+                  . 'analytics off.';
+    }
+
     if (trim((string)$data['identity']['legal_name']) === '') {
         $errors[] = 'The organisation name cannot be empty — it is what search '
                   . 'engines record the company as.';

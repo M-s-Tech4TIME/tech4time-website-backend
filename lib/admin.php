@@ -973,9 +973,9 @@ function admin_move_row(array $rows, string $what, int $index): ?array
 function admin_standing_notice(string $text): void
 {
     ?>
-    <p class="admin__notice">
+    <p class="admin__notice admin__notice-line">
       <?= admin_icon('info-circle', 'icon icon--sm') ?>
-      <?= h($text) ?>
+      <span><?= h($text) ?></span>
     </p>
     <?php
 }
@@ -1676,7 +1676,8 @@ function admin_shell_error(string $message): void
     }
 
     echo '<div class="admin__notice admin__notice--error signin__notice">'
-       . '<p>' . admin_icon('exclamation-circle', 'icon icon--sm') . ' ' . h($message) . '</p>'
+       . '<p class="admin__notice-line">' . admin_icon('exclamation-circle', 'icon icon--sm')
+       . '<span>' . h($message) . '</span></p>'
        . '</div>';
 }
 

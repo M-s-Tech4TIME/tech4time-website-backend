@@ -171,6 +171,28 @@
     tone: "danger"
   };
 
+  /* WHAT TO DO NEXT DEPENDS ON WHAT WENT WRONG. The same reasoning, and the
+     same wording, as admin-forms.js: a 404 is the server saying it does not
+     serve this address, so "press again" is advice that cannot work, and the
+     one report of this had four identical toasts stacked up to prove it. */
+  function whatNext(error) {
+    var code = error && error.status;
+
+    if (code === 404 || code === 405) {
+      return "Pressing again will not help: the address this screen asked for " +
+             "is not one the server answers. Reload the page. If it happens " +
+             "again, the site is misconfigured.";
+    }
+    if (code === 403 || code === 419) {
+      return "Reload the page — the sign-in may have expired while this " +
+             "screen was open.";
+    }
+    if (code >= 400 && code < 500) {
+      return "The server refused the request as it was made. Reload the page.";
+    }
+    return "Press again, or reload.";
+  }
+
   function askToLeave() {
     var dialog = global.Tech4Time.adminDialog;
 
@@ -361,7 +383,9 @@
         }
 
         if (!response.ok) {
-          throw new Error("The server answered " + response.status + ".");
+          var refused = new Error("The server answered " + response.status + ".");
+          refused.status = response.status;
+          throw refused;
         }
 
         return response.text().then(function (html) {
@@ -392,7 +416,7 @@
         status(
           "Not loaded — " +
             (error && error.message ? error.message : "the connection failed") +
-            " Press again, or reload.",
+            " " + whatNext(error),
           BAD
         );
       });

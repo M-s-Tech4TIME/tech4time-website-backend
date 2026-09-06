@@ -324,7 +324,7 @@ if (!$errors && $pending !== '') {
 <?php /* ----------------------------------------------------------- drift */ ?>
 <?php if (!$inStep): ?>
   <div class="admin__notice admin__notice--warn">
-    <p><?= admin_icon('info-circle', 'icon icon--sm') ?>
+    <p class="admin__notice-line"><?= admin_icon('info-circle', 'icon icon--sm') ?>
        <strong>The site footer is showing older details.</strong></p>
     <p>
       Every page repeats the email address, phone numbers, addresses and opening

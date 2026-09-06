@@ -225,6 +225,7 @@ description were literal strings in the page file, and the only two on the site 
   "title":       "About Tech4TIME | Trusted IT & Cybersecurity Solutions",
   "description": "Founded in 2018, Tech4TIME delivers …",
   "share_title": "About Tech4TIME",
+  "keywords":    "about Tech4TIME, IT company Bangladesh, cybersecurity company Dhaka",
   "breadcrumb":  "About Us",
   "robots":      "index",
   "changefreq":  "monthly",
@@ -238,6 +239,7 @@ description were literal strings in the page file, and the only two on the site 
 |---|---|
 | `title` | the browser tab and the search result's heading. At most `SEO_TITLE_MAX` (65) characters |
 | `description` | the search result's paragraph. `SEO_DESC_MIN`–`SEO_DESC_MAX` (50–165); 150–160 is the ideal the editor hints at and nothing refuses |
+| `keywords` | a comma-separated list, tidied on save: empties and case-insensitive repeats dropped, one space after each comma. **Omitted from the page entirely when empty.** Google has ignored the tag since 2009 and Bing treats a stuffed one as spam — a handful of true words is worth more than a long list |
 | `share_title` | the heading on a shared link |
 | `breadcrumb` | the page's name in the BreadcrumbList. **Pure SEO** — there is no visible breadcrumb anywhere on the site |
 | `robots` | `index` or `noindex`. **Also decides the sitemap**: one control, not two |
@@ -275,7 +277,7 @@ record, because that page renders no content document and never will.
 | `identity` | the Organization node — legal name, slogan, founding year, the services it offers, what it knows about | `?s=seo&site=identity` |
 | `sameas` | the profiles that are this company elsewhere. Rows: add, reorder, **hide** | `?s=seo&site=identity` |
 | `hours` | opening hours as machine-readable rows — `days[]`, `opens`, `closes`. The office rows in `content/contact.json` carry hours as prose, which a search engine cannot read | `?s=seo&site=identity` |
-| `crawl` | extra `Disallow` paths, and the Search Console and Bing verification tokens | `?s=seo&site=crawl` |
+| `crawl` | extra `Disallow` paths, the Search Console and Bing verification tokens, and **`analytics_id`** — a Google measurement id. Empty means no analytics and no external origin; anything that is not the shape Google issues is refused rather than escaped, because it lands inside a `<script src>`. [ADR 0021](../90-decisions/0021-analytics-is-off-until-somebody-turns-it-on.md) | `?s=seo&site=crawl` |
 | `manifest` | what the web manifest says. The **icon list is not here** — it names files that must exist | `?s=seo&site=crawl` |
 | `notfound` | the 404's title, description and crawl directive. No canonical and no `og:url`, by design | `?s=seo&page=notfound` |
 

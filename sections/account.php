@@ -221,7 +221,7 @@ admin_notices($errors);
 
 <?php if ($nudge && !$enrolled): ?>
 <div class="admin__notice admin__notice--warn">
-  <p><?= admin_icon('exclamation-circle', 'icon icon--sm') ?>
+  <p class="admin__notice-line"><?= admin_icon('exclamation-circle', 'icon icon--sm') ?>
      <strong>There is no second factor on this account.</strong></p>
   <p>A password on its own is one guessed, phished or reused password away from
      somebody else editing your website. Pairing an authenticator app takes a

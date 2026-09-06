@@ -365,7 +365,12 @@ def run(b: Browser, base: str, r: Results) -> None:
     for screen in ("/?s=overview", "/?s=careers", "/?s=careers&action=new",
                    "/?s=contact", "/?s=company", "/?s=about", "/?s=home",
                    "/?s=services", "/?s=services&service=cybersecurity",
-                   "/?s=certifications", "/?s=branding", "/?s=privacy", "/?s=account"):
+                   "/?s=certifications", "/?s=branding", "/?s=privacy",
+                   # Every shape the SEO editor takes: the index, a page
+                   # screen, and the two site-wide ones.
+                   "/?s=seo", "/?s=seo&page=about",
+                   "/?s=seo&site=identity", "/?s=seo&site=crawl",
+                   "/?s=account"):
         b.go(base + screen)
         loud = b.js("""
         var out = [];
@@ -408,7 +413,15 @@ def run(b: Browser, base: str, r: Results) -> None:
     for screen in ("/?s=careers", "/?s=contact", "/?s=company", "/?s=about",
                    "/?s=home", "/?s=services",
                    "/?s=services&service=cybersecurity",
-                   "/?s=certifications", "/?s=branding", "/?s=privacy", "/?s=account"):
+                   "/?s=certifications", "/?s=branding", "/?s=privacy",
+                   # Every SEO screen that posts something. The 404's screen
+                   # is a different form from an ordinary page's -- it has no
+                   # canonical and no sitemap band -- so both are listed. The
+                   # index is not here: it edits nothing, and is checked for
+                   # exactly that below.
+                   "/?s=seo&page=about", "/?s=seo&page=notfound",
+                   "/?s=seo&site=identity", "/?s=seo&site=crawl",
+                   "/?s=account"):
         b.go(base + screen)
         counts = b.js(
             "var all = document.querySelectorAll('#admin-main form');"
@@ -418,6 +431,28 @@ def run(b: Browser, base: str, r: Results) -> None:
                 counts["all"] == counts["async"] and counts["all"] > 0,
                 f"{counts['async']} of {counts['all']} — a form without it "
                 f"navigates, and lands back at the top of the page")
+
+    # The index is the one screen in the shell that edits nothing, so the loop
+    # above cannot speak for it: "no form is missing data-async" is true of a
+    # page with no forms, which is why that loop insists on finding at least
+    # one. Assert what the index actually is instead.
+    b.go(base + "/?s=seo")
+    index = b.js(
+        "var rows = document.querySelectorAll('#band-pages .admin-card');"
+        "var linked = 0;"
+        "rows.forEach(function (row) {"
+        "  if (row.querySelector('a[href*=\"page=\"]')) { linked += 1; }"
+        "});"
+        "return {forms: document.querySelectorAll('#admin-main form').length,"
+        " rows: rows.length, linked: linked};")
+    r.check("/?s=seo: the index posts nothing",
+            index["forms"] == 0,
+            f"{index['forms']} forms on a screen that only lists pages — if it "
+            f"has grown one, list it in the roster above instead")
+    r.check(f"/?s=seo: each of its {index['rows']} rows opens its own screen",
+            index["rows"] > 0 and index["linked"] == index["rows"],
+            f"{index['linked']} of {index['rows']} rows carry a link — a row "
+            f"nobody can open is a page nobody can edit")
 
     b.go(base + "/?s=company")
     b.js(MARK)
@@ -537,7 +572,12 @@ def navigate(b: Browser, base: str, r: Results) -> None:
     for screen in ("/?s=overview", "/?s=careers", "/?s=careers&action=new",
                    "/?s=contact", "/?s=company", "/?s=about", "/?s=home",
                    "/?s=services", "/?s=services&service=cybersecurity",
-                   "/?s=certifications", "/?s=branding", "/?s=privacy", "/?s=account"):
+                   "/?s=certifications", "/?s=branding", "/?s=privacy",
+                   # Every shape the SEO editor takes: the index, a page
+                   # screen, and the two site-wide ones.
+                   "/?s=seo", "/?s=seo&page=about",
+                   "/?s=seo&site=identity", "/?s=seo&site=crawl",
+                   "/?s=account"):
         b.go(base + screen)
         stragglers = b.js(STRAGGLERS)
         r.check(f"{screen}: no link falls through to a full page load",
@@ -565,7 +605,12 @@ def navigate(b: Browser, base: str, r: Results) -> None:
     for screen in ("/?s=overview", "/?s=careers", "/?s=contact",
                    "/?s=company", "/?s=about", "/?s=home", "/?s=services",
                    "/?s=services&service=cybersecurity",
-                   "/?s=certifications", "/?s=branding", "/?s=privacy", "/?s=account"):
+                   "/?s=certifications", "/?s=branding", "/?s=privacy",
+                   # Every shape the SEO editor takes: the index, a page
+                   # screen, and the two site-wide ones.
+                   "/?s=seo", "/?s=seo&page=about",
+                   "/?s=seo&site=identity", "/?s=seo&site=crawl",
+                   "/?s=account"):
         b.go(base + screen)
         r.check(f"{screen}: there is somewhere to say it",
                 b.js(SHELL)["status"],
@@ -840,6 +885,8 @@ def improvements(b: Browser, base: str, r: Results) -> None:
         ("/?s=about", "whyus", "whyus[items]"),
         ("/?s=home", "tags", "tags[items]"),
         ("/?s=home", "destinations", "destinations[items]"),
+        ("/?s=seo&site=identity", "sameas", "sameas[items]"),
+        ("/?s=seo&site=identity", "hours", "hours[items]"),
         ("/?s=services", "ossf", "ossf[items]"),
         ("/?s=services", "nav", "nav[items]"),
         # The nested case, which nothing else in this list covers: the rows
@@ -1007,9 +1054,12 @@ def improvements(b: Browser, base: str, r: Results) -> None:
     # branding each carry one and were missing from this list, which is the
     # same way the contact editor came to be in the state described above.
     for screen in ("/?s=contact", "/?s=company", "/?s=account", "/?s=careers",
-                   "/?s=about", "/?s=home", "/?s=branding"):
+                   "/?s=about", "/?s=home", "/?s=branding",
+                   "/?s=seo&site=identity"):
         # The privacy editor is deliberately absent: it has no file input at
-        # all, so it would pass this vacuously and read as though it did.
+        # all, so it would pass this vacuously and read as though it did. So
+        # are the SEO editor's other screens, for the same reason -- only the
+        # identity screen takes a file, and it takes two.
         b.go(base + screen)
         bad = b.js("""
         var out = [];
@@ -1022,6 +1072,32 @@ def improvements(b: Browser, base: str, r: Results) -> None:
         return out;""")
         r.check(f"{screen}: every form holding a file input is multipart",
                 bad == [], f"{bad} — a file input here posts its filename only")
+
+    r.section("no page editor still offers a field it no longer writes")
+    # Every page's title, description, share title and breadcrumb are edited on
+    # ?s=seo now. The values still LIVE in each page's own document and are
+    # still published with it — only the editing moved. So the fault to look
+    # for is a field left behind: an input a person can type into that nothing
+    # reads any more looks exactly like one that works.
+    #
+    # That the values SURVIVE a save is asserted in tools/test_seo_admin.py,
+    # which can read the documents; this is the half a browser can see.
+    for screen in ("/?s=home", "/?s=about", "/?s=services",
+                   "/?s=services&service=cybersecurity", "/?s=company",
+                   "/?s=contact", "/?s=certifications", "/?s=branding",
+                   "/?s=privacy"):
+        b.go(base + screen)
+        left = b.js("""
+        return Array.prototype.map.call(
+            document.querySelectorAll('[name^="meta["], [name*="[meta]["]'),
+            function (el) { return el.name; });""")
+        r.check(f"{screen}: no meta field is left on the form", left == [],
+                f"{left} — these post over the SEO screen's values or, worse, "
+                f"look editable and change nothing")
+        r.check(f"{screen}: and the band points at the screen that owns them",
+                b.js("return !!document.querySelector("
+                     "'#band-meta a[href*=\"s=seo\"]');") is True,
+                "the outline still lists band-meta, so it has to lead somewhere")
 
     r.section("things are where they are supposed to be")
     # MEASURED, NOT EYEBALLED. Both of these shipped and were reported from

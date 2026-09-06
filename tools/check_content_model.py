@@ -75,12 +75,28 @@ SUBJECTS = [
     {
         "name": "contact",
         "model": ROOT / "lib" / "contract.php",
-        "form": (FORM_DIR / "contact.php") if FORM_DIR else None,
+        # TWO FORMS, NOT ONE. The contact editor writes the page's bands;
+        # sections/seo.php writes its meta band, together with every other
+        # page's — see ADR 0020. A field is editable if EITHER writes it, and
+        # naming only the first would report the whole meta band as
+        # uneditable, which is exactly backwards.
+        "form": [FORM_DIR / "contact.php", FORM_DIR / "seo.php"] if FORM_DIR else [],
         "page": (PAGE_DIR / "contact" / "index.php") if PAGE_DIR else None,
         # Where a field may be read on the way to the page. The model file is
         # in here too: contact_shown_offices() and contact_email() read fields
         # the page then never names itself.
-        "helpers": [ROOT / "lib" / "contact.php", ROOT / "lib" / "contract.php"],
+        #
+        # lib/head.php and lib/seo.php exist only in the frontend, which is
+        # the half that has pages to read -- and they are here because the
+        # meta band is no longer read by a page at all. Every page's <head> is
+        # emitted by seo_head(), handed $data['meta'], so the title, the
+        # description, the share title and the breadcrumb are read there once
+        # for all seventeen pages instead of seventeen times in seventeen
+        # files. Without them this check would report the whole meta band as
+        # edited-but-never-rendered, which is exactly backwards. A helper that
+        # is not present is skipped, so naming them costs the backend nothing.
+        "helpers": [ROOT / "lib" / "contact.php", ROOT / "lib" / "contract.php",
+                    ROOT / "lib" / "head.php", ROOT / "lib" / "seo.php"],
         # Where the other half of this check lives, named so that a run which
         # can only do one direction says who does the other.
         "other_half": {"frontend": "tech4time-website-backend",
@@ -343,9 +359,24 @@ def form_writes(php: str) -> set[str]:
 
     Matched on name="…" so that a field rendered but never given a name — a
     box that looks editable and saves nothing — does not count as written.
+
+    A name reaches the markup two ways. Most sections write it there
+    literally; sections/seo.php and sections/services.php hand it to a field
+    helper instead — seo_text_field('meta[title]', …) — and the helper prints
+    the name="…". So a quoted string shaped like a field name counts as well.
+    It is the same evidence one indirection away: that string is the name
+    attribute, and a helper that did not print it would fail every other
+    admin suite. Recognising it is what keeps this check from going quiet on
+    a whole section merely because it renders its fields through a function.
     """
     names = set()
     for value in re.findall(r'name="([^"]+)"', php):
+        for part in re.findall(r"[\w]+", value):
+            names.add(part)
+    # 'meta[title]', "sameas[items][$i][label]" — a bare word followed by at
+    # least one subscript, inside quotes. The subscript may not contain a
+    # quote, so this cannot run from the end of one string into the next.
+    for value in re.findall(r"""['"](\w+(?:\[[^\]'"]*\])+)['"]""", php):
         for part in re.findall(r"[\w]+", value):
             names.add(part)
     # PHP-side reads, for anything assembled rather than posted one-to-one.
@@ -553,15 +584,17 @@ def main() -> None:
     for subject in SUBJECTS:
         for key in ("model", "form", "page"):
             here = subject[key]
-            if here is not None and not here.is_file():
-                raise SystemExit(f"Missing {here.relative_to(ROOT)}")
+            for one in (here if isinstance(here, list) else [here]):
+                if one is not None and not one.is_file():
+                    raise SystemExit(f"Missing {one.relative_to(ROOT)}")
 
         keep = bookkeeping()
         model_php = subject["model"].read_text()
 
         model = model_fields(model_php)
-        form_php = subject["form"].read_text() if subject["form"] else ""
-        form = form_writes(form_php) if subject["form"] else set()
+        form = set()
+        for one in subject["form"]:
+            form |= form_writes(one.read_text())
 
         # The renderer is the page plus the helpers it renders through:
         # contact_flag_picture() reads the flag, contact_reach_href() reads the
@@ -590,7 +623,9 @@ def main() -> None:
         for field in missing_form:
             problems.append(
                 f"{subject['name']}: '{field}' is in the model but nothing in "
-                f"{subject['form'].relative_to(ROOT)} writes it — it cannot be edited"
+                + " or ".join(sorted(one.relative_to(ROOT).as_posix()
+                                    for one in subject["form"]))
+                + " writes it — it cannot be edited"
             )
         for field in missing_page:
             problems.append(
@@ -602,8 +637,11 @@ def main() -> None:
         # And the other direction: the form must not promise a field the model
         # does not keep, because contact_from_post() would silently drop it.
         model_leaves = {leaf(f) for f in model}
-        posted = set(re.findall(r'name="(?:reach|offices|form|meta|hero)\[[^"]*?(\w+)\]"',
-                                form_php))
+        posted = set()
+        for one in subject["form"]:
+            posted |= set(re.findall(
+                r'name="(?:reach|offices|form|meta|hero)\[[^"]*?(\w+)\]"',
+                one.read_text()))
         stray = sorted(n for n in posted if n not in model_leaves)
         for name in stray:
             problems.append(

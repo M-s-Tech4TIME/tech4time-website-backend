@@ -303,6 +303,13 @@ def careers_model() -> dict:
     bookkeeping is asked for by name too, because each setting is posted on its
     own and a form posting a field the editor does not own blanks the ones it
     does. 'revision' arrived and cleared cv_form_url exactly that way.
+
+    CONTRACT_META_BAND is excluded for the same reason and not a different one.
+    The careers page gained a meta band -- its title and description were
+    literal strings in the page file and were the only ones on the site nobody
+    could change -- but this editor does not own it: the SEO screen does. It is
+    a top-level key here, so without this line it would be posted as a setting
+    and blanked.
     """
     out = subprocess.run(
         ["php", "-r",
@@ -312,7 +319,8 @@ def careers_model() -> dict:
          "'rich' => CAREERS_RICH_FIELDS,"
          "'sections' => CAREERS_SECTIONS,"
          "'settings' => array_values(array_diff("
-         "    array_keys(careers_load()), ['jobs'], CONTRACT_BOOKKEEPING)),"
+         "    array_keys(careers_load()), ['jobs', CONTRACT_META_BAND],"
+         "    CONTRACT_BOOKKEEPING)),"
          "]);"],
         cwd=ROOT, capture_output=True, text=True,
     )

@@ -55,7 +55,7 @@ function certifications_from_post(array $current): array
 {
     $data = $current;
 
-    foreach (CERTIFICATIONS_TEXT_FIELDS as $band => $fields) {
+    foreach (contract_page_bands(CERTIFICATIONS_TEXT_FIELDS) as $band => $fields) {
         foreach ($fields as $field) {
             $data[$band][$field] = trim((string)($_POST[$band][$field] ?? ''));
         }
@@ -651,37 +651,7 @@ if (!$errors && $pending !== '') {
   </fieldset>
 
   <!-- ====================== search and sharing ==================== -->
-  <fieldset class="admin__block" id="band-meta">
-    <?php admin_band_head('Search and sharing',
-        'What a search engine lists and what a shared link shows. Not on the '
-      . 'page itself.'); ?>
-
-    <div class="admin__grid">
-      <label class="admin__field admin__field--wide">
-        <span class="admin__label">Browser tab title</span>
-        <input class="admin__input" type="text" name="meta[title]" required
-               value="<?= h($data['meta']['title']) ?>">
-      </label>
-
-      <label class="admin__field admin__field--wide">
-        <span class="admin__label">Search description</span>
-        <textarea class="admin__input" name="meta[description]" rows="3"><?= h($data['meta']['description']) ?></textarea>
-        <span class="admin__hint">Up to 320 characters once the counts are
-          filled in — measured on what gets published, not on what is typed.</span>
-      </label>
-      <div class="admin__field admin__field--wide">
-        <?php certifications_token_hint('meta[description]',
-                                        (string)$data['meta']['description'], $counts); ?>
-      </div>
-
-      <label class="admin__field admin__field--wide">
-        <span class="admin__label">Title when shared</span>
-        <input class="admin__input" type="text" name="meta[share_title]"
-               value="<?= h($data['meta']['share_title']) ?>">
-        <span class="admin__hint">Shown on a social card instead of the tab title.</span>
-      </label>
-    </div>
-  </fieldset>
+  <?php admin_meta_band('certifications'); ?>
 
   <?php /* Last, so a form posted with the fields above truncated still carries
            it and its ABSENCE is readable. See admin_form_tail(). */ ?>

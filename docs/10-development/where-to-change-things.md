@@ -104,7 +104,10 @@ The public site's palette, layout, motion, JavaScript modules and page markup ar
 | I want to change | Where |
 |---|---|
 | **Add an editable page to the admin** | `ADMIN_SECTIONS` in `lib/admin.php` + a file in `sections/` + a name in `CONTRACT_DOCUMENTS` **in both repositories** — [adding-an-editor.md](server-side/adding-an-editor.md) |
-| The icon rail | `ADMIN_SECTIONS`; new icons go in `ADMIN_ICONS`, same file |
+| The icon rail's rows, or their order | `ADMIN_RAIL_SECTIONS` in `lib/admin.php`. **Registry order is not rail order**, and `account` is registered but deliberately not in the rail — deleting it from the registry instead would make `?s=account` land on the Overview and put the password screen out of reach |
+| A rail label | `ADMIN_SECTIONS`; new icons go in `ADMIN_ICONS`, same file. It must fit on one line — `check_admin_a11y.py` measures that, and `--rail-wide` in `admin.css` is what to widen |
+| **A page's title, search description, share card, breadcrumb or crawl setting** | `sections/seo.php`. It writes the `meta` band of that page's own document; the page's own editor does not, and must not — [seo.md](../40-reference/seo.md) |
+| The Organization graph, robots rules, the manifest, verification tokens | `sections/seo.php`, writing `content/seo.json` |
 | How long a session lasts | `AUTH_IDLE` (1 hour idle) and `AUTH_ABSOLUTE` (12 hours) in `lib/auth.php` |
 | How many failures before a lockout | `AUTH_ALLOW` in `lib/auth.php`; the backoff is in `lib/throttle.php` |
 | The longest lockout | `THROTTLE_MAX_BLOCK` in `lib/throttle.php` |

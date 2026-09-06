@@ -65,7 +65,7 @@ structured data from these.
 {
   "updated": "…",
   "footer_synced": "…",
-  "meta":    { "title": "…", "description": "…", "share_title": "…" },
+  "meta":    { … },
   "hero":    { "title": "…", "subtitle": "…" },
   "form":    { "title": "…", "lead": "…", "subject_hint": "…", "note": "…",
                "service_types": [] },
@@ -79,7 +79,7 @@ structured data from these.
 |---|---|
 | `updated` | ISO 8601, written on save. Bookkeeping |
 | `footer_synced` | the fingerprint of the contact details as last pushed into the pages' footers. Drives the drift banner — *shared-markup.md* (in tech4time-website-frontend) |
-| `meta` | `<title>`, meta description, Open Graph title |
+| `meta` | everything the `<head>` says about this page — see [The `meta` band](#the-meta-band-on-every-document) |
 | `hero` | the page's heading and subheading |
 | `form` | the enquiry form's copy, and `service_types` — the subject options offered |
 | `reach` | direct contact methods. `status` switches the whole band off |
@@ -132,7 +132,7 @@ numbers had two of them reachable on the page and invisible to a search engine.
 {
   "updated":  "…",
   "revision": 0,
-  "meta":        { "title": "…", "description": "…", "share_title": "…" },
+  "meta":        { … },
   "hero":        { "title": "…", "subtitle": "…" },
   "story":       { "status": "shown", "items": [] },
   "specialties": { "status": "shown", "title": "…", "interval": 10000, "items": [] },
@@ -144,7 +144,7 @@ numbers had two of them reachable on the page and invisible to a search engine.
 | Field | |
 |---|---|
 | `updated` · `revision` | bookkeeping — see *Rules that apply to both* |
-| `meta` | `<title>`, meta description, Open Graph title |
+| `meta` | everything the `<head>` says about this page — see [The `meta` band](#the-meta-band-on-every-document) |
 | `hero` | the page's heading and subheading. No `status`: a page with no title is not a page with a section switched off |
 | `story` | the image-and-prose sections. `status` switches the whole run of them off |
 | `specialties` | the slideshow. `interval` is milliseconds, clamped 2000–60000 |
@@ -214,6 +214,76 @@ page comes under management.
 Security and Security First, Client-Centric Approach and Client Partnership — and are deliberately
 separate: different wording, different icons, different markup, on different pages. Editing one is
 worth a look at the other.
+
+## The `meta` band, on every document
+
+Every document has one, including `content/careers.json`, which never used to — its title and
+description were literal strings in the page file, and the only two on the site nobody could change.
+
+```json
+"meta": {
+  "title":       "About Tech4TIME | Trusted IT & Cybersecurity Solutions",
+  "description": "Founded in 2018, Tech4TIME delivers …",
+  "share_title": "About Tech4TIME",
+  "breadcrumb":  "About Us",
+  "robots":      "index",
+  "changefreq":  "monthly",
+  "priority":    "0.8",
+  "share":       { "src": "", "webp": "", "width": 0, "height": 0 },
+  "share_alt":   ""
+}
+```
+
+| Field | |
+|---|---|
+| `title` | the browser tab and the search result's heading. At most `SEO_TITLE_MAX` (65) characters |
+| `description` | the search result's paragraph. `SEO_DESC_MIN`–`SEO_DESC_MAX` (50–165); 150–160 is the ideal the editor hints at and nothing refuses |
+| `share_title` | the heading on a shared link |
+| `breadcrumb` | the page's name in the BreadcrumbList. **Pure SEO** — there is no visible breadcrumb anywhere on the site |
+| `robots` | `index` or `noindex`. **Also decides the sitemap**: one control, not two |
+| `changefreq`, `priority` | the sitemap's hints for this page |
+| `share` | a per-page share card. Empty means the site-wide one in `content/seo.json` |
+| `share_alt` | its alt text |
+
+A service row carries the same band, so a seventh service arrives with sensible defaults.
+
+### Only `?s=seo` writes it
+
+The nine page editors do **not**. Each renders a link to that page's SEO screen where its meta
+fieldset used to be, and each `*_from_post()` iterates `contract_page_bands()` — `*_TEXT_FIELDS`
+**minus** `meta`.
+
+That subtraction is the whole safety property. A form that stops *rendering* a field while its band
+is still named in the loop reads `$_POST['meta']['title']` as absent, `?? ''` supplies an empty
+string, and the page's title is blanked on every save — silently, because empty is a valid title
+and nothing throws. `tools/test_seo_admin.py` saves each page editor untouched and requires every
+meta value to survive; with `contract_page_bands()` deliberately broken it reports four fields
+blanked on every document.
+
+[seo.md](seo.md) · [ADR 0020](../90-decisions/0020-page-metadata-is-content.md)
+
+---
+
+## `content/seo.json`
+
+The site-wide half: what is true of the whole site rather than of one page, plus the 404's own
+record, because that page renders no content document and never will.
+
+| Band | | Edited at |
+|---|---|---|
+| `site` | the defaults every page inherits: `<html lang>`, `og:locale`, `og:type`, the card shape, the theme colours, the default share card | `?s=seo&site=identity` |
+| `identity` | the Organization node — legal name, slogan, founding year, the services it offers, what it knows about | `?s=seo&site=identity` |
+| `sameas` | the profiles that are this company elsewhere. Rows: add, reorder, **hide** | `?s=seo&site=identity` |
+| `hours` | opening hours as machine-readable rows — `days[]`, `opens`, `closes`. The office rows in `content/contact.json` carry hours as prose, which a search engine cannot read | `?s=seo&site=identity` |
+| `crawl` | extra `Disallow` paths, and the Search Console and Bing verification tokens | `?s=seo&site=crawl` |
+| `manifest` | what the web manifest says. The **icon list is not here** — it names files that must exist | `?s=seo&site=crawl` |
+| `notfound` | the 404's title, description and crawl directive. No canonical and no `og:url`, by design | `?s=seo&page=notfound` |
+
+**The offices are not here.** The addresses and telephone numbers in the Organization graph come
+from `content/contact.json`, through the same functions the contact page renders from — so the
+graph and the visible page cannot disagree.
+
+---
 
 ## Rules that apply to both
 

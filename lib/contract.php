@@ -54,7 +54,7 @@ const CONTRACT_VERSION = 1;
 
 /** Every document that is published, by name. The endpoint refuses any other. */
 const CONTRACT_DOCUMENTS = ['careers', 'contact', 'company', 'about', 'home', 'services',
-                            'certifications', 'branding', 'privacy'];
+                            'certifications', 'branding', 'privacy', 'seo'];
 
 /**
  * Where a document's record lives, on either host.
@@ -96,6 +96,38 @@ function contract_path(string $document): string
  * point. That is exactly how 'revision' announced itself.
  */
 const CONTRACT_BOOKKEEPING = ['updated', 'revision', 'footer_synced'];
+
+/* ---------------------------------------------------- page metadata
+
+   THE meta BAND IS THE SAME SHAPE IN EVERY DOCUMENT, AND ONE SCREEN EDITS
+   IT. These live up here rather than beside their functions because a
+   file-scope const is evaluated where it stands, and the first document to
+   name CONTRACT_META_TEXT is the contact page a couple of hundred lines
+   below. The functions that use them are further down, with the other
+   cross-document helpers -- those are hoisted and do not care. */
+
+/** The band that belongs to the SEO screen rather than to the page's editor. */
+const CONTRACT_META_BAND = 'meta';
+
+/** Its free-text fields, the same four in every document. */
+const CONTRACT_META_TEXT = ['title', 'description', 'share_title', 'breadcrumb'];
+
+/**
+ * What a page tells a crawler, as the two states somebody chooses between.
+ *
+ * The directive STRING is the renderer's business and is longer than this: an
+ * indexed page also asks for large image previews and full snippets. Two
+ * states rather than five directives, because SITEMAP MEMBERSHIP IS DERIVED
+ * FROM THIS -- so there is no second switch that can be set to contradict it,
+ * and a noindex URL cannot end up in the sitemap, which is a Search Console
+ * warning against the whole file.
+ */
+const CONTRACT_ROBOTS = ['index', 'noindex'];
+
+/** The sitemap's changefreq vocabulary, fixed by the sitemap schema. */
+const CONTRACT_CHANGEFREQ = ['always', 'hourly', 'daily', 'weekly', 'monthly',
+                             'yearly', 'never'];
+
 
 /* ==========================================================================
    1. Careers — the shape of a job post
@@ -141,6 +173,24 @@ function careers_defaults(): array
         'cv_form_url' => '',
         'updated'     => '',
         'revision'    => 0,
+        /* THE CAREERS PAGE WAS THE ONE PAGE NOBODY COULD RETITLE. Its <title>
+           and description were literal strings in pages/careers/index.php,
+           because this document grew around a list of job posts and never had
+           a band for the page itself. It has the same meta band as every other
+           document now, and the same screen edits it. */
+        'meta'        => [
+            'title'       => 'Careers | Tech4TIME',
+            'description' => 'Open roles at Tech4TIME in cybersecurity, software and '
+                           . 'infrastructure. See what is available now, or send us '
+                           . 'your CV for the roles we open next.',
+            'share_title' => 'Careers | Tech4TIME',
+            'breadcrumb'  => 'Careers',
+            'robots'      => 'index',
+            'changefreq'  => 'weekly',
+            'priority'    => '0.7',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
+        ],
         'jobs'        => [],
     ];
 }
@@ -154,6 +204,9 @@ function careers_defaults(): array
 function careers_normalise(array $data): array
 {
     $data += careers_defaults();
+
+    $data['meta'] = contract_meta_defaults($data['meta'] ?? [],
+                                           careers_defaults()['meta']);
 
     $data['revision'] = max(0, (int)($data['revision'] ?? 0));
     $data['jobs'] = is_array($data['jobs'] ?? null) ? array_values($data['jobs']) : [];
@@ -291,7 +344,7 @@ const CONTACT_ICONS = [
 
 /* Free-text single-line fields, by section. */
 const CONTACT_TEXT_FIELDS = [
-    'meta'    => ['title', 'description', 'share_title'],
+    'meta'    => CONTRACT_META_TEXT,
     'hero'    => ['title', 'subtitle'],
     'form'    => ['title', 'subject_hint', 'note'],
     'reach'   => ['title'],
@@ -323,6 +376,12 @@ function contact_defaults(): array
             'title'       => 'Contact Us | Tech4TIME',
             'description' => 'Get in touch with Tech4TIME.',
             'share_title' => 'Ask for a quote or just contact us',
+            'breadcrumb'  => 'Contact Us',
+            'robots'      => 'index',
+            'changefreq'  => 'yearly',
+            'priority'    => '0.7',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
         ],
         'hero' => [
             'title'    => 'Contact Us',
@@ -371,6 +430,9 @@ function contact_normalise(array $data): array
         }
         $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
     }
+
+    $data['meta'] = contract_meta_defaults($data['meta'] ?? [],
+                                          $defaults['meta']);
 
     /* Clamped the same way COMPANY_BANDS are, and for the same reason: this
        arrives from a file as often as from a form, and "banana" is not a
@@ -676,7 +738,7 @@ const COMPANY_ICONS = [
 
 /* Free-text single-line fields, by band. */
 const COMPANY_TEXT_FIELDS = [
-    'meta'       => ['title', 'description', 'share_title'],
+    'meta'       => CONTRACT_META_TEXT,
     'hero'       => ['title', 'subtitle'],
     'milestones' => ['eyebrow', 'title'],
     'background' => ['eyebrow', 'title'],
@@ -747,6 +809,12 @@ function company_defaults(): array
             'title'       => 'Company Profile | Tech4TIME',
             'description' => 'Our milestones, the clients we serve, and the technology our engagements are built on.',
             'share_title' => 'Milestones in Technological Excellence',
+            'breadcrumb'  => 'Company Profile',
+            'robots'      => 'index',
+            'changefreq'  => 'monthly',
+            'priority'    => '0.7',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
         ],
         'hero' => [
             'title'    => 'Company Profile',
@@ -830,6 +898,9 @@ function company_normalise(array $data): array
         }
         $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
     }
+
+    $data['meta'] = contract_meta_defaults($data['meta'] ?? [],
+                                          $defaults['meta']);
 
     foreach (COMPANY_BANDS as $band) {
         $data[$band]['status'] =
@@ -1161,6 +1232,102 @@ function contract_identify_rows(array $rows, string $placeholder, callable $name
     return $ids;
 }
 
+
+/* ------------------------------------------------------ page metadata
+
+   THE meta BAND IS THE SAME SHAPE IN EVERY DOCUMENT, AND ONE SCREEN EDITS IT.
+
+   Every page's title, description, share title, breadcrumb, crawl directive
+   and sitemap tuning live in that page's OWN document, beside its content, and
+   are edited at admin.tech4time.bd/?s=seo -- one screen for the whole site.
+   The values stayed where they were; only the typing moved. See
+   docs/40-reference/seo.md and ADR 0020.
+
+   THE meta BAND IS THEREFORE NOT A BAND THE PAGE'S OWN EDITOR WRITES, and that
+   distinction is load-bearing rather than tidy. Every *_from_post() starts from
+   the stored document and then overwrites each band named in its *_TEXT_FIELDS
+   from $_POST. A form that has stopped RENDERING the meta fieldset while still
+   naming it in that loop reads $_POST['meta']['title'] as absent, ?? ''
+   supplies an empty string, and the page's title is blanked on every save --
+   silently, because empty is a valid value and nothing throws.
+   contract_page_bands() is what the page editors iterate instead, and
+   sections/seo.php iterates the meta band alone. */
+
+/**
+ * Bring a meta band to the current shape, whatever it arrived as.
+ *
+ * $fallback is the document's own defaults, so a key that has never been
+ * written comes back as the value the page ships with rather than as a blank --
+ * the same floor every other band already has.
+ */
+function contract_meta_defaults(mixed $meta, array $fallback): array
+{
+    $meta = is_array($meta) ? $meta : [];
+    $meta += $fallback;
+
+    foreach (CONTRACT_META_TEXT as $field) {
+        $meta[$field] = is_string($meta[$field] ?? null)
+            ? trim($meta[$field])
+            : (string)($fallback[$field] ?? '');
+    }
+
+    $meta['robots'] = in_array($meta['robots'] ?? '', CONTRACT_ROBOTS, true)
+        ? $meta['robots']
+        : (string)($fallback['robots'] ?? 'index');
+
+    $meta['changefreq'] = in_array($meta['changefreq'] ?? '', CONTRACT_CHANGEFREQ, true)
+        ? $meta['changefreq']
+        : (string)($fallback['changefreq'] ?? 'monthly');
+
+    /* One decimal, clamped. A priority outside 0.0-1.0 is a schema error
+       against the whole sitemap, not a bad value on one line of it. */
+    $meta['priority'] = number_format(
+        min(1.0, max(0.0, (float)($meta['priority'] ?? $fallback['priority'] ?? 0.5))), 1);
+
+    /* Empty means "use the site-wide share card", which is what all seventeen
+       pages do today -- so a document that has never been given one renders
+       exactly the bytes it renders now. */
+    $meta['share']     = contract_image_defaults($meta['share'] ?? []);
+    $meta['share_alt'] = is_string($meta['share_alt'] ?? null)
+        ? trim($meta['share_alt']) : '';
+
+    return $meta;
+}
+
+/**
+ * Every band of a document the PAGE's own editor writes.
+ *
+ * Which is all of them except meta. See the note above: this is what stops a
+ * form that no longer renders a field from posting an empty string over it.
+ */
+function contract_page_bands(array $text_fields): array
+{
+    unset($text_fields[CONTRACT_META_BAND]);
+    return $text_fields;
+}
+
+/**
+ * The share-card override a meta band points at, as web paths.
+ *
+ * Every document has one now, including the five that carry no other artwork,
+ * so every document needs an arm in contract_images() -- see the note there
+ * about one screen offering to delete another's uploads.
+ */
+function contract_meta_images(mixed $meta): array
+{
+    $meta = is_array($meta) ? $meta : [];
+    $seen = [];
+
+    foreach ([$meta['share']['src'] ?? '', $meta['share']['webp'] ?? ''] as $path) {
+        $path = trim((string)$path);
+        if ($path !== '') {
+            $seen[$path] = true;
+        }
+    }
+
+    return array_keys($seen);
+}
+
 /** Only the rows of a list a visitor should see. */
 function company_shown(array $data, string $band): array
 {
@@ -1273,7 +1440,7 @@ const ABOUT_SIDES = [
 /* Free-text single-line fields, by band. The story band has none: every
    heading on that part of the page belongs to a row, not to the band. */
 const ABOUT_TEXT_FIELDS = [
-    'meta'        => ['title', 'description', 'share_title'],
+    'meta'        => CONTRACT_META_TEXT,
     'hero'        => ['title', 'subtitle'],
     'specialties' => ['title'],
     'whyus'       => ['title'],
@@ -1332,6 +1499,12 @@ function about_defaults(): array
             'title'       => 'About Tech4TIME | Trusted IT & Cybersecurity Solutions',
             'description' => 'Founded in 2018, Tech4TIME delivers cybersecurity, software development, cloud infrastructure, HRaaS and IT training — orchestrating technology with time.',
             'share_title' => 'About Tech4TIME',
+            'breadcrumb'  => 'About Us',
+            'robots'      => 'index',
+            'changefreq'  => 'monthly',
+            'priority'    => '0.8',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
         ],
         'hero' => [
             'title'    => 'About Us',
@@ -1384,6 +1557,9 @@ function about_normalise(array $data): array
         }
         $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
     }
+
+    $data['meta'] = contract_meta_defaults($data['meta'] ?? [],
+                                          $defaults['meta']);
 
     foreach (ABOUT_BANDS as $band) {
         $data[$band]['status'] =
@@ -1633,7 +1809,7 @@ const HOME_PROMPT_DEFAULT = 'tech4time@soc:~$';
 /* Free-text single-line fields, by band. The list bands carry only their own
    headings here; everything inside them belongs to a row. */
 const HOME_TEXT_FIELDS = [
-    'meta'         => ['title', 'description', 'share_title'],
+    'meta'         => CONTRACT_META_TEXT,
     'hero'         => ['title', 'accent', 'cta_label', 'cta_href'],
     'terminal'     => ['title', 'summary'],
     'capabilities' => ['title', 'lead'],
@@ -1709,6 +1885,12 @@ function home_defaults(): array
             'title'       => 'Tech4TIME | Orchestrating Technology with Time',
             'description' => 'Enterprise-grade cybersecurity, software development, cloud infrastructure and HR solutions from Tech4TIME. Orchestrate, build, maintain and protect your business.',
             'share_title' => 'Tech4TIME | Orchestrating Technology with Time',
+            'breadcrumb'  => 'Home',
+            'robots'      => 'index',
+            'changefreq'  => 'weekly',
+            'priority'    => '1.0',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
         ],
         'hero' => [
             'title'     => 'Orchestrating Technology with Time',
@@ -1798,6 +1980,9 @@ function home_normalise(array $data): array
         }
         $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
     }
+
+    $data['meta'] = contract_meta_defaults($data['meta'] ?? [],
+                                          $defaults['meta']);
 
     foreach (HOME_BANDS as $band) {
         $data[$band]['status'] =
@@ -2127,7 +2312,7 @@ const SERVICES_GROUP_WIDTHS = [
 
 /* Free-text single-line fields of the INDEX document, by band. */
 const SERVICES_TEXT_FIELDS = [
-    'meta' => ['title', 'description', 'share_title'],
+    'meta' => CONTRACT_META_TEXT,
     'hero' => ['title', 'subtitle'],
     'nav'  => ['eyebrow', 'title', 'lead'],
     'ossf' => ['eyebrow', 'title', 'lead'],
@@ -2137,7 +2322,7 @@ const SERVICES_TEXT_FIELDS = [
 /* Free-text single-line fields of ONE SERVICE, by band. */
 const SERVICES_PAGE_TEXT_FIELDS = [
     'service' => ['name', 'slug', 'schema_type', 'schema_description'],
-    'meta'   => ['title', 'description', 'share_title'],
+    'meta'   => CONTRACT_META_TEXT,
     'hero'   => ['title', 'subtitle'],
     'core'   => ['eyebrow', 'title', 'lead'],
     'layers' => ['eyebrow', 'title', 'lead'],
@@ -2214,6 +2399,12 @@ function services_defaults(): array
             'title'       => 'Services — Cybersecurity, Software, Cloud & HRaaS | Tech4TIME',
             'description' => "Software development, cybersecurity and SOC build-out, private cloud on OpenStack, HRaaS, IT equipment supply, consultancy and training — Tech4TIME's six practices.",
             'share_title' => 'Our Comprehensive Technological Solutions',
+            'breadcrumb'  => 'Services',
+            'robots'      => 'index',
+            'changefreq'  => 'weekly',
+            'priority'    => '0.9',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
         ],
         'hero' => [
             'title'    => 'Services',
@@ -2280,6 +2471,9 @@ function services_normalise(array $data): array
         $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
     }
 
+    $data['meta'] = contract_meta_defaults($data['meta'] ?? [],
+                                          $defaults['meta']);
+
     foreach (SERVICES_BANDS as $band) {
         $data[$band]['status'] =
             ($data[$band]['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown';
@@ -2326,8 +2520,26 @@ function services_service_defaults(array $row): array
         'schema_description' => '',
     ];
 
-    $row['meta'] = is_array($row['meta'] ?? null) ? $row['meta'] : [];
-    $row['meta'] += ['title' => '', 'description' => '', 'share_title' => ''];
+    /* A service page's own metadata, edited on the SEO screen like every other
+       page's. THE BREADCRUMB FALLS BACK TO THE SERVICE'S NAME, which is what
+       services_breadcrumbs() used before this field existed -- so the six
+       services that have never been given one render the trail they render
+       today, and a seventh added by the Add button gets a sensible one without
+       anybody visiting a second screen. changefreq and priority are the values
+       sitemap.php applied to every service from one pair of constants; they
+       are per-service now because a seventh service is not obliged to be worth
+       the same as the first six. */
+    $row['meta'] = contract_meta_defaults($row['meta'] ?? [], [
+        'title'       => '',
+        'description' => '',
+        'share_title' => '',
+        'breadcrumb'  => (string)$row['name'],
+        'robots'      => 'index',
+        'changefreq'  => 'monthly',
+        'priority'    => '0.9',
+        'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+        'share_alt'   => '',
+    ]);
 
     $row['hero'] = is_array($row['hero'] ?? null) ? $row['hero'] : [];
     $row['hero'] += ['title' => '', 'subtitle' => ''];
@@ -2681,6 +2893,28 @@ function services_rows_shown(array $rows): array
 {
     return contract_rows_shown($rows);}
 
+/**
+ * Every picture this document points at, as web paths, without duplicates.
+ *
+ * Which today means the share-card override on each of the seven pages it
+ * holds -- the index and the six services -- and nothing else: the services
+ * pages draw icons from the sprite, not uploads. It still has to exist and
+ * still has to be complete, because contract_images() is what tells the sweep
+ * on every OTHER screen which uploads are spoken for.
+ */
+function services_images(array $data): array
+{
+    $seen = [];
+
+    foreach (services_all($data) as $service) {
+        foreach (contract_meta_images($service['meta'] ?? []) as $path) {
+            $seen[$path] = true;
+        }
+    }
+
+    return array_keys($seen);
+}
+
 /** Every service, hidden ones included. The editor lists these. */
 function services_all(array $data): array
 {
@@ -2808,7 +3042,7 @@ const CERTIFICATIONS_CERT_GLYPH = 'certificate';
 /* Free-text single-line fields, by band. A group's own heading belongs to the
    group, not to the band, so 'certs' carries only the band header. */
 const CERTIFICATIONS_TEXT_FIELDS = [
-    'meta'  => ['title', 'description', 'share_title'],
+    'meta'  => CONTRACT_META_TEXT,
     'hero'  => ['title', 'subtitle'],
     'certs' => ['eyebrow', 'title', 'lead'],
     'cta'   => ['title', 'text'],
@@ -2901,6 +3135,12 @@ function certifications_defaults(): array
                            . 'incident responders, threat hunters and security engineers hold, '
                            . 'grouped by the role they are deployed in.',
             'share_title' => 'Resource Certifications',
+            'breadcrumb'  => 'Resource Certifications',
+            'robots'      => 'index',
+            'changefreq'  => 'monthly',
+            'priority'    => '0.6',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
         ],
         'hero'     => [
             'title'    => 'Resource Certifications',
@@ -2941,6 +3181,9 @@ function certifications_normalise(array $data): array
         }
         $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
     }
+
+    $data['meta'] = contract_meta_defaults($data['meta'] ?? [],
+                                          $defaults['meta']);
 
     foreach (CERTIFICATIONS_BANDS as $band) {
         $data[$band]['status'] =
@@ -3262,7 +3505,7 @@ const BRANDING_DOWNLOAD_GLYPH = 'arrow-down';
    asset, not to the band, so 'assets' carries only the band header; the legal
    band carries only its title, because its paragraphs are rows. */
 const BRANDING_TEXT_FIELDS = [
-    'meta'   => ['title', 'description', 'share_title', 'breadcrumb'],
+    'meta'   => CONTRACT_META_TEXT,
     'hero'   => ['title', 'subtitle'],
     'assets' => ['eyebrow', 'title', 'lead'],
     'legal'  => ['title'],
@@ -3341,13 +3584,19 @@ function branding_defaults(): array
                authored one: a breadcrumb names a place in a hierarchy, and a
                heading introduces a page.
 
-               The about, company and certifications pages let their breadcrumb
-               follow hero.title, because on those three the two strings are the
-               same and a second field would have been a second chance to
-               disagree. Here they differ, so following the hero would have
-               quietly renamed this page in every search result that shows a
-               breadcrumb trail. */
+               This page and the privacy policy were the only two that carried
+               the field, because they were the only two whose two strings
+               differed; the about, company and certifications pages let their
+               breadcrumb follow hero.title instead. Every page has the field
+               now -- the SEO screen edits one shape, not seven -- and each of
+               those three was seeded with the string it was already
+               rendering. */
             'breadcrumb'  => 'Branding & Advertisement',
+            'robots'      => 'index',
+            'changefreq'  => 'yearly',
+            'priority'    => '0.4',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
         ],
         'hero'     => [
             'title'    => 'Branding Assets & Guidelines',
@@ -3393,6 +3642,9 @@ function branding_normalise(array $data): array
         }
         $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
     }
+
+    $data['meta'] = contract_meta_defaults($data['meta'] ?? [],
+                                          $defaults['meta']);
 
     foreach (BRANDING_BANDS as $band) {
         $data[$band]['status'] =
@@ -3760,7 +4012,7 @@ const PRIVACY_ROW_BLOCKS = [
 /* Free-text single-line fields, by band. The sections carry their own
    headings, so 'policy' holds only the effective date and the callout. */
 const PRIVACY_TEXT_FIELDS = [
-    'meta'   => ['title', 'description', 'share_title', 'breadcrumb'],
+    'meta'   => CONTRACT_META_TEXT,
     'hero'   => ['title', 'subtitle'],
     'policy' => ['label', 'effective'],
     'cta'    => ['title', 'text'],
@@ -3822,6 +4074,11 @@ function privacy_defaults(): array
                            . 'tracking.',
             'share_title' => 'Privacy Policy | Tech4TIME',
             'breadcrumb'  => 'Privacy Policy',
+            'robots'      => 'index',
+            'changefreq'  => 'yearly',
+            'priority'    => '0.3',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
         ],
         'hero'     => [
             'title'    => 'Privacy Policy',
@@ -3872,6 +4129,9 @@ function privacy_normalise(array $data): array
         }
         $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
     }
+
+    $data['meta'] = contract_meta_defaults($data['meta'] ?? [],
+                                          $defaults['meta']);
 
     foreach (PRIVACY_BANDS as $band) {
         $data[$band]['status'] =
@@ -4390,7 +4650,475 @@ function privacy_shared_facts(array $privacy, array $contact): array
 }
 
 /* ==========================================================================
-   10. Revisions
+   10. SEO — the site-wide half, and the map of what a page is
+   ========================================================================== */
+
+/*
+   WHAT IS HERE, AND WHAT IS DELIBERATELY NOT.
+
+   A PAGE's own metadata is not here. Its title, description, share title,
+   breadcrumb, crawl directive and sitemap tuning live in that page's own
+   document, in the meta band every document has -- see the page metadata block
+   near the top of this file. One screen edits all of them, and the values stay
+   with the page they describe. Moving them into this document was considered
+   and rejected: content/ is never synced by a deploy, so a document assembled
+   from the repository's committed seeds would carry SEED titles onto a host
+   whose live copies hold titles edited since, and the reversion would be
+   silent. Leaving them where they are removes that failure mode rather than
+   managing it.
+
+   What IS here is everything that belongs to the SITE rather than to any one
+   page: the Organization graph, the default share card, the colours, the
+   crawl file and the web manifest -- plus the 404 page's record, because that
+   page renders no content document and never will.
+
+   ROUTES ARE CODE. SEO_ROUTES below cannot be added to, renamed, removed or
+   reordered from the editor. Adding a page is a code change, as it always was,
+   and its card then appears by itself -- which is what makes it impossible to
+   orphan a record or point one at a URL that does not resolve.
+*/
+
+/** Where the public site lives. The canonical of every page is built on it. */
+const SEO_ORIGIN = 'https://tech4time.bd';
+
+/**
+ * Every page that is a FILE in the frontend repository: key => [route, name,
+ * document].
+ *
+ *   route     the address, with its trailing slash. '' for a page that has no
+ *             canonical URL and must not be given one -- the 404, which is
+ *             served at every address that does not exist.
+ *   name      what the SEO screen calls it, and the fallback breadcrumb.
+ *   document  which content document holds this page's meta band. '' means
+ *             this document holds it, which is true of the 404 alone.
+ *
+ * THE SERVICE PAGES ARE NOT HERE, and that is the point of them. A service is
+ * a row of content/services.json, a seventh can be added in the editor, and
+ * its metadata is its row's own meta band -- so there is no key to keep in
+ * step, and renaming a slug cannot orphan a record because there is no record
+ * apart from the row.
+ *
+ * Order is sitemap order and screen order.
+ */
+const SEO_ROUTES = [
+    'home'           => ['/',                                  'Home',                    'home'],
+    'services'       => ['/pages/services/',                   'Services',                'services'],
+    'about'          => ['/pages/about/',                      'About Us',                'about'],
+    'company'        => ['/pages/company-profile/',            'Company Profile',         'company'],
+    'careers'        => ['/pages/careers/',                    'Careers',                 'careers'],
+    'contact'        => ['/pages/contact/',                    'Contact',                 'contact'],
+    'certifications' => ['/pages/resource-certifications/',    'Resource Certifications', 'certifications'],
+    'branding'       => ['/pages/branding-and-advertisement/', 'Branding & Advertisement','branding'],
+    'privacy'        => ['/pages/privacy-policy/',             'Privacy Policy',          'privacy'],
+    'notfound'       => ['',                                   'Page not found',          ''],
+];
+
+/*
+   HOW LONG A TITLE AND A DESCRIPTION MAY BE, IN ONE PLACE.
+
+   tools/audit_pages.py enforced 65 / 50 / 165 as literals of its own while
+   docs/10-development/frontend/adding-a-page.md advised 150-160, and the two
+   had drifted apart with nothing to notice. The audit reads these now, the way
+   tools/check_content_model.py already reads CONTRACT_BOOKKEEPING, and the
+   editor refuses outside the hard range and hints outside the ideal one.
+*/
+const SEO_TITLE_MAX  = 65;
+const SEO_DESC_MIN   = 50;
+const SEO_DESC_MAX   = 165;
+const SEO_DESC_IDEAL = [150, 160];
+
+/** Free-text single-line fields of the site-wide document, by band. */
+const SEO_TEXT_FIELDS = [
+    'site'     => ['name', 'description', 'locale', 'lang', 'og_type', 'twitter_card',
+                   'theme_light', 'theme_dark', 'share_alt'],
+    'identity' => ['legal_name', 'alternate_name', 'slogan', 'description',
+                   'founded', 'price_range', 'area_served'],
+    'crawl'    => ['verify_google', 'verify_bing'],
+    'manifest' => ['short_name', 'background', 'theme', 'display'],
+    'notfound' => ['title', 'description', 'share_title'],
+];
+
+/**
+ * Fields typed one entry per line into a textarea, and stored as a list.
+ *
+ * Same reasoning as SERVICES_LINE_FIELDS: twenty short strings as twenty
+ * inputs is twenty inputs, and it is not how anybody wants to type a list.
+ */
+const SEO_LINE_FIELDS = [
+    'identity' => ['service_types', 'knows_about'],
+    'crawl'    => ['robots_extra'],
+];
+
+/** The bands that hold a list, and the function that fills one of their rows. */
+const SEO_LISTS = ['sameas' => 'seo_link_defaults', 'hours' => 'seo_hours_defaults'];
+
+/** What a row is called before it is called anything. See seo_identify(). */
+const SEO_ID_PLACEHOLDER = 'row';
+
+/** schema.org's day names, in week order, which is the order they render. */
+const SEO_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday',
+                  'Friday', 'Saturday'];
+
+/** The display modes a web manifest understands. */
+const SEO_DISPLAY = ['standalone', 'fullscreen', 'minimal-ui', 'browser'];
+
+/**
+ * What a page tells a crawler, as the string that actually goes in the tag.
+ *
+ * Two states in, two strings out, and both are the exact bytes the seventeen
+ * hand-written heads carried before this file emitted them -- which is what
+ * lets the conversion be proved byte-identical. An indexed page also asks for
+ * large image previews and full snippets, so a rich result may use the branded
+ * share card; a noindex page asks only not to be listed, and still follows its
+ * links, because a page nobody indexes is still a page whose links matter.
+ */
+function seo_robots_directive(string $robots): string
+{
+    return $robots === 'noindex'
+        ? 'noindex, follow'
+        : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1';
+}
+
+/**
+ * The route keys above this route, outermost first.
+ *
+ * Found by prefix match over SEO_ROUTES, so a breadcrumb trail is never
+ * hand-numbered and a page added to the constant joins the trails below it by
+ * having been added. A service page passes its own address and gets
+ * ['home', 'services'] without being in the constant at all.
+ */
+function seo_ancestors(string $route): array
+{
+    $found = [];
+
+    foreach (SEO_ROUTES as $key => [$path, $_name, $_document]) {
+        if ($path !== '' && $path !== $route && str_starts_with($route, $path)) {
+            $found[$key] = strlen($path);
+        }
+    }
+
+    asort($found);
+
+    return array_keys($found);
+}
+
+/** A list typed one entry per line. Blank lines are dropped. */
+function seo_lines(mixed $value): array
+{
+    if (is_array($value)) {
+        $value = implode("\n", array_map(static fn($v) => (string)$v, $value));
+    }
+
+    $out = [];
+    foreach (preg_split('/\R/', (string)(is_scalar($value) ? $value : '')) ?: [] as $line) {
+        $line = trim($line);
+        if ($line !== '') {
+            $out[] = $line;
+        }
+    }
+
+    return $out;
+}
+
+/** One profile the Organization says is also it. */
+function seo_link_defaults(array $row): array
+{
+    $row += ['id' => '', 'label' => '', 'url' => '', 'status' => 'shown'];
+
+    $row['id']     = trim((string)$row['id']);
+    $row['label']  = trim((string)$row['label']);
+    $row['url']    = rt_safe_href(trim((string)$row['url']));
+    $row['status'] = $row['status'] === 'hidden' ? 'hidden' : 'shown';
+
+    return $row;
+}
+
+/**
+ * One opening-hours block of the ProfessionalService graph.
+ *
+ * The hours on the contact page are free prose -- "Sun - Thu: 9:00 AM - 6:00
+ * PM" -- because that is what reads well to a person. schema.org wants days
+ * and 24-hour times, so they are authored here rather than parsed out of a
+ * sentence somebody is free to reword. tools/check_shared_facts.py reports it
+ * when the two stop agreeing; it never refuses a save over it.
+ */
+function seo_hours_defaults(array $row): array
+{
+    $row += ['id' => '', 'label' => '', 'days' => [], 'opens' => '',
+             'closes' => '', 'status' => 'shown'];
+
+    $row['id']    = trim((string)$row['id']);
+    $row['label'] = trim((string)$row['label']);
+
+    $days = is_array($row['days']) ? $row['days'] : [];
+    $row['days'] = array_values(array_filter(
+        SEO_DAYS,
+        static fn(string $day): bool => in_array($day, $days, true)
+    ));
+
+    foreach (['opens', 'closes'] as $field) {
+        $time = trim((string)$row[$field]);
+        $row[$field] = preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time) === 1 ? $time : '';
+    }
+
+    $row['status'] = $row['status'] === 'hidden' ? 'hidden' : 'shown';
+
+    return $row;
+}
+
+/**
+ * The site-wide document as it ships, and the fallback for anything missing.
+ *
+ * THESE ARE THE REAL VALUES, NOT PLACEHOLDERS, and that is the safety net for
+ * the deploy: if content/seo.json is ever missing on the host, every page
+ * still emits the correct Organization graph, the correct share card and the
+ * correct colours -- exactly as contact_defaults() and company_defaults()
+ * already do for their pages. Every string below was read out of the rendered
+ * <head> the seventeen pages carried before this file replaced them.
+ */
+function seo_defaults(): array
+{
+    return [
+        'updated'  => '',
+        'revision' => 0,
+
+        /* What every page says about the site rather than about itself. */
+        'site' => [
+            'name'         => 'Tech4TIME',
+            'description'  => 'Cybersecurity, software development, cloud infrastructure and HR solutions.',
+            'locale'       => 'en_US',
+            'lang'         => 'en',
+            'og_type'      => 'website',
+            'twitter_card' => 'summary_large_image',
+            'theme_light'  => '#fafafa',
+            'theme_dark'   => '#0b0b0c',
+            /* The default share card. A page may override it in its own meta
+               band; none does today, which is why all seventeen carry these
+               same bytes. */
+            'share'        => [
+                'src'    => '/assets/images/og/tech4time-og.png',
+                'webp'   => '',
+                'width'  => 1200,
+                'height' => 630,
+            ],
+            'share_alt'    => 'Tech4TIME — Orchestrating Technology with Time',
+        ],
+
+        /* The Organization, WebSite and ProfessionalService graph. Addresses
+           and telephone numbers are NOT here: they belong to the contact page
+           and are read from content/contact.json at render time, which is what
+           stopped this graph going stale on sixteen pages at once. */
+        'identity' => [
+            'legal_name'     => 'Tech4TIME',
+            'alternate_name' => 'M/s. Tech4TIME',
+            'slogan'         => 'Orchestrating Technology with Time',
+            'description'    => 'Open-Source and enterprise-grade cybersecurity, software '
+                              . 'development, cloud infrastructure and IT solutions. '
+                              . 'Orchestrate, build, maintain and protect your business.',
+            'founded'        => '2018-05-15',
+            'price_range'    => '$$',
+            'area_served'    => 'Worldwide',
+            'logo'           => [
+                'src'    => '/assets/images/logo/logo-light-540.png',
+                'webp'   => '',
+                'width'  => 540,
+                'height' => 192,
+            ],
+            'service_types'  => [
+                'Cybersecurity Services',
+                'Software Development',
+                'Cloud Infrastructure',
+                'IT Consulting',
+                'Managed Services',
+                'Human Resources as a Service',
+                'DevOps Services',
+                'Security Operations Center',
+            ],
+            'knows_about'    => [
+                'Cybersecurity',
+                'Penetration Testing',
+                'Security Operations Center',
+                'Incident Response',
+                'Digital Forensics',
+                'Software Development',
+                'DevSecOps',
+                'Cloud Computing',
+                'OpenStack',
+                'Kubernetes',
+                'IT Staffing',
+                'HR as a Service',
+            ],
+        ],
+
+        /* The profiles the Organization says are also it. The footer links to
+           the same two in literal markup on every page; check_shared_facts.py
+           reports it when they part. */
+        'sameas' => [
+            'items' => [
+                ['id' => 'linkedin', 'label' => 'LinkedIn',
+                 'url' => 'https://www.linkedin.com/company/tech4time-bd/', 'status' => 'shown'],
+                ['id' => 'github', 'label' => 'GitHub',
+                 'url' => 'https://github.com/M-s-Tech4TIME', 'status' => 'shown'],
+            ],
+        ],
+
+        'hours' => [
+            'items' => [
+                ['id' => 'bangladesh', 'label' => 'Bangladesh office',
+                 'days' => ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
+                 'opens' => '09:00', 'closes' => '18:00', 'status' => 'shown'],
+                ['id' => 'malaysia', 'label' => 'Malaysia office',
+                 'days' => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+                 'opens' => '09:00', 'closes' => '18:00', 'status' => 'shown'],
+            ],
+        ],
+
+        /* robots.txt, and the two tags that let somebody claim this site in a
+           search engine's console. Empty means the tag is not emitted at all,
+           which is the right default: a verification tag naming nobody is
+           noise in every head on the site. */
+        'crawl' => [
+            'verify_google' => '',
+            'verify_bing'   => '',
+            /* The form endpoint has nothing to index. This is the one rule
+               robots.txt carried before it was rendered. */
+            'robots_extra'  => ['/contact-handler.php'],
+        ],
+
+        /* site.webmanifest. name and description come from the site band, so
+           the app name and the share card cannot disagree; the icon list stays
+           in code because it names files that must exist. */
+        'manifest' => [
+            'short_name' => 'Tech4TIME',
+            'background' => '#0b0b0c',
+            'theme'      => '#0b0b0c',
+            'display'    => 'standalone',
+        ],
+
+        /* The 404 page's own record. It is the one page with no content
+           document to keep its meta band in, and it never will have one: there
+           is nothing on it to edit but the words in this block. */
+        'notfound' => [
+            'title'       => 'Page Not Found | Tech4TIME',
+            'description' => "The page you are looking for could not be found. Browse "
+                           . "Tech4TIME's cybersecurity, software development, cloud and "
+                           . "HR services, or contact our team.",
+            'share_title' => 'Page Not Found',
+            'breadcrumb'  => 'Page not found',
+            'robots'      => 'noindex',
+            'changefreq'  => 'yearly',
+            'priority'    => '0.0',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
+        ],
+    ];
+}
+
+/** Bring the site-wide document to the current shape, whatever it arrived as. */
+function seo_normalise(array $data): array
+{
+    $defaults = seo_defaults();
+
+    foreach ($defaults as $key => $value) {
+        if ($key === 'revision') {
+            $data[$key] = max(0, (int)($data[$key] ?? 0));
+            continue;
+        }
+        if (!is_array($value)) {
+            $data[$key] = is_string($data[$key] ?? null) ? $data[$key] : $value;
+            continue;
+        }
+        $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
+    }
+
+    foreach (SEO_TEXT_FIELDS as $band => $fields) {
+        foreach ($fields as $field) {
+            $data[$band][$field] = is_string($data[$band][$field] ?? null)
+                ? trim($data[$band][$field])
+                : (string)($defaults[$band][$field] ?? '');
+        }
+    }
+
+    foreach (SEO_LINE_FIELDS as $band => $fields) {
+        foreach ($fields as $field) {
+            $data[$band][$field] = seo_lines($data[$band][$field] ?? []);
+        }
+    }
+
+    $data['site']['share']     = contract_image_defaults($data['site']['share'] ?? []);
+    $data['identity']['logo']  = contract_image_defaults($data['identity']['logo'] ?? []);
+
+    /* The 404's record is a full meta band, the same shape every page's is, so
+       the head emitter takes any of them and does not need to know which. Only
+       three of its fields are editable -- see SEO_TEXT_FIELDS -- because a page
+       with no address has no breadcrumb, no canonical and no sitemap row. */
+    $data['notfound'] = contract_meta_defaults($data['notfound'] ?? [],
+                                               $defaults['notfound']);
+    $data['notfound']['robots'] = 'noindex';
+
+    if (!in_array($data['manifest']['display'], SEO_DISPLAY, true)) {
+        $data['manifest']['display'] = 'standalone';
+    }
+
+    foreach (SEO_LISTS as $band => $filler) {
+        $rows = is_array($data[$band]['items'] ?? null) ? $data[$band]['items'] : [];
+        $data[$band]['items'] = array_map(
+            $filler,
+            array_values(array_filter($rows, 'is_array'))
+        );
+    }
+
+    return seo_identify($data);
+}
+
+/** Give every row an id, unique within its own list. Same contract as the rest. */
+function seo_identify(array $data): array
+{
+    foreach (SEO_LISTS as $band => $_filler) {
+        $rows = $data[$band]['items'] ?? [];
+        $ids  = contract_identify_rows(
+            $rows,
+            SEO_ID_PLACEHOLDER,
+            static fn(array $row): string => (string)($row['label'] ?? '')
+        );
+
+        foreach ($ids as $i => $id) {
+            $data[$band]['items'][$i]['id'] = $id;
+        }
+    }
+
+    return $data;
+}
+
+/** Only the rows of a list a visitor should see. */
+function seo_shown(array $data, string $band): array
+{
+    return contract_rows_shown($data[$band]['items'] ?? []);
+}
+
+/** Every picture this document points at, as web paths, without duplicates. */
+function seo_images(array $data): array
+{
+    $seen = [];
+
+    foreach ([$data['site']['share'] ?? [], $data['identity']['logo'] ?? []] as $image) {
+        foreach ([$image['src'] ?? '', $image['webp'] ?? ''] as $path) {
+            $path = trim((string)$path);
+            if ($path !== '') {
+                $seen[$path] = true;
+            }
+        }
+    }
+
+    foreach (contract_meta_images($data['notfound'] ?? []) as $path) {
+        $seen[$path] = true;
+    }
+
+    return array_keys($seen);
+}
+
+/* ==========================================================================
+   11. Revisions
    ========================================================================== */
 
 /**
@@ -4413,7 +5141,7 @@ function contract_next_revision(array $data): int
 }
 
 /* ==========================================================================
-   11. Normalising and re-sanitising on receipt
+   12. Normalising and re-sanitising on receipt
    ========================================================================== */
 
 /**
@@ -4443,6 +5171,7 @@ function contract_normalise(string $document, array $data): array
         'certifications' => certifications_normalise($data),
         'branding' => branding_normalise($data),
         'privacy'  => privacy_normalise($data),
+        'seo'      => seo_normalise($data),
         default    => throw new RuntimeException('Unknown document: ' . $document),
     };
 }
@@ -4464,16 +5193,24 @@ function contract_normalise(string $document, array $data): array
  */
 function contract_images(string $document, array $data): array
 {
+    /* EVERY DOCUMENT CARRIES ARTWORK NOW. The meta band gained a per-page
+       share-card override, so the five documents that used to fall through to
+       the empty default would each have had one picture nothing claimed --
+       and an unclaimed upload is one the sweep on another screen offers to
+       delete. There is no default any more, and there must not be: a new
+       document must be listed here or fail loudly rather than quietly lose a
+       file. */
+    $meta = contract_meta_images($data['meta'] ?? []);
+
     return match ($document) {
-        'company'  => company_images($data),
-        'about'    => about_images($data),
-        'home'     => home_images($data),
-        'branding' => branding_images($data),
-        /* Nothing else carries a picture record today. Listed as a default
-           rather than omitted, because a document that grows one and is not
-           added here becomes a document whose artwork another screen offers
-           to delete. */
-        default    => [],
+        'company'  => array_values(array_unique([...company_images($data), ...$meta])),
+        'about'    => array_values(array_unique([...about_images($data), ...$meta])),
+        'home'     => array_values(array_unique([...home_images($data), ...$meta])),
+        'branding' => array_values(array_unique([...branding_images($data), ...$meta])),
+        'services' => array_values(array_unique([...services_images($data), ...$meta])),
+        'careers', 'contact', 'certifications', 'privacy' => $meta,
+        'seo'      => seo_images($data),
+        default    => throw new RuntimeException('Unknown document: ' . $document),
     };
 }
 
@@ -4603,6 +5340,16 @@ function contract_sanitise(string $document, array $data): array
        calls rich is a field this reaches. */
     if ($document === 'privacy') {
         return privacy_sanitise($data);
+    }
+
+    /* The site-wide SEO document has no rich text and cannot grow any: a meta
+       description that carried markup would be printed as characters in a
+       search result, and the Organization graph is JSON, not HTML. The branch
+       is still explicit, for the reason home's and services' are -- the throw
+       below is a refusal, and "nothing to sanitise" must not arrive at the
+       same line as "document I do not know". */
+    if ($document === 'seo') {
+        return $data;
     }
 
     throw new RuntimeException('Unknown document: ' . $document);

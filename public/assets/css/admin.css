@@ -23,8 +23,14 @@
 
 .admin-page {
   /* The two widths the rail has, named once so the grid and the rail itself
-     cannot disagree about them. */
-  --rail-wide: 16.5rem;
+     cannot disagree about them.
+
+     THE WIDE ONE IS SET BY THE LONGEST LABEL, and is measured rather than
+     chosen: "Branding & Advertisement" and "Resource Certifications" have to
+     sit on ONE LINE and be fully readable, and at 16.5rem they did not.
+     tools/check_admin_a11y.py asserts it, at both rail widths, so a section
+     renamed later fails a check instead of quietly wrapping. */
+  --rail-wide: 19rem;
   --rail-narrow: 4.5rem;
   background-color: var(--bg-surface);
 }
@@ -336,6 +342,12 @@
 
 .rail__label {
   font-weight: 600;
+  /* ONE LINE, ALWAYS. Without this the ellipsis below is inert -- text-overflow
+     only applies to text that does not wrap -- so a label too long for the rail
+     wrapped to two lines and made its row taller than every other. The rail is
+     widened to fit the longest label, so the ellipsis is a last resort that
+     should never be reached; check_admin_a11y.py fails if it is. */
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -1536,7 +1548,13 @@
    on the screens most people are using. */
 @media (max-width: 39.99em) {
   :root {
-    --admin-bar-h: 13.5rem;   /* 216px: clears the 212px services bar */
+    /* 232px: clears the 231px certifications bar, which is the tallest.
+       It grew when that section was renamed from "Certifications" to
+       "Resource Certifications" and the heading began wrapping to two
+       lines at this width. MEASURED, not chosen -- check_admin_a11y.py
+       measures every screen's bar at 320px and fails if this does not
+       clear the tallest, which is how the rename was noticed at all. */
+    --admin-bar-h: 14.5rem;
   }
 }
 

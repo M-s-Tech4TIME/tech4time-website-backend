@@ -66,7 +66,7 @@ function branding_from_post(array $current): array
 {
     $data = $current;
 
-    foreach (BRANDING_TEXT_FIELDS as $band => $fields) {
+    foreach (contract_page_bands(BRANDING_TEXT_FIELDS) as $band => $fields) {
         foreach ($fields as $field) {
             $data[$band][$field] = trim((string)($_POST[$band][$field] ?? ''));
         }
@@ -769,42 +769,7 @@ if (!$errors && $pending !== '') {
   </fieldset>
 
   <!-- ===================== search and sharing ===================== -->
-  <fieldset class="admin__block" id="band-meta">
-    <?php admin_band_head('Search and sharing',
-        'What a search result and a shared link say. None of this appears on '
-      . 'the page itself.'); ?>
-
-    <div class="admin__grid">
-      <label class="admin__field admin__field--wide">
-        <span class="admin__label">Browser tab title</span>
-        <input class="admin__input" type="text" name="meta[title]" required
-               value="<?= h($data['meta']['title']) ?>">
-      </label>
-
-      <label class="admin__field admin__field--wide">
-        <span class="admin__label">Search description</span>
-        <textarea class="admin__input" name="meta[description]" rows="3"><?= h($data['meta']['description']) ?></textarea>
-        <span class="admin__hint">Up to about 320 characters. Longer and it is cut off.</span>
-      </label>
-
-      <label class="admin__field">
-        <span class="admin__label">Title when shared</span>
-        <input class="admin__input" type="text" name="meta[share_title]"
-               value="<?= h($data['meta']['share_title']) ?>">
-      </label>
-
-      <label class="admin__field">
-        <span class="admin__label">Name in a breadcrumb trail</span>
-        <input class="admin__input" type="text" name="meta[breadcrumb]"
-               value="<?= h($data['meta']['breadcrumb']) ?>">
-        <span class="admin__hint">
-          What the site calls this page rather than what the page calls itself
-          — the footer link says "Branding &amp; Advertisement" while the
-          heading above says something longer. Search results show this one.
-        </span>
-      </label>
-    </div>
-  </fieldset>
+  <?php admin_meta_band('branding'); ?>
 
   <?php /* LAST, and the marker admin_form_truncated() looks for. It has to be
            the final field in the form so that PHP dropping the tail of an

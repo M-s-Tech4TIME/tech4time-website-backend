@@ -60,22 +60,16 @@ const ADMIN_SECTIONS = [
         'view'  => '',
     ],
     'home' => [
-        'label' => 'Home Page',
+        'label' => 'Home',
         'icon'  => 'home',
         'desc'  => 'The hero, the services and the cards on the front page',
         'view'  => '/',                 // resolved through public_url()
     ],
-    'careers' => [
-        'label' => 'Careers',
-        'icon'  => 'briefcase',
-        'desc'  => 'Job posts and the CV link',
-        'view'  => '/pages/careers/',   // resolved through public_url()
-    ],
-    'contact' => [
-        'label' => 'Contact',
-        'icon'  => 'envelope',
-        'desc'  => 'Offices, numbers, the form',
-        'view'  => '/pages/contact/',
+    'about' => [
+        'label' => 'About Us',
+        'icon'  => 'users',
+        'desc'  => 'The story, specialities and why-us cards',
+        'view'  => '/pages/about/',
     ],
     'services' => [
         'label' => 'Services',
@@ -89,29 +83,42 @@ const ADMIN_SECTIONS = [
         'desc'  => 'Milestones, clients, technology',
         'view'  => '/pages/company-profile/',
     ],
-    'about' => [
-        'label' => 'About Us',
-        'icon'  => 'users',
-        'desc'  => 'The story, specialities and why-us cards',
-        'view'  => '/pages/about/',
+    'careers' => [
+        'label' => 'Careers',
+        'icon'  => 'briefcase',
+        'desc'  => 'Job posts and the CV link',
+        'view'  => '/pages/careers/',   // resolved through public_url()
+    ],
+    'contact' => [
+        'label' => 'Contact',
+        'icon'  => 'envelope',
+        'desc'  => 'Offices, numbers, the form',
+        'view'  => '/pages/contact/',
     ],
     'certifications' => [
-        'label' => 'Certifications',
+        'label' => 'Resource Certifications',
         'icon'  => 'certificate',
         'desc'  => 'Role groups and the qualifications inside them',
         'view'  => '/pages/resource-certifications/',
     ],
     'branding' => [
-        'label' => 'Branding',
+        'label' => 'Branding & Advertisement',
         'icon'  => 'palette',
         'desc'  => 'The logo files people download, and the terms of use',
         'view'  => '/pages/branding-and-advertisement/',
     ],
     'privacy' => [
-        'label' => 'Privacy',
+        'label' => 'Privacy Policy',
         'icon'  => 'user-lock',
         'desc'  => 'What the site collects, why, and what people can ask for',
         'view'  => '/pages/privacy-policy/',
+    ],
+    'seo' => [
+        'label' => 'SEO Management',
+        'icon'  => 'globe',
+        'desc'  => 'Titles, descriptions and how each page appears in search',
+        /* No single page: this screen edits all of them. */
+        'view'  => '',
     ],
     'account' => [
         'label' => 'Account',
@@ -122,14 +129,36 @@ const ADMIN_SECTIONS = [
 ];
 
 /**
+ * The rail's rows, in the order they appear.
+ *
+ * NOT THE SAME LIST AS ADMIN_SECTIONS, and the difference is one entry: the
+ * account is a section but not a rail row. It is reached from the avatar menu
+ * pinned to the foot of the rail, which is where the account belongs -- it is
+ * the one thing on the screen that is about the person rather than the page,
+ * and every tool with a rail like this one puts it there.
+ *
+ * IT CANNOT SIMPLY BE DROPPED FROM THE REGISTRY INSTEAD. admin_section()
+ * returns 'overview' for any name ADMIN_SECTIONS does not list, so removing
+ * the entry would make ?s=account land silently on the Overview and put the
+ * password and two-factor screens out of reach.
+ *
+ * Adding a section means adding it in BOTH places, and its label has to fit
+ * the rail on one line -- see .rail__label in public/assets/css/admin.css and
+ * the assertion in tools/check_admin_a11y.py.
+ */
+const ADMIN_RAIL_SECTIONS = ['overview', 'home', 'about', 'services', 'company',
+                             'careers', 'contact', 'certifications', 'branding',
+                             'privacy', 'seo'];
+
+/**
  * Sections that edit a page of the website, in rail order.
  *
  * ADMIN_SECTIONS also carries the ones that do not — the overview and the
  * account — so anything counting or listing "the pages you can edit" asks here
  * rather than filtering the registry by hand in three places.
  */
-const ADMIN_PAGE_SECTIONS = ['home', 'careers', 'contact', 'company', 'about', 'services',
-                             'certifications', 'branding', 'privacy'];
+const ADMIN_PAGE_SECTIONS = ['home', 'about', 'services', 'company', 'careers',
+                             'contact', 'certifications', 'branding', 'privacy'];
 
 /* The marker admin_form_tail() writes and admin_form_truncated() looks for. */
 const ADMIN_TAIL_FIELD = '__tail';
@@ -951,6 +980,45 @@ function admin_standing_notice(string $text): void
     <?php
 }
 
+/**
+ * Where a page's search and sharing settings are edited, which is not here.
+ *
+ * EVERY PAGE EDITOR USED TO CARRY A "How it appears elsewhere" FIELDSET: a tab
+ * title, a search description and a share title, nine near-identical copies of
+ * the same three boxes. They are edited on one screen now -- ?s=seo -- together
+ * with the crawl setting, the breadcrumb, the share card and the sitemap
+ * tuning that never had a box at all, and beside every other page's, which is
+ * the only way a person can see that two pages share a title.
+ *
+ * THE VALUES DID NOT MOVE. They are still in this page's own document, in the
+ * meta band every document has, and are still published with it. Only the
+ * typing moved. See the page metadata block in lib/contract.php.
+ *
+ * A fieldset with nothing in it but a link, rather than nothing at all,
+ * because the outline column on the right lists band-meta and a person who
+ * knows where that setting used to be should find out where it went rather
+ * than find a gap.
+ *
+ * $page is the SEO screen's key for this page: a route key from SEO_ROUTES, or
+ * "service:<id>" for one of the service pages.
+ */
+function admin_meta_band(string $page): void
+{
+    ?>
+    <fieldset class="admin__block" id="band-meta">
+      <?php admin_band_head('How it appears elsewhere',
+          'The browser tab title, the search description and the share card '
+          . 'for this page are edited with every other page\'s, in one place.'); ?>
+
+      <p class="admin__notes">
+        <a href="<?= h(admin_url('seo', ['page' => $page])) ?>">
+          Open SEO Management for this page
+        </a>
+      </p>
+    </fieldset>
+    <?php
+}
+
 /* --------------------------------------------------------------- the page */
 
 /**
@@ -1143,7 +1211,7 @@ function admin_head(string $section, string $user, string $lede = '',
 
     <nav class="rail__nav" aria-label="Pages you can edit">
       <ul class="rail__list" role="list">
-<?php foreach (ADMIN_SECTIONS as $key => $item): ?>
+<?php foreach (ADMIN_RAIL_SECTIONS as $key): $item = ADMIN_SECTIONS[$key]; ?>
 <?php $current = $key === $section; ?>
         <li>
           <a class="rail__item" href="<?= h(admin_url($key)) ?>"<?= $current ? ' aria-current="page"' : '' ?>>

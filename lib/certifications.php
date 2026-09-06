@@ -79,25 +79,13 @@ function certifications_validate(array $data): array
     if (trim((string)$data['hero']['title']) === '') {
         $errors[] = 'The page needs a heading — the banner title cannot be empty.';
     }
-    if (trim((string)$data['meta']['title']) === '') {
-        $errors[] = 'The browser tab title cannot be empty.';
-    }
-
-    /* strlen and not mb_strlen: bytes, as about_validate() counts them. It
-       undercounts the characters allowed in a description with accents, which
-       for a soft search-engine limit is the safe direction to be wrong in.
-
-       Counted AFTER the tokens are filled in, because {certifications} is
-       fifteen characters that will be published as two. Measuring the stored
-       string would refuse a description that fits and accept one that does
-       not. */
-    $filled = certifications_fill(
-        (string)$data['meta']['description'], certifications_counts($data));
-
-    if (strlen(trim($filled)) > 320) {
-        $errors[] = 'The search description is longer than 320 characters once its '
-                  . 'counts are filled in. Search engines will cut it off.';
-    }
+    /* NOTHING ABOUT THE meta BAND IS CHECKED HERE ANY MORE. Its title,
+       description, breadcrumb and crawl setting are edited on the SEO screen
+       and validated by seo_validate(), which is the only place that can see
+       all of them at once -- two pages sharing a title is a fault neither page
+       can detect on its own. Leaving the checks here as well would refuse a
+       save on THIS page for a field this page no longer offers, which is a
+       dead end rather than a warning. */
 
     foreach (CERTIFICATIONS_BANDS as $band) {
         if (!in_array($data[$band]['status'] ?? 'shown', ['shown', 'hidden'], true)) {

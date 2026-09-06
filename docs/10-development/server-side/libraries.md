@@ -26,6 +26,7 @@ store they read from is outside the document root entirely.
 | [`svg.php`](#svgphp) **shared** | what a publishable vector file is | — |
 | [`home.php`](#homephp) | what this side does with the home page | `contract`, `store` |
 | [`services.php`](#servicesphp) | what this side does with the services document | `contract`, `store`, `publish_client` |
+| [`seo.php`](#seophp) | what every page says about itself in its `<head>` — read from ten documents, written to whichever one owns the field | `contract`, `store`, `services`, `publish_client` |
 | [`upload.php`](#uploadphp) *(backend)* | a file somebody chose, turned into a picture this site will show | `publish` |
 | [`publish.php`](#publishphp) **shared** | how a document is signed and checked on the wire | `private`, `contract` |
 | [`publish_client.php`](#publish_clientphp) *(backend)* | sending one | `publish` |
@@ -296,6 +297,52 @@ it is legal text, and the person editing it is not necessarily the person who ch
 **Validation refuses what would make the page wrong rather than merely empty** — a preview with no
 description, a download row with no file, a saved-as name with a separator in it, and an empty
 breadcrumb, which is what a search result calls this page in a trail.
+
+
+### `seo.php`
+
+`seo_load()` · `seo_pages()` · `seo_page_meta()` · `seo_effective_description()` · `seo_edit()` ·
+`seo_meta_edit()` · `seo_service_meta_edit()` · `seo_validate()` · `seo_validate_meta()`
+
+The one library here that **does not own a document**. It owns a *field* — the `meta` band — across
+ten of them, plus one document of its own, `content/seo.json`, for what belongs to the whole site
+rather than to any page. That split is ADR 0020 and it is the thing to understand before reading
+anything else in this file: **a page's title lives with that page's content, and only the editing
+moved.**
+
+So there are three save paths, not one:
+
+| | Writes | Used by |
+|---|---|---|
+| `seo_edit()` | `content/seo.json` | the two site screens |
+| `seo_meta_edit()` | the `meta` band of one page's own document | `?s=seo&page=<key>` |
+| `seo_service_meta_edit()` | the `meta` band of one row of `content/services.json` | `?s=seo&page=service:<id>` |
+
+The last two are **read-modify-writes under `store_edit()`'s `flock`**, modelled on
+`services_edit()`, so an SEO save and a page save landing at the same moment cannot lose one
+another. Each mutates only the `meta` key and hands the rest of the document back untouched — which
+is what makes it safe for two screens to own different parts of one file.
+
+`seo_pages()` is what the index screen lists: the ten fixed routes from `SEO_ROUTES`, then every
+service read out of `content/services.json`. A service added this morning has a row this afternoon,
+with no key to register anywhere, because **its record is its row** — there is nothing to orphan
+when somebody renames a slug.
+
+`seo_effective_description()` exists because one page's description is not literal: the
+certifications page fills a `{certifications}` token with a live count. The editor shows what a
+search engine will actually see, and its length check measures *that* — a description that fits
+before the substitution and overruns after it is the failure this prevents. It shipped once, as the
+token itself, visible in the page source.
+
+**Validation is the gate the site never had.** `seo_validate_meta()` refuses a title over
+`SEO_TITLE_MAX`, a description outside `SEO_DESC_MIN`–`SEO_DESC_MAX`, and a title or description
+that **duplicates another page's** — `audit_pages.py` in the other half has always enforced
+site-wide uniqueness and could only ever find out afterwards. Between 150 and 160 characters is a
+hint, not a refusal; `SEO_DESC_IDEAL` is advice and says so.
+
+The canonical is not here, in any form. It is derived from the route and cannot be edited, because
+a canonical pointing at another page tells Google to index that one and drop this one, and nothing
+on this side would show it.
 
 
 ### `privacy.php`

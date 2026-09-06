@@ -91,10 +91,14 @@ sections/
 ├── privacy.php         the privacy policy       → content/privacy.json
 ├── services.php        the services editor, and each service page beneath it
 │                                                → content/services.json
+├── seo.php             every page's search and share metadata, and the
+│                       site-wide graph          → content/seo.json AND the
+│                                                  meta band of nine others
 └── account.php         password, second factor, recovery codes, the log
 ```
 
-The rail draws itself from `ADMIN_SECTIONS` in `lib/admin.php`:
+The rail draws itself from `ADMIN_RAIL_SECTIONS`, and each entry's label, icon
+and description from `ADMIN_SECTIONS` — both in `lib/admin.php`:
 
 | URL | Section | Edits |
 |---|---|---|
@@ -109,11 +113,33 @@ The rail draws itself from `ADMIN_SECTIONS` in `lib/admin.php`:
 | `/?s=certifications` | `certifications` | `content/certifications.json`, then publishes |
 | `/?s=branding` | `branding` | `content/branding.json`, then publishes |
 | `/?s=privacy` | `privacy` | `content/privacy.json`, then publishes |
+| `/?s=seo` | `seo` | nothing — it lists every page and links to its screen |
+| `/?s=seo&page=<key>` | `seo` | the `meta` band of that page's own document |
+| `/?s=seo&page=service:<id>` | `seo` | the `meta` band of one service row |
+| `/?s=seo&site=identity` | `seo` | `content/seo.json` — the Organization graph and the share card |
+| `/?s=seo&site=crawl` | `seo` | `content/seo.json` — robots rules, the manifest, verification |
 | `/?s=account` | `account` | your own password, second factor and recovery codes |
 
 `ADMIN_PAGE_SECTIONS` names the subset that edits a page of the public website
-— everything but `overview` and `account` — so anything counting "the pages you
-can edit" asks there rather than filtering the registry by hand.
+— everything but `overview`, `seo` and `account` — so anything counting "the
+pages you can edit" asks there rather than filtering the registry by hand.
+
+**`account` is in the registry and not in the rail.** `ADMIN_RAIL_SECTIONS`
+holds the rail's eleven rows and their order; `ADMIN_SECTIONS` holds every
+section there is. They differ by exactly one entry, because the account is
+about the person rather than about a page — it is reached from the avatar menu
+at the foot of the rail. Deleting it from the registry instead would not hide
+it: `admin_section()` returns `'overview'` for a name it does not know, so
+`?s=account` would land silently on the Overview and the password screen would
+become unreachable.
+
+**`seo` edits ten documents and owns one.** `content/seo.json` holds only what
+belongs to the whole site — the Organization graph, the default share card, the
+crawl rules, the manifest, the 404's own record. Every *page's* title,
+description, breadcrumb and crawl directive stay in that page's own document,
+where they have always been; this screen is where they are edited, and the nine
+page editors no longer render those fields at all. See
+[ADR 0020](../90-decisions/0020-page-metadata-is-content.md).
 
 **`services` is one section over two screens, and one document over seven
 pages.** `content/services.json` holds the services index *and* all six service

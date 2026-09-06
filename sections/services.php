@@ -107,7 +107,7 @@ function services_lines_value(array $items): string
  */
 function services_index_from_post(array $data): array
 {
-    foreach (SERVICES_TEXT_FIELDS as $band => $fields) {
+    foreach (contract_page_bands(SERVICES_TEXT_FIELDS) as $band => $fields) {
         foreach ($fields as $field) {
             $data[$band][$field] = services_post_text($_POST[$band][$field] ?? '');
         }
@@ -252,8 +252,11 @@ function services_one_from_post(array $data, int $index): array
     $service['schema_type']        = services_post_text($post['schema_type'] ?? '');
     $service['schema_description'] = services_post_text($post['schema_description'] ?? '');
 
-    foreach (['meta' => ['title', 'description', 'share_title'],
-              'hero' => ['title', 'subtitle']] as $band => $fields) {
+    /* No 'meta' here. A service page's title, description, share title,
+       breadcrumb, crawl setting and sitemap tuning are edited on the SEO
+       screen, and a form that no longer renders those fields must not post an
+       empty string over them -- see contract_page_bands(). */
+    foreach (['hero' => ['title', 'subtitle']] as $band => $fields) {
         foreach ($fields as $field) {
             $service[$band][$field] = services_post_text($post[$band][$field] ?? '');
         }
@@ -1083,16 +1086,7 @@ if (!$errors && $pending !== '') {
   </fieldset>
 
   <!-- ====================== search and sharing ==================== -->
-  <fieldset class="admin__block" id="band-meta">
-    <?php admin_band_head('Search and sharing',
-        'What a search engine shows, and what appears when the page is shared.'); ?>
-    <div class="admin__grid">
-      <?php services_text_field('meta[title]', 'Browser tab title', $data['meta']['title'], '', true, true); ?>
-      <?php services_area_field('meta[description]', 'Search description', $data['meta']['description'],
-          'Up to 320 characters. Longer and search engines cut it off.', 2); ?>
-      <?php services_text_field('meta[share_title]', 'Title when shared', $data['meta']['share_title'], '', true); ?>
-    </div>
-  </fieldset>
+  <?php admin_meta_band('services'); ?>
 
 <?php else: /* ================= one service's screen ================= */ ?>
 
@@ -1272,16 +1266,7 @@ if (!$errors && $pending !== '') {
   </fieldset>
 
   <!-- ====================== search and sharing ==================== -->
-  <fieldset class="admin__block" id="band-meta">
-    <?php admin_band_head('Search and sharing',
-        'What a search engine shows, and what appears when this page is shared.'); ?>
-    <div class="admin__grid">
-      <?php services_text_field('service[meta][title]', 'Browser tab title', $service['meta']['title'], '', true, true); ?>
-      <?php services_area_field('service[meta][description]', 'Search description', $service['meta']['description'],
-          'Up to 320 characters. Longer and search engines cut it off.', 2); ?>
-      <?php services_text_field('service[meta][share_title]', 'Title when shared', $service['meta']['share_title'], '', true); ?>
-    </div>
-  </fieldset>
+  <?php admin_meta_band('service:' . $service['id']); ?>
 
 <?php endif; ?>
 

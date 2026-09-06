@@ -1,0 +1,137 @@
+{
+    "updated": "",
+    "revision": 0,
+    "site": {
+        "name": "Tech4TIME",
+        "description": "Cybersecurity, software development, cloud infrastructure and HR solutions.",
+        "locale": "en_US",
+        "lang": "en",
+        "og_type": "website",
+        "twitter_card": "summary_large_image",
+        "theme_light": "#fafafa",
+        "theme_dark": "#0b0b0c",
+        "share": {
+            "src": "/assets/images/og/tech4time-og.png",
+            "webp": "",
+            "width": 1200,
+            "height": 630
+        },
+        "share_alt": "Tech4TIME — Orchestrating Technology with Time"
+    },
+    "identity": {
+        "legal_name": "Tech4TIME",
+        "alternate_name": "M/s. Tech4TIME",
+        "slogan": "Orchestrating Technology with Time",
+        "description": "Open-Source and enterprise-grade cybersecurity, software development, cloud infrastructure and IT solutions. Orchestrate, build, maintain and protect your business.",
+        "founded": "2018-05-15",
+        "price_range": "$$",
+        "area_served": "Worldwide",
+        "logo": {
+            "src": "/assets/images/logo/logo-light-540.png",
+            "webp": "",
+            "width": 540,
+            "height": 192
+        },
+        "service_types": [
+            "Cybersecurity Services",
+            "Software Development",
+            "Cloud Infrastructure",
+            "IT Consulting",
+            "Managed Services",
+            "Human Resources as a Service",
+            "DevOps Services",
+            "Security Operations Center"
+        ],
+        "knows_about": [
+            "Cybersecurity",
+            "Penetration Testing",
+            "Security Operations Center",
+            "Incident Response",
+            "Digital Forensics",
+            "Software Development",
+            "DevSecOps",
+            "Cloud Computing",
+            "OpenStack",
+            "Kubernetes",
+            "IT Staffing",
+            "HR as a Service"
+        ]
+    },
+    "sameas": {
+        "items": [
+            {
+                "id": "linkedin",
+                "label": "LinkedIn",
+                "url": "https://www.linkedin.com/company/tech4time-bd/",
+                "status": "shown"
+            },
+            {
+                "id": "github",
+                "label": "GitHub",
+                "url": "https://github.com/M-s-Tech4TIME",
+                "status": "shown"
+            }
+        ]
+    },
+    "hours": {
+        "items": [
+            {
+                "id": "bangladesh",
+                "label": "Bangladesh office",
+                "days": [
+                    "Sunday",
+                    "Monday",
+                    "Tuesday",
+                    "Wednesday",
+                    "Thursday"
+                ],
+                "opens": "09:00",
+                "closes": "18:00",
+                "status": "shown"
+            },
+            {
+                "id": "malaysia",
+                "label": "Malaysia office",
+                "days": [
+                    "Monday",
+                    "Tuesday",
+                    "Wednesday",
+                    "Thursday",
+                    "Friday"
+                ],
+                "opens": "09:00",
+                "closes": "18:00",
+                "status": "shown"
+            }
+        ]
+    },
+    "crawl": {
+        "verify_google": "",
+        "verify_bing": "",
+        "robots_extra": [
+            "/contact-handler.php"
+        ]
+    },
+    "manifest": {
+        "short_name": "Tech4TIME",
+        "background": "#0b0b0c",
+        "theme": "#0b0b0c",
+        "display": "standalone"
+    },
+    "notfound": {
+        "title": "Page Not Found | Tech4TIME",
+        "description": "The page you are looking for could not be found. Browse Tech4TIME's cybersecurity, software development, cloud and HR services, or contact our team.",
+        "share_title": "Page Not Found",
+        "breadcrumb": "Page not found",
+        "robots": "noindex",
+        "changefreq": "yearly",
+        "priority": "0.0",
+        "share": {
+            "src": "",
+            "webp": "",
+            "width": 0,
+            "height": 0
+        },
+        "share_alt": ""
+    }
+}

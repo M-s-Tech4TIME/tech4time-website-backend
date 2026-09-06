@@ -45,6 +45,7 @@ python3 tools/test_services_admin.py    # the services editor — two screens, o
 python3 tools/test_certifications_admin.py  # the certifications editor — three lists deep
 python3 tools/test_branding_admin.py    # the branding editor — logos and the files in them
 python3 tools/test_privacy_admin.py     # the privacy editor — three lists deep, and the anchor rule
+python3 tools/test_seo_admin.py         # the SEO editor — and that no other editor blanks a meta band
 python3 tools/test_svg.py               # the SVG sanitiser, which is a security boundary
 python3 tools/test_store.py             # the JSON store itself
 python3 tools/test_qr.py                # the pairing code, against libqrencode
@@ -81,9 +82,11 @@ never covered these screens — before the split as well as after it. They went 
 `tech4time-website-frontend` with the pages they were written for, and for a while this paragraph
 said the admin had never been checked for focus visibility, tap targets at 320px, or dark mode.
 
-It has now. `check_admin_a11y.py` signs in the way `test_editor.py` does and walks all nine
-screens — the three anyone can reach and the four behind the sign-in — asserting four families of
-thing at 1200px and 320px. It is one file rather than four because there are nine screens here and
+It has now. `check_admin_a11y.py` signs in the way `test_editor.py` does and walks every screen —
+the ones anyone can reach, the ones behind the sign-in, and all five of the SEO editor's — asserting
+four families of thing at 1200px and 320px. It also measures the rail: **every label must render as
+one line box that is not cut off**, at both rail widths and in the 320px chip strip, so renaming a
+section to something too long fails a check instead of being noticed by eye. It is one file rather than four because there are nine screens here and
 four copies of the sign-in would be four things to fix when the login markup moves.
 
 **It was not a formality.** The first run found that five `admin.css` rules wrote
@@ -148,6 +151,7 @@ runs against a copy of the real data files, restored afterwards whether the run 
 | Script | Proves |
 |---|---|
 | `test_editor.py` | the rich-text editor driven as a person drives it, including a real sign-in: the toolbar, the selection, and that alignment is a class and never an inline style |
+| `test_seo_admin.py` | all five screens of the SEO editor: every field round-trips; the index lists every route **and** every service, so a service added in the services editor gets a card with no key registered anywhere; a page screen's save leaves **the rest of that document untouched**, because it writes one band of a file another editor owns; add, remove, reorder and hide on `sameas` and `hours`; an over-long title and a duplicate title are both refused; a page set to `noindex` leaves the sitemap; and the certifications description is measured **after** its `{certifications}` token is filled. **Its most important assertion is about the other nine editors**: saving any of them leaves that document's `meta` band exactly as it was. Those forms stopped rendering those fields, and a `*_from_post()` still naming the band would blank a title on every save — silently, because an empty string is a valid title. Broken on purpose, the check reports four fields emptied on every document |
 | `test_admin_forms.py` | that nothing in the admin throws the document away. Every form carries `data-async` and every link is one `admin-swap.js` will answer; adding, moving, removing and saving each leave the page where it was and the focus where it is wanted; following a rail item changes the bar, the tab, the address and `aria-current` while leaving the rail element itself standing; Back and Forward work. Then the same edits **and the same moves** with **JavaScript switched off** — including the one measurement only that browser can make, that the server draws a narrow rail on its own, which is what stopped the rail flashing open and shut on every load |
 | `check_hover.py` | every interactive element visibly responds to a real pointer |
 | `check_dark_mode.py` | every page in both themes, as painted — catching what a CSS reader cannot, like a token that resolves to the same colour as its background |

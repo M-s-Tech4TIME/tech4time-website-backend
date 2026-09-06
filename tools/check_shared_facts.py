@@ -34,13 +34,35 @@ The comparison is on a NORMALISED form: non-breaking spaces and runs of
 whitespace collapsed, commas and full stops dropped, case folded. That is what
 makes it useful rather than noisy -- it reports a different street and stays
 quiet about a different comma.
+
+THE SECOND COMPARISON, AND WHY IT ONLY NOTICES
+The Organization graph carries a sameAs list -- the profiles that are this
+company elsewhere -- and it is edited on the SEO screen. The footer links to
+the same profiles, in literal markup, in tools/templates/footer.html. Two
+copies again, and this time neither is wrong when they differ: a profile can
+legitimately be in the graph and not in the footer (an old account a search
+engine should still connect) or in the footer and not the graph (a link added
+for readers, not for machines).
+
+So this half REPORTS and never refuses. It exists because the disagreement is
+invisible otherwise -- the footer is markup and the graph is a document, and
+nobody reading one is looking at the other. It cannot affect the exit code, on
+purpose: a check that fails on a decision somebody is entitled to make is a
+check people learn to skip.
 """
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+FOOTER = ROOT / "tools" / "templates" / "footer.html"
+
+# The footer's social list, and the hrefs inside it. Scoped to the list so the
+# brand link, the two link columns and the legal line are not read as profiles.
+SOCIAL_LIST = re.compile(r'<ul class="site-footer__social">(.*?)</ul>', re.S)
+SOCIAL_HREF = re.compile(r'href="(https?://[^"]+)"')
 
 PHP = r"""
 require __DIR__ . '/lib/contract.php';
@@ -53,11 +75,62 @@ if (!is_array($privacy) || !is_array($contact)) {
     exit(2);
 }
 
-echo json_encode(privacy_shared_facts(
-    contract_normalise('privacy', $privacy),
-    contract_normalise('contact', $contact)
-));
+$seo = json_decode(file_get_contents(__DIR__ . '/content/seo.json'), true);
+$same = [];
+if (is_array($seo)) {
+    foreach (contract_normalise('seo', $seo)['sameas']['items'] as $row) {
+        if (($row['status'] ?? 'shown') === 'shown' && trim((string)$row['url']) !== '') {
+            $same[] = ['label' => $row['label'], 'url' => trim((string)$row['url'])];
+        }
+    }
+}
+
+echo json_encode([
+    'facts'  => privacy_shared_facts(
+        contract_normalise('privacy', $privacy),
+        contract_normalise('contact', $contact)
+    ),
+    'sameas' => $same,
+]);
 """
+
+
+def social_notice(sameas: list[dict]) -> None:
+    """Say whether the graph's sameAs and the footer's links agree.
+
+    Prints. Returns nothing, and the caller ignores it -- see the docstring.
+    """
+    print()
+    if not FOOTER.is_file():
+        # This file is byte-identical in both repositories, and only one of
+        # them has a footer to compare against: the markup lives with the
+        # pages. Said plainly rather than skipped in silence, so a run here
+        # does not read as "the two agree".
+        print("sameAs — not checked here; the footer is the frontend's.")
+        return
+
+    block = SOCIAL_LIST.search(FOOTER.read_text())
+    if block is None:
+        print("sameAs — the footer template has no <ul class=\"site-footer__social\">.")
+        print("         It has been restructured; update SOCIAL_LIST in this file.")
+        return
+
+    footer = {url.rstrip("/") for url in SOCIAL_HREF.findall(block.group(1))}
+    graph = {row["url"].rstrip("/") for row in sameas}
+
+    if footer == graph:
+        print(f"sameAs — the graph and the footer name the same "
+              f"{len(graph)} profile(s).")
+        return
+
+    print("sameAs — the graph and the footer do not name the same profiles.")
+    print("         Not a failure: either may legitimately carry one the other does not.")
+    for url in sorted(graph - footer):
+        print(f"    in the graph only    {url}")
+    for url in sorted(footer - graph):
+        print(f"    in the footer only   {url}")
+    print("         The graph is edited on the SEO screen; the footer is markup,")
+    print("         in tools/templates/footer.html.")
 
 
 def main() -> int:
@@ -71,9 +144,11 @@ def main() -> int:
         print(run.stderr.strip() or "php failed")
         return 1
 
-    facts = json.loads(run.stdout)
+    payload = json.loads(run.stdout)
+    facts = payload["facts"]
     if not facts:
         print("The contact document states no facts the policy repeats.")
+        social_notice(payload["sameas"])
         return 0
 
     missing = []
@@ -86,6 +161,7 @@ def main() -> int:
     print()
     if not missing:
         print(f"The privacy policy still states all {len(facts)} facts the contact page manages.")
+        social_notice(payload["sameas"])
         return 0
 
     for fact in missing:
@@ -96,6 +172,7 @@ def main() -> int:
     print("policy has not been reviewed. Both are decisions for a person: edit content/privacy.json")
     print("through the admin, not by hand — content/ on the host is live data and the seed here is")
     print("only what a fresh deploy starts from.")
+    social_notice(payload["sameas"])
     return 1
 
 

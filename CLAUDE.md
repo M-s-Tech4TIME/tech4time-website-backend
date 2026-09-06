@@ -1,8 +1,8 @@
 # Tech4TIME — backend
 
-The editor at **`admin.tech4time.bd`**: a sign-in of its own, five screens, and the content of
-record for the three pages of the public site that change. No build step, no framework — the files
-here are the files that run on the server.
+The editor at **`admin.tech4time.bd`**: a sign-in of its own, twelve screens, and the content of
+record for **every page of the public site** — including what each of them tells a search engine. No
+build step, no framework — the files here are the files that run on the server.
 
 **The public site is not in this repository.** It is **`tech4time-website-frontend`**, serving
 `tech4time.bd`. This half owns the content and *pushes* a signed copy to it on every save; that half
@@ -54,8 +54,8 @@ its record before acting.
 
 | | |
 |---|---|
-| `public/` | **the document root** — six entry points, `.htaccess`, and the assets a browser fetches |
-| `sections/` | the six screens, included by `public/index.php` |
+| `public/` | **the document root** — six entry points, `robots.txt`, `.htaccess`, and the assets a browser fetches |
+| `sections/` | the twelve screens, included by `public/index.php` |
 | `lib/` | the sign-in, the contract, the publish client, the store |
 | `content/` | the JSON the editors write — **the system of record** |
 | `tools/` | build, audit and test scripts — never deployed |
@@ -78,8 +78,11 @@ Full table: [docs/10-development/where-to-change-things.md](docs/10-development/
 | Validation, the flag picker, the save | `lib/careers.php`, `lib/contact.php` |
 | The sign-in, sessions, hashing | `lib/auth.php` — read [authentication.md](docs/10-development/server-side/authentication.md) first |
 | Add an editor | [adding-an-editor.md](docs/10-development/server-side/adding-an-editor.md) |
+| **A page's title, description, share card or crawl setting** | `sections/seo.php` — and **not** that page's own editor, which no longer renders those fields |
+| What a search engine is told about the company | `sections/seo.php`, `lib/seo.php` — [seo.md](docs/40-reference/seo.md) |
 | The editor's appearance | `public/assets/css/admin.css` |
 | The shell — rail, bar, account menu, Save | `admin_head()` in `lib/admin.php` |
+| Which sections the rail shows, and in what order | `ADMIN_RAIL_SECTIONS` in `lib/admin.php` — **not** registry order, and `account` is deliberately not in it |
 | "On this page", the column right of the form | the `*_OUTLINE` constant in that `sections/*.php` |
 | A stylesheet, script or image URL | never by hand — `admin_asset()` puts the version on it |
 | Whether a form posts without navigating | `data-async` on the `<form>`; `public/assets/js/admin-forms.js` |

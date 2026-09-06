@@ -475,26 +475,35 @@ def run(client, r, site):
     r.check("and the whole closing band can be switched off",
             out["cta"]["status"] == "hidden")
 
-    print("\nsearch and sharing")
+    print("\nsearch and sharing, which this screen no longer owns")
 
+    # The breadcrumb, the title and the description are edited on the SEO
+    # screen now, together with every other page's -- which is the only place
+    # two pages sharing a title can be seen. They are still STORED here, in
+    # content/branding.json, and still published with the page; only the
+    # editing moved. tools/test_seo_admin.py proves the field still works and
+    # still cannot be emptied.
+    #
+    # What is asserted here is that this screen has genuinely let go of them.
+    # A field left on the form that nothing reads any more would be worse than
+    # either arrangement: it would look editable and change nothing.
     status, page = client.get(ADMIN)
-    fields = form_fields(page)
-    r.check("the breadcrumb has its own field, separate from the heading",
-            fields["meta[breadcrumb]"] == "Branding & Advertisement"
-            and fields["hero[title]"] != fields["meta[breadcrumb]"],
-            f'{fields.get("meta[breadcrumb]")!r} vs {fields.get("hero[title]")!r}')
+    r.check("the breadcrumb is not a field on this screen",
+            'name="meta[breadcrumb]"' not in page)
+    r.check("nor the search description",
+            'name="meta[description]"' not in page)
+    r.check("but the band is still there, pointing at the screen that owns it",
+            'id="band-meta"' in page and "s=seo&amp;page=branding" in page)
 
-    fields["meta[breadcrumb]"] = ""
-    status, _h, page = save(client, fields)
-    r.check("and it cannot be emptied",
-            status == 200 and "breadcrumb name cannot be empty" in page,
-            f"status {status}")
-
+    # And the value survived, which is the failure this could quietly cause:
+    # every *_from_post() rebuilds the bands named in *_TEXT_FIELDS from
+    # $_POST, so a form that stopped rendering these while still naming them
+    # would blank the breadcrumb on every save. See contract_page_bands().
     fields = form_fields(page)
-    fields["meta[description]"] = "x" * 321
-    status, _h, page = save(client, fields)
-    r.check("an over-long search description is refused",
-            status == 200 and "320 characters" in page, f"status {status}")
+    save(client, fields)
+    r.check("and a save that never touched it leaves it alone",
+            published(site)["meta"]["breadcrumb"] == "Branding & Advertisement",
+            str(published(site)["meta"]))
 
 
 def main():

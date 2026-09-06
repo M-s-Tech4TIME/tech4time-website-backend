@@ -363,10 +363,17 @@ def run(client, r, site):
     _s, _h, body = save(client, page, fields)
     r.check("a service with no name is refused", "has no name" in body)
 
-    html, fields = reopen(client, ADMIN)
-    fields["meta[description]"] = "x" * 400
-    _s, _h, body = save(client, ADMIN, fields)
-    r.check("an over-long search description is refused", "320 characters" in body)
+    # The over-long search description used to be refused here. It is refused
+    # by seo_validate() now, on the screen that offers the field, and against
+    # SEO_DESC_MAX rather than a number written into this editor --
+    # tools/test_seo_admin.py. What is asserted here is that this editor has
+    # genuinely stopped offering it, because a field still on the form but no
+    # longer read would be worse than either arrangement.
+    html, _fields = reopen(client, ADMIN)
+    r.check("the search description is not a field on this screen",
+            'name="meta[description]"' not in html)
+    r.check("and the band points at the screen that owns it",
+            "s=seo&amp;page=services" in html)
 
     print("\nit refuses a request without a token")
     html, fields = reopen(client, page)

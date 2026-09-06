@@ -135,6 +135,13 @@ jobs:
       - run: python3 tools/test_certifications_admin.py
       - run: python3 tools/test_branding_admin.py
       - run: python3 tools/test_privacy_admin.py
+      # The SEO screen, and the one assertion in this repository that no other
+      # suite can make: saving one of the nine page editors leaves that
+      # document's meta band exactly as it was. Those forms no longer RENDER
+      # the meta fields but their documents still hold them, so a *_from_post()
+      # that still names the band would blank a title on every save — silently,
+      # because an empty string is a valid title. See ADR 0020.
+      - run: python3 tools/test_seo_admin.py
 
   browser:
     name: firefox

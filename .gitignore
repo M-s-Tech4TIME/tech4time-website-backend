@@ -32,6 +32,7 @@ content/home.json.bak
 content/services.json.bak
 content/certifications.json.bak
 content/branding.json.bak
+content/privacy.json.bak
 content/*.tmp
 .test-router-*.php
 

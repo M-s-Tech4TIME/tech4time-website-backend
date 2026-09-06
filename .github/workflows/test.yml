@@ -60,6 +60,11 @@ jobs:
       # the guarantee is CONTRACT_VERSION, checked at run time by the endpoint
       # this half posts to.
       - run: python3 tools/check_shared_lib.py
+      # A fact stated in two documents at once -- the offices, the email and the
+      # telephone are authored in BOTH the privacy policy and the contact page,
+      # on purpose. This asks whether they still agree. It can only see the
+      # committed seed: content edited in the admin never passes through git.
+      - run: python3 tools/check_shared_facts.py
 
       # And the thing the line above structurally cannot see: whether the OTHER
       # half still holds the same bytes. A per-repo digest passes happily while
@@ -129,6 +134,7 @@ jobs:
       - run: python3 tools/test_services_admin.py
       - run: python3 tools/test_certifications_admin.py
       - run: python3 tools/test_branding_admin.py
+      - run: python3 tools/test_privacy_admin.py
 
   browser:
     name: firefox

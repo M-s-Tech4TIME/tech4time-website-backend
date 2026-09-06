@@ -107,6 +107,12 @@ const ADMIN_SECTIONS = [
         'desc'  => 'The logo files people download, and the terms of use',
         'view'  => '/pages/branding-and-advertisement/',
     ],
+    'privacy' => [
+        'label' => 'Privacy',
+        'icon'  => 'user-lock',
+        'desc'  => 'What the site collects, why, and what people can ask for',
+        'view'  => '/pages/privacy-policy/',
+    ],
     'account' => [
         'label' => 'Account',
         'icon'  => 'user-shield',
@@ -123,7 +129,7 @@ const ADMIN_SECTIONS = [
  * rather than filtering the registry by hand in three places.
  */
 const ADMIN_PAGE_SECTIONS = ['home', 'careers', 'contact', 'company', 'about', 'services',
-                             'certifications', 'branding'];
+                             'certifications', 'branding', 'privacy'];
 
 /* The marker admin_form_tail() writes and admin_form_truncated() looks for. */
 const ADMIN_TAIL_FIELD = '__tail';
@@ -883,6 +889,66 @@ function admin_card_head(string $band, int $index, int $total, array $card): voi
         </div>
       </div>
 <?php
+}
+
+/**
+ * Remove or reorder one row of a list.
+ *
+ * HERE BECAUSE IT WAS ABOUT TO BE COPIED A THIRD TIME. The docblock on the
+ * copy in sections/branding.php says it best -- "four copies of an
+ * array_splice is four places for an off-by-one to live" -- and there were by
+ * then two copies of that sentence, in branding and in certifications,
+ * byte-identical. The privacy editor moves rows at three levels of nesting and
+ * would have made a third.
+ *
+ * Returns the new list and what to tell the person who pressed the button, or
+ * null when the press cannot be honoured -- a row that is not there, or a move
+ * off either end. Null is not an error: it is a button pressed twice before
+ * the page caught up, and the right answer is to redraw unchanged.
+ */
+function admin_move_row(array $rows, string $what, int $index): ?array
+{
+    if (!isset($rows[$index])) {
+        return null;
+    }
+
+    if ($what === 'remove') {
+        array_splice($rows, $index, 1);
+
+        return [array_values($rows), 'Removed. Nothing is written to the site until you save.'];
+    }
+
+    $to = $index + ($what === 'up' ? -1 : 1);
+    if ($to < 0 || $to >= count($rows)) {
+        return null;
+    }
+
+    [$rows[$index], $rows[$to]] = [$rows[$to], $rows[$index]];
+
+    return [$rows, 'Moved. Nothing is written to the site until you save.'];
+}
+
+/**
+ * A warning that is always there, because what it warns about is always true.
+ *
+ * NOT A FLASH, AND THAT IS THE POINT. admin_notices() reports what just went
+ * wrong and admin_publish_notice() reports what just failed; both answer "what
+ * happened?". This one answers "what should you know before you start?", so it
+ * is drawn on every render and never dismissed. The branding editor wrote one
+ * inline for its disclaimer band; the privacy editor needs one for the whole
+ * page, and two inline copies of a component is how a component stops looking
+ * the same in both places.
+ *
+ * Bare admin__notice, with no --warn or --error modifier: nothing is wrong.
+ */
+function admin_standing_notice(string $text): void
+{
+    ?>
+    <p class="admin__notice">
+      <?= admin_icon('info-circle', 'icon icon--sm') ?>
+      <?= h($text) ?>
+    </p>
+    <?php
 }
 
 /* --------------------------------------------------------------- the page */

@@ -27,6 +27,7 @@ breath**.
 | The about page's sections, specialities and why-us cards | `/?s=about` |
 | The home page's hero, badges, tags, terminal and cards | `/?s=home` |
 | What the enquiry form says | `/?s=contact` |
+| Anything the privacy policy says — a clause, the retention table, the effective date | `/?s=privacy` |
 
 Saving writes `content/careers.json` or `content/contact.json` here — **the system of record** —
 and then pushes a signed copy to the public site, which verifies it, re-sanitises it and writes its

@@ -125,6 +125,15 @@ REQUIRED = [
     "sections/company.php",
     "sections/about.php",
     "sections/home.php",
+    # These four were never added as each editor landed. They still shipped --
+    # sections/ is not in FORBIDDEN_TREES, so the sweep picked them up -- but
+    # the assertion read as though it covered every editor and did not. A list
+    # that is silently incomplete is worse than no list.
+    "sections/services.php",
+    "sections/certifications.php",
+    "sections/branding.php",
+    "sections/privacy.php",
+    "lib/privacy.php",               # the privacy editor's model
 ]
 
 # Never in the set, whatever else changes. Stated separately from "not in

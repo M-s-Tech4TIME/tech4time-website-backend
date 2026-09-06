@@ -494,9 +494,16 @@
 .admin__footer code,
 .admin-tile__file code,
 .admin__notes code,
+.admin__list-item code,
 .admin__hint code {
   font-family: var(--font-mono);
   font-size: 0.9em;
+
+  /* A path, an anchor or an address has no space in it to break at, so at
+     320px one of them pushes the whole document sideways -- which is how the
+     privacy editor's "/pages/privacy-policy/#what-we-do-not-do" was found.
+     WCAG 2.2 SC 1.4.10, and check_admin_a11y.py measures it at exactly 320. */
+  overflow-wrap: anywhere;
 }
 
 /* It has to be allowed to shrink. flex: none here made the bar 384px wide
@@ -1145,6 +1152,14 @@
 .admin__block {
   /* flow-root so the block contains its own floated heading; see below. */
   display: flow-root;
+
+  /* A <fieldset> will not go narrower than its content's min-content width
+     without this -- it is the one element with that behaviour built in, and
+     no amount of wrapping inside it helps. The privacy editor is three cards
+     deep and was the first block whose min-content exceeded 320px, so this
+     was the element pushing the whole document sideways. WCAG 2.2 SC 1.4.10. */
+  min-width: 0;
+
   padding: var(--space-lg);
   margin-block-end: var(--space-lg);
   background-color: var(--bg-elevated);
@@ -1200,6 +1215,54 @@
   background-color: var(--bg-base);
   border: var(--border-width) solid var(--border-subtle);
   border-radius: var(--radius);
+}
+
+/* THREE CARDS DEEP, WHICH THE PRIVACY EDITOR IS THE FIRST TO NEED. Sections
+   hold blocks and blocks hold rows, so the padding above is paid three times
+   over on both sides of one row of content -- and at 320px that alone pushed
+   the document 40px wider than the viewport. The nesting is the shape of the
+   page and not a style choice, so the padding is what gives way.
+   WCAG 2.2 SC 1.4.10, measured by tools/check_admin_a11y.py at exactly 320. */
+@media (max-width: 33.99em) {
+  .admin-card .admin-card {
+    padding-inline: var(--space-xs);
+  }
+
+  .admin-card .admin-card .admin-card {
+    padding-inline: 0;
+    border-inline: 0;
+    border-radius: 0;
+  }
+
+  /* The row of controls on a card head is the same width however deep the
+     card is, so three levels in it is the widest thing left. It already
+     wraps; what it cannot do is shrink, because each button pads itself out
+     to a comfortable size. At this width comfortable loses to legible. The
+     24x24 minimum target size (SC 2.5.8) is held by min-height, which is not
+     touched. */
+  /* The head of a nested card holds an index, a label, a state pill and three
+     buttons. It already wraps, but wrapping only helps if each part can also
+     SHRINK, and a grid or flex item defaults to min-width: auto -- it will not
+     go narrower than its content. Stacking is what actually fits. */
+  .admin-card .admin-card .admin-card__head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-card .admin-card .admin-card__controls {
+    margin-inline-start: 0;
+  }
+
+  .admin-card .admin-card .admin-card__controls .btn {
+    padding-inline: var(--space-2xs);
+  }
+
+  /* Same reason, for the fields themselves: a <select> holding a long option
+     will not shrink below it without this. */
+  .admin-card .admin-card .admin__field,
+  .admin-card .admin-card .admin__input {
+    min-width: 0;
+  }
 }
 
 /* A file input is not a text field, whatever the class it shares says. It
@@ -1338,6 +1401,13 @@
 .admin-card__value {
   font-size: var(--text-xs);
   color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* The label beside it gets the same treatment. It is authored text, so it can
+   be a run with nothing to break at -- an email address, a path -- and at
+   320px one of those pushes the whole document sideways. */
+.admin-card__preview strong {
   overflow-wrap: anywhere;
 }
 

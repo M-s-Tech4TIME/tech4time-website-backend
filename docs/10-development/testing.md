@@ -23,6 +23,7 @@ python3 tools/check_docs.py            # the docs still describe the code
 python3 tools/audit_pages.py           # SEO, accessibility, structure, internal links
 python3 tools/build_deploy_set.py --check   # nothing secret or local is bound for the server
 python3 tools/check_shared_lib.py
+python3 tools/check_shared_facts.py    # the offices, email and phone the policy repeats from the contact page
 python3 tools/check_shared_repos.py      # the four files both halves hold identically
 ```
 
@@ -43,6 +44,7 @@ python3 tools/test_about_admin.py       # the about page editor
 python3 tools/test_services_admin.py    # the services editor — two screens, one document
 python3 tools/test_certifications_admin.py  # the certifications editor — three lists deep
 python3 tools/test_branding_admin.py    # the branding editor — logos and the files in them
+python3 tools/test_privacy_admin.py     # the privacy editor — three lists deep, and the anchor rule
 python3 tools/test_svg.py               # the SVG sanitiser, which is a security boundary
 python3 tools/test_store.py             # the JSON store itself
 python3 tools/test_qr.py                # the pairing code, against libqrencode
@@ -126,6 +128,7 @@ These start a real PHP server on a spare port and drive it over HTTP.
 | `test_services_admin.py` | the services editor — the only one split across two screens, and the only one whose save **merges** rather than replaces. Both halves of that are covered: saving one service must not disturb another, saving the index must not write the six pages it never showed, and a service added on the list screen must survive the round trip. Plus add, remove, hide and reorder on the lists — including the **nested** one, a solution inside a group, which nothing else exercises — and that a hand-written solution id is kept rather than re-minted from its name |
 | `test_certifications_admin.py` | the certifications editor — the only one with a list **inside a list**, so add, remove, hide and reorder are exercised at all three levels and, more to the point, a button pressed on one role group is checked to have left the others alone. Also that a new group arrives hidden, that its web address is minted from its first role and then **survives that role being renamed**, and that the counts shown beside the prose are the live ones rather than anything stored |
 | `test_branding_admin.py` | the branding editor: logo variants and the files inside them, so add, remove, hide and reorder are exercised at both levels and a button pressed on one variant is checked to have left the others alone. Also that a new variant arrives hidden, that a card's preview and its download stay two separate records rather than one, and that the size shown beside a download is read off the file rather than typed |
+| `test_privacy_admin.py` | the privacy editor, which is **three** lists deep: sections hold blocks and blocks hold rows, so every verb is exercised at all three levels and checked to have left the other two alone. Also that all six block kinds are present, that changing a kind narrows the block to that kind's fields rather than carrying the old ones invisibly, that a section which has been named keeps its anchor when a section with the same heading is added above it — the case the obvious implementation gets silently wrong — and that a policy disagreeing with the contact page still saves, because that comparison is a notice and never a refusal |
 | `test_svg.py` **shared** | the SVG sanitiser, as the security boundary it is: a real logo survives and still draws, sanitising it twice changes nothing — which is what lets the receiving host prove bytes are clean without editing them — and script, event handlers, entities, embedded rasters, animation, filters and any reference off the file are each refused rather than quietly stripped |
 | `test_store.py` | `lib/store.php`: telling apart missing, unreadable and corrupt; the atomic write; and the rule that a damaged file is never copied over a good `.bak`, because the backup is what damage is recovered from |
 

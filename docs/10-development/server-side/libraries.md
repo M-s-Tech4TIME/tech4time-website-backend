@@ -22,6 +22,7 @@ store they read from is outside the document root entirely.
 | [`about.php`](#aboutphp) | what this side does with the about page | `contract`, `store` |
 | [`certifications.php`](#certificationsphp) | what this side does with the certifications page | `contract`, `store` |
 | [`branding.php`](#brandingphp) | what this side does with the branding page | `contract`, `store` |
+| [`privacy.php`](#privacyphp) | what this side does with the privacy policy | `contract`, `store`, `contact` |
 | [`svg.php`](#svgphp) **shared** | what a publishable vector file is | — |
 | [`home.php`](#homephp) | what this side does with the home page | `contract`, `store` |
 | [`services.php`](#servicesphp) | what this side does with the services document | `contract`, `store`, `publish_client` |
@@ -295,6 +296,55 @@ it is legal text, and the person editing it is not necessarily the person who ch
 **Validation refuses what would make the page wrong rather than merely empty** — a preview with no
 description, a download row with no file, a saved-as name with a separator in it, and an empty
 breadcrumb, which is what a search result calls this page in a trail.
+
+
+### `privacy.php`
+
+`privacy_load()` · `privacy_save()` · `privacy_validate()` · `privacy_facts()` *(backend)* · the renderers *(frontend)*
+
+One document, `content/privacy.json`, holding the whole privacy policy: twelve headed sections, a
+summary callout, a retention table and an address block. It was the last hand-written page on the
+site, and the one that most needed not to be — a privacy policy is the page most likely to need a
+correction at short notice, and every correction used to need a developer and a deploy.
+
+**Structure is a kind, not markup.** `rt_sanitise_html()` allows nine tags and no heading, no
+`<address>` and no `<table>` among them, so structure cannot live in a rich field: somebody typing
+`<h3>` into one would watch it disappear on save with no way to tell that from a bug. Each block
+instead declares which of six kinds it is — `paragraph`, `list`, `subheading`, `note`, `address`,
+`table` — and the renderer owns the markup. See `PRIVACY_BLOCK_KINDS` and `privacy_block()`.
+
+**Every rich field is inline-only**, through `rt_sanitise_inline()`. All of them render *inside* an
+element the renderer supplies — a `<p>`, a `<p class="legal__notice">`, an `<address>`, an `<li>` —
+so a `<p>` arriving from the editor is not emphasis somebody added, it is a paragraph inside a
+paragraph. Pressing Enter in a textarea is how it would arrive, which is not a corner case.
+
+**Three lists deep**, one deeper than any editor before it: sections hold blocks, and a list, an
+address or a table holds rows. The verbs carry the parents in the band name — `block-3-up:2`,
+`row-3-2-remove:1` — because the index is cast to an int.
+
+**A section's id is its anchor, and an anchor is a promise.** Ids are assigned by
+`contract_identify_rows()`, which claims every id somebody already chose *before* it mints anything
+new. The one-pass version has a bug that only bites a page whose ids are anchors: a section added
+above an existing one with the same heading takes the existing one's fragment, and the incumbent is
+silently renamed. Nine of the twelve shipped ids are hand-authored and are not what the slug
+algorithm would produce, so there is nothing to recover them from.
+
+**The effective date is never stamped.** `updated` records when the document was last published; an
+effective date is a claim about when the *policy* changed. Fixing a typo is not a new policy, so
+nothing writes that field but a person.
+
+**The policy band cannot be hidden.** `PRIVACY_BANDS` holds only `cta`. Hiding the policy would
+leave a page headed *"Privacy Policy"* with no policy on it, still linked from the footer of all
+sixteen pages and still in the sitemap — not a configuration anybody wants. The callout and any
+single section can be hidden.
+
+**What it repeats from the contact page is compared, never enforced.** The policy states the
+offices, the email and the telephone, and so does `content/contact.json`. `privacy_shared_facts()`
+asks by containment whether the policy still states the current values, on a normalised form —
+`&nbsp;` and whitespace collapsed, commas dropped, case folded — so it reports a different street
+and stays quiet about a different comma. The editor draws it as a standing notice.
+**It never refuses a save**: after an office move whichever page you edited first could not be
+saved, and an unrelated typo fix would be blocked by an address that drifted months earlier.
 
 ### `svg.php`
 

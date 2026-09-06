@@ -54,7 +54,7 @@ const CONTRACT_VERSION = 1;
 
 /** Every document that is published, by name. The endpoint refuses any other. */
 const CONTRACT_DOCUMENTS = ['careers', 'contact', 'company', 'about', 'home', 'services',
-                            'certifications', 'branding'];
+                            'certifications', 'branding', 'privacy'];
 
 /**
  * Where a document's record lives, on either host.
@@ -1025,6 +1025,142 @@ function contract_image_defaults(mixed $image): array
     return $image;
 }
 
+/* ------------------------------------------------- rows, ids and bands
+
+   SIX DOCUMENTS ASKED THE SAME FOUR QUESTIONS, so they are asked once here.
+
+   Whether a band is shown; which rows of a list a visitor sees; whether an id
+   is one somebody chose; what a name slugs to. Every document since the company
+   profile has carried its own copy of all four, and every copy was
+   character-for-character the same once the document's own prefix was taken
+   off -- checked, not assumed. A seventh copy is not a seventh answer.
+
+   The PLACEHOLDER stays a per-document constant and is passed in, because that
+   part really is the document's own: an id vocabulary that moved because
+   another page changed would be a fragment link broken by a page nobody
+   touched. Each document keeps its named wrapper too, so no renderer, no
+   editor and no test has to learn a new name for something it already calls. */
+
+/** Whether a band of the page is shown at all. */
+function contract_band_shown(array $data, string $band): bool
+{
+    return ($data[$band]['status'] ?? 'shown') !== 'hidden';
+}
+
+/**
+ * Only the rows of a list a visitor should see, wherever the list is.
+ *
+ * Takes the rows rather than the band, because by the sixth document the lists
+ * that matter are no longer all one level down: a list inside a block inside a
+ * section of the privacy policy is three deep, and there is no band to name it
+ * by.
+ */
+function contract_rows_shown(mixed $rows): array
+{
+    return array_values(array_filter(
+        is_array($rows) ? $rows : [],
+        static fn($row): bool => is_array($row) && ($row['status'] ?? 'shown') !== 'hidden'
+    ));
+}
+
+/** An id nobody has chosen: empty, or the placeholder the Add button leaves. */
+function contract_provisional(string $id, string $placeholder): bool
+{
+    return $id === '' || preg_match('/^' . $placeholder . '(-\d+)?$/', $id) === 1;
+}
+
+/** The same id, suffixed until nothing else in the list has it. */
+function contract_unique(string $slug, array $taken): string
+{
+    $base = $slug;
+    $n    = 2;
+    while (in_array($slug, $taken, true)) {
+        $slug = $base . '-' . $n++;
+    }
+    return $slug;
+}
+
+/** A URL-safe id from a name, falling back to the document's placeholder. */
+function contract_slug(string $name, string $placeholder, array $taken = []): string
+{
+    $slug = strtolower(trim($name));
+    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
+    $slug = trim($slug, '-') ?: $placeholder;
+
+    return contract_unique($slug, $taken);
+}
+
+/**
+ * Keep a real id; replace a placeholder once there is a name to replace it with.
+ *
+ * THE FREEZE RULE, and the reason this is worth having in one place. A row that
+ * has been named keeps its id for good: it is the handle a fragment link, an
+ * upload and a test all hold the row by, and re-minting it because somebody
+ * reworded a heading breaks a link that was a promise.
+ */
+function contract_mint(string $id, string $name, string $placeholder, array $taken): string
+{
+    $id   = trim($id);
+    $name = trim($name);
+
+    if ((contract_provisional($id, $placeholder) && $name !== '') || in_array($id, $taken, true)) {
+        return contract_slug($name, $placeholder, $taken);
+    }
+    if ($id === '') {
+        return contract_slug('', $placeholder, $taken);
+    }
+    return $id;
+}
+
+/**
+ * Ids for a whole list at once, in two passes, so a newcomer cannot take one.
+ *
+ * THE ONE-PASS VERSION HAS A BUG, and it is the kind that only bites a page
+ * whose ids are anchors. Add a section titled "Your rights" above the existing
+ * one and mint in row order: the newcomer is provisional, so it slugs to
+ * "your-rights" and claims it; the real section then finds its own id already
+ * taken and is renamed to "your-rights-2". The incumbent loses the anchor, the
+ * empty newcomer inherits it, and every link anyone ever made lands in the
+ * wrong place.
+ *
+ * So everything already named claims its id first, and only then is anything
+ * provisional minted around what is left. A published fragment is a promise,
+ * and the row that made the promise keeps it.
+ *
+ * $name is asked for a row's name rather than given a field, because what
+ * names a row differs by list -- a heading here, a label there, the words
+ * themselves in a bullet.
+ */
+function contract_identify_rows(array $rows, string $placeholder, callable $name): array
+{
+    $ids   = [];
+    $taken = [];
+
+    foreach ($rows as $i => $row) {
+        $id = trim((string)($row['id'] ?? ''));
+        if ($id !== ''
+            && !contract_provisional($id, $placeholder)
+            && !in_array($id, $taken, true)
+        ) {
+            $ids[$i] = $id;
+            $taken[] = $id;
+        }
+    }
+
+    foreach ($rows as $i => $row) {
+        if (isset($ids[$i])) {
+            continue;
+        }
+        $ids[$i] = contract_mint((string)($row['id'] ?? ''), (string)$name($row),
+                                 $placeholder, $taken);
+        $taken[] = $ids[$i];
+    }
+
+    ksort($ids);
+
+    return $ids;
+}
+
 /** Only the rows of a list a visitor should see. */
 function company_shown(array $data, string $band): array
 {
@@ -1037,8 +1173,7 @@ function company_shown(array $data, string $band): array
 /** Whether a band of the page is shown at all. */
 function company_band_shown(array $data, string $band): bool
 {
-    return ($data[$band]['status'] ?? 'shown') !== 'hidden';
-}
+    return contract_band_shown($data, $band);}
 
 function company_find(array $data, string $band, string $id): ?array
 {
@@ -1072,17 +1207,7 @@ function company_images(array $data): array
 /** A URL-safe id from a name, unique against the ids already in use. */
 function company_slug(string $name, array $taken = []): string
 {
-    $slug = strtolower(trim($name));
-    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
-    $slug = trim($slug, '-') ?: COMPANY_ID_PLACEHOLDER;
-
-    $base = $slug;
-    $n = 2;
-    while (in_array($slug, $taken, true)) {
-        $slug = $base . '-' . $n++;
-    }
-    return $slug;
-}
+    return contract_slug($name, COMPANY_ID_PLACEHOLDER, $taken);}
 
 /* ==========================================================================
    4. About page — the shape of the about page
@@ -1385,8 +1510,7 @@ function about_shown(array $data, string $band): array
 /** Whether a band of the page is shown at all. */
 function about_band_shown(array $data, string $band): bool
 {
-    return ($data[$band]['status'] ?? 'shown') !== 'hidden';
-}
+    return contract_band_shown($data, $band);}
 
 function about_find(array $data, string $band, string $id): ?array
 {
@@ -1426,17 +1550,7 @@ function about_images(array $data): array
 /** A URL-safe id from a name, unique against the ids already in use. */
 function about_slug(string $name, array $taken = []): string
 {
-    $slug = strtolower(trim($name));
-    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
-    $slug = trim($slug, '-') ?: ABOUT_ID_PLACEHOLDER;
-
-    $base = $slug;
-    $n = 2;
-    while (in_array($slug, $taken, true)) {
-        $slug = $base . '-' . $n++;
-    }
-    return $slug;
-}
+    return contract_slug($name, ABOUT_ID_PLACEHOLDER, $taken);}
 
 /* ==========================================================================
    5. Home page — the shape of the home page
@@ -1855,8 +1969,7 @@ function home_shown(array $data, string $band): array
 /** Whether a band of the page is shown at all. */
 function home_band_shown(array $data, string $band): bool
 {
-    return ($data[$band]['status'] ?? 'shown') !== 'hidden';
-}
+    return contract_band_shown($data, $band);}
 
 function home_find(array $data, string $band, string $id): ?array
 {
@@ -1896,17 +2009,7 @@ function home_images(array $data): array
 /** A URL-safe id from a name, unique against the ids already in use. */
 function home_slug(string $name, array $taken = []): string
 {
-    $slug = strtolower(trim($name));
-    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
-    $slug = trim($slug, '-') ?: HOME_ID_PLACEHOLDER;
-
-    $base = $slug;
-    $n = 2;
-    while (in_array($slug, $taken, true)) {
-        $slug = $base . '-' . $n++;
-    }
-    return $slug;
-}
+    return contract_slug($name, HOME_ID_PLACEHOLDER, $taken);}
 
 /* ==========================================================================
    6. Services — the shape of the services index AND its detail pages
@@ -2542,45 +2645,22 @@ function services_identify(array $data): array
 /** Whether an id is one this file minted as a placeholder rather than a name. */
 function services_provisional(string $id): bool
 {
-    return $id === ''
-        || preg_match('/^' . SERVICES_ID_PLACEHOLDER . '(-\d+)?$/', $id) === 1;
-}
+    return contract_provisional($id, SERVICES_ID_PLACEHOLDER);}
 
 /** Keep a real id, replace a placeholder once there is a name to replace it with. */
 function services_mint(string $id, string $name, array $taken): string
 {
-    $id   = trim($id);
-    $name = trim($name);
-
-    if ((services_provisional($id) && $name !== '') || in_array($id, $taken, true)) {
-        return services_slug($name, $taken);
-    }
-    if ($id === '') {
-        return services_slug('', $taken);
-    }
-    return $id;
-}
+    return contract_mint($id, $name, SERVICES_ID_PLACEHOLDER, $taken);}
 
 /** A URL-safe id from a name. */
 function services_slug(string $name, array $taken = []): string
 {
-    $slug = strtolower(trim($name));
-    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
-    $slug = trim($slug, '-') ?: SERVICES_ID_PLACEHOLDER;
-
-    return services_unique($slug, $taken);
-}
+    return contract_slug($name, SERVICES_ID_PLACEHOLDER, $taken);}
 
 /** The same id, suffixed until nothing else in the list has it. */
 function services_unique(string $slug, array $taken): string
 {
-    $base = $slug;
-    $n    = 2;
-    while (in_array($slug, $taken, true)) {
-        $slug = $base . '-' . $n++;
-    }
-    return $slug;
-}
+    return contract_unique($slug, $taken);}
 
 /** Only the rows of an index list a visitor should see. */
 function services_shown(array $data, string $band): array
@@ -2594,17 +2674,12 @@ function services_shown(array $data, string $band): array
 /** Whether a band of the index is shown at all. */
 function services_band_shown(array $data, string $band): bool
 {
-    return ($data[$band]['status'] ?? 'shown') !== 'hidden';
-}
+    return contract_band_shown($data, $band);}
 
 /** Only the rows of a list a visitor should see, wherever the list is. */
 function services_rows_shown(array $rows): array
 {
-    return array_values(array_filter(
-        is_array($rows) ? $rows : [],
-        static fn($row): bool => is_array($row) && ($row['status'] ?? 'shown') !== 'hidden'
-    ));
-}
+    return contract_rows_shown($rows);}
 
 /** Every service, hidden ones included. The editor lists these. */
 function services_all(array $data): array
@@ -3039,60 +3114,32 @@ function certifications_identify(array $data): array
 /** An id nobody has chosen: empty, or the placeholder the Add button leaves. */
 function certifications_provisional(string $id): bool
 {
-    return $id === ''
-        || preg_match('/^' . CERTIFICATIONS_ID_PLACEHOLDER . '(-\d+)?$/', $id) === 1;
-}
+    return contract_provisional($id, CERTIFICATIONS_ID_PLACEHOLDER);}
 
 /** Keep a real id, replace a placeholder once there is a name to replace it with. */
 function certifications_mint(string $id, string $name, array $taken): string
 {
-    $id   = trim($id);
-    $name = trim($name);
-
-    if ((certifications_provisional($id) && $name !== '') || in_array($id, $taken, true)) {
-        return certifications_slug($name, $taken);
-    }
-    if ($id === '') {
-        return certifications_slug('', $taken);
-    }
-    return $id;
-}
+    return contract_mint($id, $name, CERTIFICATIONS_ID_PLACEHOLDER, $taken);}
 
 /** A URL-safe id from a name. */
 function certifications_slug(string $name, array $taken = []): string
 {
-    $slug = strtolower(trim($name));
-    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
-    $slug = trim($slug, '-') ?: CERTIFICATIONS_ID_PLACEHOLDER;
-
-    return certifications_unique($slug, $taken);
-}
+    return contract_slug($name, CERTIFICATIONS_ID_PLACEHOLDER, $taken);}
 
 /** The same id, suffixed until nothing else in the list has it. */
 function certifications_unique(string $slug, array $taken): string
 {
-    $base = $slug;
-    $n    = 2;
-    while (in_array($slug, $taken, true)) {
-        $slug = $base . '-' . $n++;
-    }
-    return $slug;
-}
+    return contract_unique($slug, $taken);}
 
 /** Whether a band is shown at all. */
 function certifications_band_shown(array $data, string $band): bool
 {
-    return ($data[$band]['status'] ?? 'shown') !== 'hidden';
-}
+    return contract_band_shown($data, $band);}
 
 /** Only the rows of a list a visitor should see, wherever the list is. */
 function certifications_rows_shown(array $rows): array
 {
-    return array_values(array_filter(
-        is_array($rows) ? $rows : [],
-        static fn($row): bool => is_array($row) && ($row['status'] ?? 'shown') !== 'hidden'
-    ));
-}
+    return contract_rows_shown($rows);}
 
 /** Every role group, hidden ones included. The editor lists these. */
 function certifications_groups(array $data): array
@@ -3531,60 +3578,32 @@ function branding_identify(array $data): array
 /** An id nobody has chosen: empty, or the placeholder the Add button leaves. */
 function branding_provisional(string $id): bool
 {
-    return $id === ''
-        || preg_match('/^' . BRANDING_ID_PLACEHOLDER . '(-\d+)?$/', $id) === 1;
-}
+    return contract_provisional($id, BRANDING_ID_PLACEHOLDER);}
 
 /** Keep a real id, replace a placeholder once there is a name to replace it with. */
 function branding_mint(string $id, string $name, array $taken): string
 {
-    $id   = trim($id);
-    $name = trim($name);
-
-    if ((branding_provisional($id) && $name !== '') || in_array($id, $taken, true)) {
-        return branding_slug($name, $taken);
-    }
-    if ($id === '') {
-        return branding_slug('', $taken);
-    }
-    return $id;
-}
+    return contract_mint($id, $name, BRANDING_ID_PLACEHOLDER, $taken);}
 
 /** A URL-safe id from a name. */
 function branding_slug(string $name, array $taken = []): string
 {
-    $slug = strtolower(trim($name));
-    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
-    $slug = trim($slug, '-') ?: BRANDING_ID_PLACEHOLDER;
-
-    return branding_unique($slug, $taken);
-}
+    return contract_slug($name, BRANDING_ID_PLACEHOLDER, $taken);}
 
 /** The same id, suffixed until nothing else in the list has it. */
 function branding_unique(string $slug, array $taken): string
 {
-    $base = $slug;
-    $n    = 2;
-    while (in_array($slug, $taken, true)) {
-        $slug = $base . '-' . $n++;
-    }
-    return $slug;
-}
+    return contract_unique($slug, $taken);}
 
 /** Whether a band is shown at all. */
 function branding_band_shown(array $data, string $band): bool
 {
-    return ($data[$band]['status'] ?? 'shown') !== 'hidden';
-}
+    return contract_band_shown($data, $band);}
 
 /** Only the rows of a list a visitor should see, wherever the list is. */
 function branding_rows_shown(array $rows): array
 {
-    return array_values(array_filter(
-        is_array($rows) ? $rows : [],
-        static fn($row): bool => is_array($row) && ($row['status'] ?? 'shown') !== 'hidden'
-    ));
-}
+    return contract_rows_shown($rows);}
 
 /** Every logo variant, hidden ones included. The editor lists these. */
 function branding_assets(array $data): array
@@ -3683,7 +3702,695 @@ function branding_download_label(array $file): string
 }
 
 /* ==========================================================================
-   9. Revisions
+   9. Privacy policy — the shape of a legal document
+   ========================================================================== */
+
+/**
+ * The kinds of block a section may hold, and what the editor calls each one.
+ *
+ * A CLOSED SET, and forced as much as chosen. rt_sanitise_html() allows nine
+ * tags -- p, br, strong, em, u, ul, ol, li, a -- and no heading, no <address>
+ * and no <table> among them. Structure therefore cannot live in a rich-text
+ * field: somebody typing <h3> into one would watch it disappear on save, with
+ * no way to tell that from a bug. So structure is a KIND, and the renderer
+ * owns the markup for it; the rich field carries only what may appear inside a
+ * paragraph.
+ *
+ * The list is what the page already contains and nothing more. A seventh shape
+ * costs a row here and an arm in privacy_block_defaults(), which is the whole
+ * price of adding one.
+ */
+const PRIVACY_BLOCK_KINDS = [
+    'paragraph'  => 'Paragraph',
+    'list'       => 'Bulleted list',
+    'subheading' => 'Subheading',
+    'note'       => 'Highlighted note',
+    'address'    => 'Address block',
+    'table'      => 'Two-column table',
+];
+
+/**
+ * The kinds whose own 'text' is markup rather than plain words.
+ *
+ * INLINE MARKUP ONLY, THROUGH rt_sanitise_inline(). Every one of these is
+ * rendered INSIDE an element the renderer supplies -- a <p>, a
+ * <p class="legal__notice">, an <address> -- so a <p> arriving from the editor
+ * is not emphasis somebody added, it is a paragraph inside a paragraph. And
+ * pressing Enter in a textarea is how it would arrive, which is not a corner
+ * case. The same goes for a list row and a summary point, both of which land
+ * in an <li>.
+ *
+ * 'address' is here, and that is the interesting one. Two of its five lines
+ * carry links -- a mailto: and a tel: -- and rt_safe_href() permits exactly
+ * those schemes, so the block round-trips as written, <strong>, <br> and all.
+ * Holding it as a list of plain lines instead would have thrown both links
+ * away.
+ */
+const PRIVACY_RICH_BLOCKS = ['paragraph', 'note', 'address'];
+
+/** 'subheading' is the one kind whose text is plain: it becomes an <h3>. */
+const PRIVACY_PLAIN_BLOCKS = ['subheading'];
+
+/** The kinds that hold rows of their own, and the function that fills one row. */
+const PRIVACY_ROW_BLOCKS = [
+    'list'  => 'privacy_item_defaults',
+    'table' => 'privacy_cell_defaults',
+];
+
+/* Free-text single-line fields, by band. The sections carry their own
+   headings, so 'policy' holds only the effective date and the callout. */
+const PRIVACY_TEXT_FIELDS = [
+    'meta'   => ['title', 'description', 'share_title', 'breadcrumb'],
+    'hero'   => ['title', 'subtitle'],
+    'policy' => ['label', 'effective'],
+    'cta'    => ['title', 'text'],
+];
+
+/**
+  * Every band that can be hidden whole, in the order it renders.
+  *
+  * NEITHER THE HERO NOR THE POLICY IS HERE. The hero is excluded for the
+  * reason it is excluded from ABOUT_BANDS and BRANDING_BANDS -- a page with no
+  * title is not a page with a section switched off, it is a broken page.
+  *
+  * The policy band is excluded for a stronger reason. Hiding it would leave a
+  * page headed "Privacy Policy" with no policy on it, still linked from the
+  * footer of all sixteen pages and still in the sitemap. That is not a
+  * configuration anybody wants; it is a compliance incident with a switch. The
+  * callout inside it can be hidden, and so can any single section.
+  */
+const PRIVACY_BANDS = ['cta'];
+
+/* The bands that hold a flat list. 'policy' is not here: its sections nest
+   blocks, and blocks nest rows, so they are normalised by
+   privacy_section_defaults() rather than by a flat map -- the same reason
+   branding.assets and certifications.certs are handled apart. */
+const PRIVACY_LISTS = ['cta' => 'privacy_button_defaults'];
+
+/* What a block or a row is called before it is called anything. */
+const PRIVACY_ID_PLACEHOLDER = 'row';
+
+/**
+ * What a SECTION is called before it is called anything, and a separate
+ * constant on purpose.
+ *
+ * A section's id is its anchor. #row-4 is a fragment somebody could link to
+ * and then find renamed; #section-4 at least says what it is while it waits
+ * for a heading. Blocks and rows are not fragment targets and keep the plain
+ * placeholder.
+ */
+const PRIVACY_SECTION_PLACEHOLDER = 'section';
+
+/**
+ * The page as it ships, and the fallback for anything missing from the file.
+ *
+ * The sections default to EMPTY, as every list-bearing document's do: a
+ * truncated or hand-edited privacy.json degrades to a page with its headings
+ * and no policy in it, which is visibly broken, rather than to a page carrying
+ * a stale policy nobody can see is stale. For a legal document that is the
+ * safer of the two failures.
+ */
+function privacy_defaults(): array
+{
+    return [
+        'updated'  => '',
+        'revision' => 0,
+        'meta'     => [
+            'title'       => 'Privacy Policy | Tech4TIME',
+            'description' => 'What Tech4TIME collects, why, how long it is kept and what '
+                           . 'you can ask us to do about it. No cookies, no analytics, no '
+                           . 'tracking.',
+            'share_title' => 'Privacy Policy | Tech4TIME',
+            'breadcrumb'  => 'Privacy Policy',
+        ],
+        'hero'     => [
+            'title'    => 'Privacy Policy',
+            'subtitle' => 'What We Collect, Why, and What You Can Ask Us to Do About It',
+        ],
+        'policy'   => [
+            /* THE NAME OF THE SECTION, READ OUT AND SHOWN TO NOBODY. The
+               <section> is labelled by a visually-hidden <h2>, which is how a
+               screen reader announces the region and the only heading on the
+               page that a sighted reader never sees. It is authored text bound
+               to an id, so it is a field: hard-coding it in the renderer would
+               put a string on the page that nothing in the model accounts for,
+               which is exactly what check_content_model.py exists to notice. */
+            'label'     => 'Privacy policy',
+
+            /* THE DATE THE POLICY TOOK EFFECT, AND NEVER A STAMP. 'updated'
+               already records when this document was last published. An
+               effective date is a different claim -- when the policy itself
+               changed -- and a save that quietly moved it would misstate the
+               one fact a reader checks first. Fixing a typo is not a new
+               policy. */
+            'effective' => '',
+            'callout'   => [],
+            'sections'  => [],
+        ],
+        'cta'      => [
+            'status' => 'shown',
+            'title'  => 'Questions about your data?',
+            'text'   => '',
+            'items'  => [],
+        ],
+    ];
+}
+
+/** Fill in everything the renderer reads, whatever the file happens to hold. */
+function privacy_normalise(array $data): array
+{
+    $defaults = privacy_defaults();
+
+    foreach ($defaults as $key => $value) {
+        if ($key === 'revision') {
+            $data[$key] = max(0, (int)($data[$key] ?? 0));
+            continue;
+        }
+        if (!is_array($value)) {
+            $data[$key] = is_string($data[$key] ?? null) ? $data[$key] : $value;
+            continue;
+        }
+        $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
+    }
+
+    foreach (PRIVACY_BANDS as $band) {
+        $data[$band]['status'] =
+            ($data[$band]['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown';
+    }
+
+    foreach (PRIVACY_LISTS as $band => $filler) {
+        $rows = is_array($data[$band]['items'] ?? null) ? $data[$band]['items'] : [];
+        $data[$band]['items'] = array_map(
+            $filler,
+            array_values(array_filter($rows, 'is_array'))
+        );
+    }
+
+    $data['policy']['callout'] = privacy_callout_defaults($data['policy']['callout'] ?? []);
+
+    $sections = is_array($data['policy']['sections'] ?? null) ? $data['policy']['sections'] : [];
+    $data['policy']['sections'] = array_map(
+        'privacy_section_defaults',
+        array_values(array_filter($sections, 'is_array'))
+    );
+
+    return privacy_identify($data);
+}
+
+/**
+ * The summary box at the top, "The short version".
+ *
+ * Its own structure rather than a section, because it is not one: it has no
+ * anchor, it renders inside .legal__callout, and its heading is an <h2> that
+ * is deliberately NOT a direct child of .legal__body. That last point is
+ * load-bearing -- assets/css/pages/legal.css zeroes the top margin of the
+ * first direct-child heading, and a flattened callout would steal the match
+ * from the first real section.
+ */
+function privacy_callout_defaults(mixed $callout): array
+{
+    $callout = is_array($callout) ? $callout : [];
+    $callout += [
+        'status' => 'shown',
+        'title'  => '',
+        'note'   => '',
+    ];
+
+    $items = is_array($callout['items'] ?? null) ? $callout['items'] : [];
+    $callout['items'] = array_map(
+        'privacy_item_defaults',
+        array_values(array_filter($items, 'is_array'))
+    );
+
+    return $callout;
+}
+
+/** One headed section of the policy: an <h2> with an anchor, and its blocks. */
+function privacy_section_defaults(array $row): array
+{
+    $row += [
+        'id'      => '',
+        'heading' => '',
+        'status'  => 'shown',
+    ];
+
+    $blocks = is_array($row['blocks'] ?? null) ? $row['blocks'] : [];
+    $row['blocks'] = array_map(
+        'privacy_block_defaults',
+        array_values(array_filter($blocks, 'is_array'))
+    );
+
+    return $row;
+}
+
+/**
+ * One block, normalised down to the fields its kind actually uses.
+ *
+ * NARROWED, not merely filled. A block that was a list and is now a paragraph
+ * would otherwise keep its items[] for ever -- invisible on the page, carried
+ * in the document, and published every time. Keeping only what the kind reads
+ * means what is stored is what is rendered, which is the same bargain
+ * upload_store() makes with a picture.
+ *
+ * An unknown kind becomes a paragraph rather than being dropped. Dropping it
+ * would lose words somebody wrote; a paragraph shows them, which is the
+ * failure that can be seen and fixed.
+ */
+function privacy_block_defaults(array $row): array
+{
+    $kind = (string)($row['kind'] ?? '');
+    $kind = isset(PRIVACY_BLOCK_KINDS[$kind]) ? $kind : 'paragraph';
+
+    $block = [
+        'id'     => (string)($row['id'] ?? ''),
+        'kind'   => $kind,
+        'status' => ($row['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown',
+    ];
+
+    if (in_array($kind, PRIVACY_RICH_BLOCKS, true) || in_array($kind, PRIVACY_PLAIN_BLOCKS, true)) {
+        $block['text'] = (string)($row['text'] ?? '');
+    }
+
+    if (isset(PRIVACY_ROW_BLOCKS[$kind])) {
+        $rows = is_array($row['rows'] ?? null) ? $row['rows'] : [];
+        $block['rows'] = array_map(
+            PRIVACY_ROW_BLOCKS[$kind],
+            array_values(array_filter($rows, 'is_array'))
+        );
+    }
+
+    if ($kind === 'table') {
+        /* The caption is read out before the table and shown to nobody. It is
+           not decoration: a table with no caption is announced as "table" and
+           the listener has to infer what it holds from the first cell. */
+        $block['caption'] = (string)($row['caption'] ?? '');
+        $columns = is_array($row['columns'] ?? null) ? array_values($row['columns']) : [];
+        $block['columns'] = [
+            (string)($columns[0] ?? ''),
+            (string)($columns[1] ?? ''),
+        ];
+    }
+
+    return $block;
+}
+
+/** One bullet, in a list block or in the callout. 'text' is sanitised HTML. */
+function privacy_item_defaults(array $row): array
+{
+    return $row + [
+        'id'     => '',
+        'text'   => '',
+        'status' => 'shown',
+    ];
+}
+
+/**
+ * One row of a two-column table: the <th scope="row"> and the <td> beside it.
+ *
+ * Both plain. A retention period is a fact, and the one thing a legal table
+ * should not invite is a link or an emphasis that changes what the row appears
+ * to promise.
+ */
+function privacy_cell_defaults(array $row): array
+{
+    return $row + [
+        'id'     => '',
+        'label'  => '',
+        'value'  => '',
+        'status' => 'shown',
+    ];
+}
+
+/** One button in the closing band. The page ships with two. */
+function privacy_button_defaults(array $row): array
+{
+    return $row + [
+        'id'     => '',
+        'label'  => '',
+        'href'   => '',
+        'style'  => 'primary',
+        'status' => 'shown',
+    ];
+}
+
+/**
+ * Give every row an id.
+ *
+ * Through contract_identify_rows(), which claims every id somebody already
+ * chose before it mints anything new. That matters here more than anywhere
+ * else on the site: a SECTION's id is its anchor, and the one-pass version
+ * lets a section added above an existing one take the existing one's fragment
+ * and rename it.
+ *
+ * Sections are numbered across the policy, because two of them may not answer
+ * to the same fragment. Blocks are numbered within their section and rows
+ * within their block, as certifications numbers roles within a group -- two
+ * sections may each hold a "paragraph-2" without either being renamed, because
+ * neither is a link target.
+ *
+ * A block is named for its KIND rather than for its words. Minting an id out
+ * of a sentence gives the longest field on the page the ugliest handle, and
+ * then freezes it.
+ */
+function privacy_identify(array $data): array
+{
+    foreach (PRIVACY_LISTS as $band => $_filler) {
+        $ids = contract_identify_rows($data[$band]['items'], PRIVACY_ID_PLACEHOLDER,
+                                      static fn(array $r): string => (string)($r['label'] ?? ''));
+        foreach ($ids as $i => $id) {
+            $data[$band]['items'][$i]['id'] = $id;
+        }
+    }
+
+    $ids = contract_identify_rows(
+        $data['policy']['callout']['items'], PRIVACY_ID_PLACEHOLDER,
+        static fn(array $r): string => privacy_row_name((string)($r['text'] ?? ''))
+    );
+    foreach ($ids as $i => $id) {
+        $data['policy']['callout']['items'][$i]['id'] = $id;
+    }
+
+    $sections = contract_identify_rows(
+        $data['policy']['sections'], PRIVACY_SECTION_PLACEHOLDER,
+        static fn(array $r): string => (string)($r['heading'] ?? '')
+    );
+
+    foreach ($sections as $s => $id) {
+        $data['policy']['sections'][$s]['id'] = $id;
+
+        $blocks = contract_identify_rows(
+            $data['policy']['sections'][$s]['blocks'], PRIVACY_ID_PLACEHOLDER,
+            static fn(array $r): string => (string)($r['kind'] ?? '')
+        );
+
+        foreach ($blocks as $b => $bid) {
+            $data['policy']['sections'][$s]['blocks'][$b]['id'] = $bid;
+
+            if (!isset($data['policy']['sections'][$s]['blocks'][$b]['rows'])) {
+                continue;
+            }
+
+            $rows = contract_identify_rows(
+                $data['policy']['sections'][$s]['blocks'][$b]['rows'], PRIVACY_ID_PLACEHOLDER,
+                static function (array $r): string {
+                    $name = trim((string)($r['label'] ?? ''));
+                    return $name !== '' ? $name : privacy_row_name((string)($r['text'] ?? ''));
+                }
+            );
+            foreach ($rows as $r => $rid) {
+                $data['policy']['sections'][$s]['blocks'][$b]['rows'][$r]['id'] = $rid;
+            }
+        }
+    }
+
+    return $data;
+}
+
+/**
+ * A short name for a row that has only prose to be named after.
+ *
+ * Bounded, because contract_slug() will happily turn a forty-word bullet into
+ * a forty-word id and then that id is frozen for good.
+ */
+function privacy_row_name(string $text): string
+{
+    $words = preg_split('/\s+/', trim(rt_plain($text))) ?: [];
+
+    return implode(' ', array_slice($words, 0, 6));
+}
+
+/** Whether a band of the page is shown at all. */
+function privacy_band_shown(array $data, string $band): bool
+{
+    return contract_band_shown($data, $band);
+}
+
+/** Only the rows of a list a visitor should see, wherever the list is. */
+function privacy_rows_shown(mixed $rows): array
+{
+    return contract_rows_shown($rows);
+}
+
+/** Every section, hidden ones included. The editor lists these. */
+function privacy_sections(array $data): array
+{
+    return is_array($data['policy']['sections'] ?? null) ? $data['policy']['sections'] : [];
+}
+
+/**
+ * Re-sanitise every rich field this document carries.
+ *
+ * Its own function rather than a branch inside contract_sanitise(), because
+ * the walk is three levels deep and the knowledge of which of six kinds hold
+ * markup belongs beside the constant that says so.
+ */
+function privacy_sanitise(array $data): array
+{
+    $callout = $data['policy']['callout'] ?? [];
+    $data['policy']['callout']['note'] = rt_sanitise_inline((string)($callout['note'] ?? ''));
+
+    foreach ($callout['items'] ?? [] as $i => $row) {
+        $data['policy']['callout']['items'][$i]['text'] =
+            rt_sanitise_inline((string)($row['text'] ?? ''));
+    }
+
+    foreach ($data['policy']['sections'] ?? [] as $s => $section) {
+        foreach ($section['blocks'] ?? [] as $b => $block) {
+            $kind = (string)($block['kind'] ?? '');
+
+            if (in_array($kind, PRIVACY_RICH_BLOCKS, true)) {
+                $data['policy']['sections'][$s]['blocks'][$b]['text'] =
+                    rt_sanitise_inline((string)($block['text'] ?? ''));
+            }
+
+            if ($kind !== 'list') {
+                continue;
+            }
+
+            foreach ($block['rows'] ?? [] as $r => $row) {
+                $data['policy']['sections'][$s]['blocks'][$b]['rows'][$r]['text'] =
+                    rt_sanitise_inline((string)($row['text'] ?? ''));
+            }
+        }
+    }
+
+    return $data;
+}
+
+/* ------------------------------------------------ what this page repeats
+
+   THE POLICY STATES FACTS ANOTHER DOCUMENT ALREADY MANAGES: the offices, the
+   email, the telephone. They are authored here on purpose -- a controller's
+   details are a legal statement, and one that changed because somebody edited
+   the contact page would be a statement nobody made. But two copies of a fact
+   drift, and this page has already done it: the telephone reads
+   "+880 1320 571562" here and "+880 1320571562" there, and the Brussels office
+   has a comma on one page and not on the other. Nothing told anyone.
+
+   So the copies stay and the DIVERGENCE is reported. What follows answers one
+   question -- does the policy still state the current value? -- and answers it
+   by containment rather than by field, because these facts live inside prose
+   and an address block, not in slots of their own.
+
+   IT IS A NOTICE, NOT A REFUSAL. The editor draws it; nothing here blocks a
+   save. Requiring the two to agree before either could be saved would mean
+   that after an office move, whichever page you edited first could not be
+   saved -- and there is no order that avoids that. */
+
+/**
+ * A string reduced to what a comparison should care about.
+ *
+ * Tags go, entities are decoded, a non-breaking space becomes a space, runs of
+ * space collapse, commas and full stops go, and case stops mattering. That is
+ * what makes this useful rather than noisy: it reports a different street and
+ * stays quiet about a different comma.
+ */
+function privacy_fact_key(string $text): string
+{
+    $text = rt_plain($text);
+    $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = str_replace(["\u{00a0}", ',', '.'], [' ', '', ''], $text);
+    $text = preg_replace('/\s+/u', ' ', $text) ?? '';
+
+    /* strtolower() and not mb_strtolower(): this is the only place in either
+       repository that would have needed mbstring, and the host having it is
+       not a reason to require it -- a check that cannot run where the tests
+       run is a check that stops being run. Byte-wise folding leaves non-ASCII
+       alone, and it leaves it alone identically on both sides of a comparison,
+       which is all a containment test asks of it. */
+    return trim(strtolower($text));
+}
+
+/**
+ * Every telephone number in a string, as bare digits.
+ *
+ * Run by run rather than by stripping every non-digit from the whole document,
+ * which would join the "12 months" of one paragraph to the "2000" of the next
+ * and find numbers nobody wrote.
+ */
+function privacy_fact_numbers(string $text): array
+{
+    $text = html_entity_decode(strip_tags($text, '<a>'), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+    /* A LIST AND NOT A SET, and that is not a style choice. Using the digits
+       as an array key makes PHP cast "8801320571562" to an int, and the
+       caller's strict in_array() against a string then never matches. The
+       comparison silently reported that the policy had lost the telephone it
+       was in fact still printing. */
+    $found = [];
+
+    if (preg_match_all('/\+?[0-9][0-9\s\x{00a0}()\-]{6,}/u', $text, $m)) {
+        foreach ($m[0] as $run) {
+            $digits = preg_replace('/\D+/', '', $run) ?? '';
+            if (strlen($digits) >= 7) {
+                $found[] = $digits;
+            }
+        }
+    }
+
+    /* tel: hrefs too. strip_tags() above keeps <a> for exactly this: the
+       number a visitor presses is in the attribute, not in the words. */
+    if (preg_match_all('/tel:([+0-9()\s\x{00a0}\-]+)/ui', $text, $m)) {
+        foreach ($m[1] as $run) {
+            $digits = preg_replace('/\D+/', '', $run) ?? '';
+            if (strlen($digits) >= 7) {
+                $found[] = $digits;
+            }
+        }
+    }
+
+    return array_values(array_unique($found));
+}
+
+/** Every word of the policy a reader sees, markup included, in one string. */
+function privacy_source_text(array $data): string
+{
+    $parts = [(string)($data['policy']['effective'] ?? '')];
+
+    $callout = $data['policy']['callout'] ?? [];
+    $parts[] = (string)($callout['title'] ?? '');
+    $parts[] = (string)($callout['note'] ?? '');
+    foreach ($callout['items'] ?? [] as $row) {
+        $parts[] = (string)($row['text'] ?? '');
+    }
+
+    foreach ($data['policy']['sections'] ?? [] as $section) {
+        $parts[] = (string)($section['heading'] ?? '');
+        foreach ($section['blocks'] ?? [] as $block) {
+            $parts[] = (string)($block['text'] ?? '');
+            $parts[] = (string)($block['caption'] ?? '');
+            foreach ($block['columns'] ?? [] as $column) {
+                $parts[] = (string)$column;
+            }
+            foreach ($block['rows'] ?? [] as $row) {
+                $parts[] = (string)($row['text'] ?? '');
+                $parts[] = (string)($row['label'] ?? '');
+                $parts[] = (string)($row['value'] ?? '');
+            }
+        }
+    }
+
+    $parts[] = (string)($data['cta']['text'] ?? '');
+    foreach ($data['cta']['items'] ?? [] as $row) {
+        $parts[] = (string)($row['label'] ?? '');
+        $parts[] = (string)($row['href'] ?? '');
+    }
+
+    return implode(' ', $parts);
+}
+
+/**
+ * Which facts the contact document manages, and whether the policy still says
+ * them.
+ *
+ * Read off the contact document rather than listed here, so an office added
+ * there is a fact checked here without anybody remembering to add it. An email
+ * is the reach value with an "@" and no slash -- the LinkedIn address has
+ * both; a telephone is one that is mostly digits. Neither is found by its
+ * label, because a label is editable text and renaming "Phone" to "Call us"
+ * must not switch a check off.
+ *
+ * Returns one row per fact: what it is, the current value, where it is
+ * managed, and whether this policy still contains it.
+ */
+function privacy_shared_facts(array $privacy, array $contact): array
+{
+    $text    = privacy_source_text($privacy);
+    $haystack = privacy_fact_key($text);
+    $numbers = privacy_fact_numbers($text);
+    $facts   = [];
+
+    /* ONE ROW PER ROUTE, NOT ONE PER VALUE. The contact page lists three
+       telephone numbers; the policy prints one, and that is correct -- a
+       privacy policy names a way to reach the controller, not the whole
+       switchboard. Reporting the other two as missing would be an alarm about
+       something nobody did wrong, and an alarm nobody can silence is an alarm
+       everybody learns to ignore. So a route is satisfied by any of its
+       values, and what is shown is the first. */
+    $emails = [];
+    $phones = [];
+
+    foreach (contract_rows_shown($contact['reach']['items'] ?? []) as $row) {
+        foreach ($row['values'] ?? [] as $value) {
+            $value = trim((string)$value);
+
+            /* Classified by SHAPE, never by label. A label is editable text,
+               and renaming "Phone" to "Call us" must not switch a check off.
+               The slash keeps the LinkedIn address out of the emails. */
+            if (str_contains($value, '@') && !str_contains($value, '/')) {
+                $emails[] = $value;
+                continue;
+            }
+            if (preg_match('/^[+0-9()\s\-]+$/', $value)
+                && strlen((string)preg_replace('/\D+/', '', $value)) >= 7
+            ) {
+                $phones[] = $value;
+            }
+        }
+    }
+
+    if ($emails !== []) {
+        $facts[] = [
+            'label' => 'Email address',
+            'value' => $emails[0],
+            'found' => (bool)array_filter(
+                $emails,
+                static fn(string $e): bool => str_contains($haystack, privacy_fact_key($e))
+            ),
+        ];
+    }
+
+    if ($phones !== []) {
+        $facts[] = [
+            'label' => 'Telephone',
+            'value' => $phones[0],
+            'found' => (bool)array_filter(
+                $phones,
+                static fn(string $p): bool =>
+                    in_array((string)preg_replace('/\D+/', '', $p), $numbers, true)
+            ),
+        ];
+    }
+
+    foreach (contract_rows_shown($contact['offices']['items'] ?? []) as $office) {
+        $address = trim((string)($office['address'] ?? ''));
+        if ($address === '') {
+            continue;
+        }
+        $facts[] = [
+            'label' => trim((string)($office['name'] ?? '')) !== ''
+                     ? 'Office — ' . $office['name']
+                     : 'Office',
+            'value' => $address,
+            'found' => str_contains($haystack, privacy_fact_key($address)),
+        ];
+    }
+
+    return $facts;
+}
+
+/* ==========================================================================
+   10. Revisions
    ========================================================================== */
 
 /**
@@ -3706,7 +4413,7 @@ function contract_next_revision(array $data): int
 }
 
 /* ==========================================================================
-   10. Normalising and re-sanitising on receipt
+   11. Normalising and re-sanitising on receipt
    ========================================================================== */
 
 /**
@@ -3735,6 +4442,7 @@ function contract_normalise(string $document, array $data): array
         'services' => services_normalise($data),
         'certifications' => certifications_normalise($data),
         'branding' => branding_normalise($data),
+        'privacy'  => privacy_normalise($data),
         default    => throw new RuntimeException('Unknown document: ' . $document),
     };
 }
@@ -3885,6 +4593,16 @@ function contract_sanitise(string $document, array $data): array
             }
         }
         return $data;
+    }
+
+    /* The walk is three levels deep and reaches four different fields, so it
+       lives beside the constants that say which kinds hold markup rather than
+       being spelled out again here. A rich field this function fails to reach
+       is a rich field published unsanitised, which is the one thing it exists
+       to prevent -- so test_publish.py asserts that every field the model
+       calls rich is a field this reaches. */
+    if ($document === 'privacy') {
+        return privacy_sanitise($data);
     }
 
     throw new RuntimeException('Unknown document: ' . $document);

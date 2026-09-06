@@ -88,6 +88,7 @@ sections/
 ├── home.php            the home page editor     → content/home.json
 ├── certifications.php  the certifications page  → content/certifications.json
 ├── branding.php        the branding page        → content/branding.json
+├── privacy.php         the privacy policy       → content/privacy.json
 ├── services.php        the services editor, and each service page beneath it
 │                                                → content/services.json
 └── account.php         password, second factor, recovery codes, the log
@@ -107,6 +108,7 @@ The rail draws itself from `ADMIN_SECTIONS` in `lib/admin.php`:
 | `/?s=services&service=<slug>` | `services` | one service page, in the same document |
 | `/?s=certifications` | `certifications` | `content/certifications.json`, then publishes |
 | `/?s=branding` | `branding` | `content/branding.json`, then publishes |
+| `/?s=privacy` | `privacy` | `content/privacy.json`, then publishes |
 | `/?s=account` | `account` | your own password, second factor and recovery codes |
 
 `ADMIN_PAGE_SECTIONS` names the subset that edits a page of the public website

@@ -365,7 +365,7 @@ def run(b: Browser, base: str, r: Results) -> None:
     for screen in ("/?s=overview", "/?s=careers", "/?s=careers&action=new",
                    "/?s=contact", "/?s=company", "/?s=about", "/?s=home",
                    "/?s=services", "/?s=services&service=cybersecurity",
-                   "/?s=certifications", "/?s=branding", "/?s=account"):
+                   "/?s=certifications", "/?s=branding", "/?s=privacy", "/?s=account"):
         b.go(base + screen)
         loud = b.js("""
         var out = [];
@@ -408,7 +408,7 @@ def run(b: Browser, base: str, r: Results) -> None:
     for screen in ("/?s=careers", "/?s=contact", "/?s=company", "/?s=about",
                    "/?s=home", "/?s=services",
                    "/?s=services&service=cybersecurity",
-                   "/?s=certifications", "/?s=branding", "/?s=account"):
+                   "/?s=certifications", "/?s=branding", "/?s=privacy", "/?s=account"):
         b.go(base + screen)
         counts = b.js(
             "var all = document.querySelectorAll('#admin-main form');"
@@ -537,7 +537,7 @@ def navigate(b: Browser, base: str, r: Results) -> None:
     for screen in ("/?s=overview", "/?s=careers", "/?s=careers&action=new",
                    "/?s=contact", "/?s=company", "/?s=about", "/?s=home",
                    "/?s=services", "/?s=services&service=cybersecurity",
-                   "/?s=certifications", "/?s=branding", "/?s=account"):
+                   "/?s=certifications", "/?s=branding", "/?s=privacy", "/?s=account"):
         b.go(base + screen)
         stragglers = b.js(STRAGGLERS)
         r.check(f"{screen}: no link falls through to a full page load",
@@ -565,7 +565,7 @@ def navigate(b: Browser, base: str, r: Results) -> None:
     for screen in ("/?s=overview", "/?s=careers", "/?s=contact",
                    "/?s=company", "/?s=about", "/?s=home", "/?s=services",
                    "/?s=services&service=cybersecurity",
-                   "/?s=certifications", "/?s=branding", "/?s=account"):
+                   "/?s=certifications", "/?s=branding", "/?s=privacy", "/?s=account"):
         b.go(base + screen)
         r.check(f"{screen}: there is somewhere to say it",
                 b.js(SHELL)["status"],
@@ -836,6 +836,7 @@ def improvements(b: Browser, base: str, r: Results) -> None:
         ("/?s=about", "story", "story[items]"),
         ("/?s=certifications", "certs", "certs[items]"),
         ("/?s=branding", "assets", "assets[items]"),
+        ("/?s=privacy", "sections", "sections"),
         ("/?s=about", "whyus", "whyus[items]"),
         ("/?s=home", "tags", "tags[items]"),
         ("/?s=home", "destinations", "destinations[items]"),
@@ -1007,6 +1008,8 @@ def improvements(b: Browser, base: str, r: Results) -> None:
     # same way the contact editor came to be in the state described above.
     for screen in ("/?s=contact", "/?s=company", "/?s=account", "/?s=careers",
                    "/?s=about", "/?s=home", "/?s=branding"):
+        # The privacy editor is deliberately absent: it has no file input at
+        # all, so it would pass this vacuously and read as though it did.
         b.go(base + screen)
         bad = b.js("""
         var out = [];

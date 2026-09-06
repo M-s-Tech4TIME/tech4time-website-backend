@@ -294,6 +294,24 @@ the reason beside it. `test_careers_admin.py` is the worked example.
 
 ---
 
+## Three things the privacy editor learnt, if yours nests
+
+**A list inside a list inside a list works, and the parent indices go in the BAND name.** The verb
+that `admin_card_head()` builds is `<band>-<verb>:<index>`, and the index is cast to an `int` — so
+two coordinates cannot both live there. `block-3-up:2` and `row-3-2-remove:1` are what the privacy
+editor sends; `$band` is a free string and carries as many parents as you need.
+
+**Move a row with `admin_move_row()`, not with your own `array_splice`.** Three editors had written
+that function before it was one function, and each copy carried the same comment saying four copies
+of an `array_splice` is four places for an off-by-one to live.
+
+**If a row's id is an ANCHOR, assign ids with `contract_identify_rows()`.** It claims every id
+somebody already chose before it mints anything new. Minting in row order instead lets a row added
+above an existing one with the same name take that row's id, silently renaming the incumbent — and
+if the id is a fragment somebody linked to, that link now lands in the wrong place.
+
+---
+
 ## Two things that will catch you out
 
 **The deploy must not overwrite the new JSON.** The moment a page becomes editable, its

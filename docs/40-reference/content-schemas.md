@@ -2,10 +2,10 @@
 
 **Applies to:** both
 
-Three of the eight JSON files the dynamic pages render from, field by field: the ones whose shape
+Three of the nine JSON files the dynamic pages render from, field by field: the ones whose shape
 this half needs spelled out. **The full set is in
-`tech4time-website-frontend/docs/40-reference/content-schemas.md`**, which documents all eight
-including `company`, `home`, `services`, `certifications` and `branding`.
+`tech4time-website-frontend/docs/40-reference/content-schemas.md`**, which documents all nine
+including `company`, `home`, `services`, `certifications`, `branding` and `privacy`.
 
 **The defaults functions are the definition of the shape**, not these files —
 `careers_load()` in `lib/careers.php`, and `contact_defaults()` / `contact_office_defaults()` /

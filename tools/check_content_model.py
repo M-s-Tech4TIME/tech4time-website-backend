@@ -194,6 +194,24 @@ COVERED_ELSEWHERE = {
         "meta line, the format on a download button and the glyph beside it — "
         "checked against what the page actually renders.",
     ),
+    "privacy": (
+        "tools/test_privacy_admin.py" if SIDE in ("backend", "both")
+        else "tools/test_publish.py",
+        "The privacy policy is three lists deep — sections hold blocks, and a "
+        "list, an address or a table holds rows — and it is the only document "
+        "whose rows are TYPED: a block declares which of six kinds it is and "
+        "the renderer owns the markup for that kind, because rt_sanitise_html() "
+        "allows no heading, no <address> and no <table> and structure therefore "
+        "cannot live in a rich field. Neither half can be read field by field: "
+        "the editor names its inputs "
+        "\"sections[<?= $s ?>][blocks][<?= $b ?>][rows][<?= $r ?>][text]\" and "
+        "the page renders with foreach over privacy_rows_shown(). It is proved "
+        "by round trip instead: every field set through the editor and read "
+        "back off the wire, add, remove, hide and reorder at all three levels, "
+        "all six block kinds rendering their own markup, and the anchor rule "
+        "that a section which has been named keeps its fragment when a section "
+        "with the same heading is added above it.",
+    ),
     "home": (
         "tools/test_home_admin.py" if SIDE in ("backend", "both")
         else "tools/test_publish.py",

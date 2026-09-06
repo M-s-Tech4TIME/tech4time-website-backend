@@ -101,7 +101,7 @@ PUBLIC_SCREENS = ["/login.php", "/forgot.php", "/reset.php"]
 
 SIGNED_IN_SCREENS = ["/", "/?s=home", "/?s=careers", "/?s=contact", "/?s=company",
                      "/?s=about", "/?s=services", "/?s=certifications",
-                     "/?s=branding",
+                     "/?s=branding", "/?s=privacy",
                      # Both services screens, because they are different pages
                      # rather than the same one with a filter: one lists the
                      # services and the other edits one, and only the second

@@ -286,24 +286,7 @@ function certifications_apply_row_action(array $data, string $do): ?array
  */
 function certifications_move(array $rows, string $what, int $index): ?array
 {
-    if (!isset($rows[$index])) {
-        return null;
-    }
-
-    if ($what === 'remove') {
-        array_splice($rows, $index, 1);
-
-        return [array_values($rows), 'Removed. Nothing is written to the site until you save.'];
-    }
-
-    $to = $index + ($what === 'up' ? -1 : 1);
-    if ($to < 0 || $to >= count($rows)) {
-        return null;
-    }
-
-    [$rows[$index], $rows[$to]] = [$rows[$to], $rows[$index]];
-
-    return [$rows, 'Moved. Nothing is written to the site until you save.'];
+    return admin_move_row($rows, $what, $index);
 }
 
 /* ---------------------------------------------------------------- helpers */

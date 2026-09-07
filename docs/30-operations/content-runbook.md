@@ -24,9 +24,9 @@ Trouble getting in: [secrets-recovery.md](secrets-recovery.md).
 
 | Where | What is there |
 |---|---|
-| Down the left | the pages you can edit |
+| Down the left | the pages you can edit, in the order they appear on the site: Overview, Home, About Us, Services, Company Profile, Careers, Contact, Resource Certifications, Branding & Advertisement, Privacy Policy, and **SEO Management** last |
 | The round `‹` at the top of that column | narrows it to icons. It remembers, so it stays that way |
-| Your name at the **bottom** of that column | your account, and **Sign out** |
+| Your name at the **bottom** of that column | your account, and **Sign out**. **Your account is not in the list above** — it is about you rather than about a page, so it lives here |
 | **Down the right**, under *On this page* | **every section of the page you are editing** — click a name to jump straight to it. On a narrower screen it sits above the form instead |
 | Beside the page name | two round buttons: **view the page** (the eye) and **open the site** (the link). Both open in a new tab |
 | Top right | **Save**, **Discard**, and the light/dark switch |
@@ -304,6 +304,114 @@ Exactly as on the company profile: JPEG, PNG or WebP up to 5 MB, re-encoded on a
 camera and location details a photograph carries are removed, and the description is not optional.
 The stored-pictures count at the bottom is shared across every editor, which is why nothing is ever
 swept automatically.
+
+## SEO Management
+
+**Admin → SEO Management**
+
+Everything a search engine is told about the site. It is one section over several screens, because
+one screen holding every page would be enormous.
+
+**The first screen is a list.** One row per page — including every service, so a service added in
+the Services editor appears here by itself — showing its title, whether the title and description
+are a good length, and whether the page is indexed. Click a row to edit that page and nothing else.
+
+Two more rows at the bottom open the site-wide screens: **the whole site**, and **crawling and
+installing**.
+
+### What you can change for one page
+
+| | |
+|---|---|
+| **Browser tab title** | what the tab says, and the blue heading in a Google result. Keep it under 65 characters or it is cut off |
+| **Search description** | the paragraph under that heading. Between 50 and 165; **150–160 reads best**, and the box tells you where you are |
+| **Keywords** | words this page is about, separated by commas. Worth knowing before you spend time on it: **Google has ignored this tag since 2009** and Bing treats a stuffed one as spam. A few true words help a handful of smaller engines and the site's own search; a long list helps nobody. Left empty, nothing is sent |
+| **Title on a shared link** | what Facebook, LinkedIn and WhatsApp show. Usually the title without the brand suffix |
+| **Share picture** | leave it empty and the page uses the site's own card, which is what every page does today |
+| **Name in a breadcrumb trail** | only a search engine sees this. There is no breadcrumb on the site itself |
+| **In search results** | *Indexed* or *Not indexed* — read the warning below before changing it |
+| **How often it changes / Priority** | hints for the sitemap. They matter little; sensible values are already set |
+
+**The same words twice is refused.** Two pages cannot share a title or a description — a search
+engine has to be able to tell them apart, and if it cannot it usually shows neither.
+
+The **web address** of a page is not editable here, and not anywhere. One page has one address, and
+that is what tells Google which page is the real one.
+
+### "Not indexed" is slow to undo, and that is the point
+
+Setting a page to **Not indexed** asks Google to drop it from search and removes it from the
+sitemap. The editor asks you to confirm and names the page before it does anything.
+
+**Undoing it is not instant.** Switching back to *Indexed* only means Google may list it again the
+next time it crawls the page — on Google's schedule, not yours, and that can take weeks. Nothing on
+this end can make it faster.
+
+The list screen carries a standing note showing every page currently set to *Not indexed*, so a
+change made months ago is still visible rather than forgotten.
+
+### The whole site
+
+The company details a search engine reads: the legal name, what else you are called, the slogan,
+the year founded, the areas served, what the company offers and knows about. Also the site's default
+share picture, the browser colour in light and dark mode, and the language.
+
+**Social profiles** are rows — add, reorder, and hide one without deleting it. These tell a search
+engine which accounts elsewhere are this same company.
+
+**Opening hours** are rows too, and they are separate from the hours written on the contact page on
+purpose: these are the machine-readable kind — which days, opens at, closes at — and only that shape
+can appear in a search result.
+
+**The offices are not here.** Addresses and telephone numbers come from the Contact editor, so they
+are only ever typed once.
+
+### Crawling and installing
+
+**Blocked paths** — one address per line that crawlers should not visit. Adding one is confirmed
+first. A rule that would block the whole site is refused; that is not a stricter rule, it is the off
+switch.
+
+**Search Console and Bing verification.** Paste the token each service gives you, save, and the tag
+is live on every page. **This is the most valuable thing on this screen and it is a text box.**
+Until it is done you cannot see what the site ranks for, submit the sitemap, or be told that Google
+refused to index something — the site is well built and invisible to you.
+
+**The app manifest** is what a phone uses when somebody adds the site to their home screen: the
+name, the short name, the colours.
+
+### Google Analytics
+
+Paste the measurement id from your Google Analytics property — it looks like `G-XXXXXXXXXX` — and
+every page starts reporting to it on the next load. Clear the field and it all stops, just as
+quickly. There is no deploy either way.
+
+**This is the only thing on the site that loads anything from another company's servers**, which is
+why it is off until you switch it on. An id that is not the shape Google issues is refused, and the
+screen says so rather than quietly emptying the box.
+
+**Two things change the moment you turn it on, and neither is automatic.**
+
+1. **The privacy policy stops being true.** It says today, in as many words, "No cookies, no
+   analytics, no tracking". That sentence has to be corrected on the Privacy Policy screen. It is
+   the page people and regulators read to find out what the site does.
+2. **EU visitors generally have to be asked first.** One of the three offices is in Brussels, and
+   European rules usually require consent *before* analytics runs. This screen turns the
+   measurement on; it does not ask anybody's permission, and nothing here can decide that for you.
+
+If you are not ready for either, leave the field empty — Search Console, on the same screen, tells
+you what people *searched* for without collecting anything from visitors at all.
+
+### What none of this can do
+
+It sets the ceiling; it does not set the position. Where the site ranks for a competitive search is
+decided mostly off the site — other sites linking to it, people searching for the brand by name, and
+how much substantial material there is to read. The four things that move it further than any change
+here: verify in Search Console and submit the sitemap; claim a Google Business Profile for each
+office; publish something substantial regularly; and earn links from partners, clients and
+certification bodies.
+
+---
 
 ## Your account
 

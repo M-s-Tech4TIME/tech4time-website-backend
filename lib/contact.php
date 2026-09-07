@@ -165,12 +165,13 @@ function contact_validate(array $data): array
     if (trim((string)$data['hero']['title']) === '') {
         $errors[] = 'The page title in the banner is required.';
     }
-    if (trim((string)$data['meta']['title']) === '') {
-        $errors[] = 'The browser tab title is required.';
-    }
-    if (strlen(trim((string)$data['meta']['description'])) > 320) {
-        $errors[] = 'The search description is longer than 320 characters; Google will cut it off.';
-    }
+    /* NOTHING ABOUT THE meta BAND IS CHECKED HERE ANY MORE. Its title,
+       description, breadcrumb and crawl setting are edited on the SEO screen
+       and validated by seo_validate(), which is the only place that can see
+       all of them at once -- two pages sharing a title is a fault neither page
+       can detect on its own. Leaving the checks here as well would refuse a
+       save on THIS page for a field this page no longer offers, which is a
+       dead end rather than a warning. */
 
     foreach ($data['reach']['items'] as $i => $item) {
         $where = 'Reach row ' . ($i + 1);

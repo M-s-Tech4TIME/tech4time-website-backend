@@ -60,22 +60,16 @@ const ADMIN_SECTIONS = [
         'view'  => '',
     ],
     'home' => [
-        'label' => 'Home Page',
+        'label' => 'Home',
         'icon'  => 'home',
         'desc'  => 'The hero, the services and the cards on the front page',
         'view'  => '/',                 // resolved through public_url()
     ],
-    'careers' => [
-        'label' => 'Careers',
-        'icon'  => 'briefcase',
-        'desc'  => 'Job posts and the CV link',
-        'view'  => '/pages/careers/',   // resolved through public_url()
-    ],
-    'contact' => [
-        'label' => 'Contact',
-        'icon'  => 'envelope',
-        'desc'  => 'Offices, numbers, the form',
-        'view'  => '/pages/contact/',
+    'about' => [
+        'label' => 'About Us',
+        'icon'  => 'users',
+        'desc'  => 'The story, specialities and why-us cards',
+        'view'  => '/pages/about/',
     ],
     'services' => [
         'label' => 'Services',
@@ -89,11 +83,42 @@ const ADMIN_SECTIONS = [
         'desc'  => 'Milestones, clients, technology',
         'view'  => '/pages/company-profile/',
     ],
-    'about' => [
-        'label' => 'About Us',
-        'icon'  => 'users',
-        'desc'  => 'The story, specialities and why-us cards',
-        'view'  => '/pages/about/',
+    'careers' => [
+        'label' => 'Careers',
+        'icon'  => 'briefcase',
+        'desc'  => 'Job posts and the CV link',
+        'view'  => '/pages/careers/',   // resolved through public_url()
+    ],
+    'contact' => [
+        'label' => 'Contact',
+        'icon'  => 'envelope',
+        'desc'  => 'Offices, numbers, the form',
+        'view'  => '/pages/contact/',
+    ],
+    'certifications' => [
+        'label' => 'Resource Certifications',
+        'icon'  => 'certificate',
+        'desc'  => 'Role groups and the qualifications inside them',
+        'view'  => '/pages/resource-certifications/',
+    ],
+    'branding' => [
+        'label' => 'Branding & Advertisement',
+        'icon'  => 'palette',
+        'desc'  => 'The logo files people download, and the terms of use',
+        'view'  => '/pages/branding-and-advertisement/',
+    ],
+    'privacy' => [
+        'label' => 'Privacy Policy',
+        'icon'  => 'user-lock',
+        'desc'  => 'What the site collects, why, and what people can ask for',
+        'view'  => '/pages/privacy-policy/',
+    ],
+    'seo' => [
+        'label' => 'SEO Management',
+        'icon'  => 'globe',
+        'desc'  => 'Titles, descriptions and how each page appears in search',
+        /* No single page: this screen edits all of them. */
+        'view'  => '',
     ],
     'account' => [
         'label' => 'Account',
@@ -104,13 +129,36 @@ const ADMIN_SECTIONS = [
 ];
 
 /**
+ * The rail's rows, in the order they appear.
+ *
+ * NOT THE SAME LIST AS ADMIN_SECTIONS, and the difference is one entry: the
+ * account is a section but not a rail row. It is reached from the avatar menu
+ * pinned to the foot of the rail, which is where the account belongs -- it is
+ * the one thing on the screen that is about the person rather than the page,
+ * and every tool with a rail like this one puts it there.
+ *
+ * IT CANNOT SIMPLY BE DROPPED FROM THE REGISTRY INSTEAD. admin_section()
+ * returns 'overview' for any name ADMIN_SECTIONS does not list, so removing
+ * the entry would make ?s=account land silently on the Overview and put the
+ * password and two-factor screens out of reach.
+ *
+ * Adding a section means adding it in BOTH places, and its label has to fit
+ * the rail on one line -- see .rail__label in public/assets/css/admin.css and
+ * the assertion in tools/check_admin_a11y.py.
+ */
+const ADMIN_RAIL_SECTIONS = ['overview', 'home', 'about', 'services', 'company',
+                             'careers', 'contact', 'certifications', 'branding',
+                             'privacy', 'seo'];
+
+/**
  * Sections that edit a page of the website, in rail order.
  *
  * ADMIN_SECTIONS also carries the ones that do not — the overview and the
  * account — so anything counting or listing "the pages you can edit" asks here
  * rather than filtering the registry by hand in three places.
  */
-const ADMIN_PAGE_SECTIONS = ['home', 'careers', 'contact', 'company', 'about', 'services'];
+const ADMIN_PAGE_SECTIONS = ['home', 'about', 'services', 'company', 'careers',
+                             'contact', 'certifications', 'branding', 'privacy'];
 
 /* The marker admin_form_tail() writes and admin_form_truncated() looks for. */
 const ADMIN_TAIL_FIELD = '__tail';
@@ -546,12 +594,21 @@ function admin_preview_src(string $path): string
  */
 function admin_image_fields(string $field, string $upload, array $image,
                             string $noun = 'picture', string $empty = '',
-                            array $fallback = []): void
+                            array $fallback = [], bool $vector = false,
+                            int $maxSide = UPLOAD_MAX_DIMENSION): void
 {
     $image += ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0];
+
+    /* A vector file is not drawn here, and that is deliberate rather than a
+       limitation. /uploads/*.svg is served with Content-Disposition:
+       attachment on both hosts -- which is the thing that makes publishing one
+       safe at all -- so an <img> pointing at it is asking the browser to
+       render something the server has just said to download. It is a FILE on
+       this screen: its name, its size and how big it draws. */
+    $isVector = str_ends_with(strtolower((string)$image['src']), '.svg');
     ?>
         <div class="admin-card__media">
-<?php if ($image['src'] !== ''): ?>
+<?php if ($image['src'] !== '' && !$isVector): ?>
           <img class="admin-card__thumb" src="<?= h(admin_preview_src((string)$image['src'])) ?>"
                alt="" width="<?= (int)$image['width'] ?>" height="<?= (int)$image['height'] ?>"
                loading="lazy" decoding="async">
@@ -560,6 +617,14 @@ function admin_image_fields(string $field, string $upload, array $image,
             &middot; <?= (int)$image['width'] ?>&times;<?= (int)$image['height'] ?>
 <?php if ($image['webp'] !== ''): ?>
             &middot; with a WebP version
+<?php endif; ?>
+          </p>
+<?php elseif ($image['src'] !== ''): ?>
+          <p class="admin__fineprint">
+            <code><?= h(basename((string)$image['src'])) ?></code>
+            &middot; vector
+<?php if ((int)$image['width'] > 0 && (int)$image['height'] > 0): ?>
+            &middot; draws at <?= (int)$image['width'] ?>&times;<?= (int)$image['height'] ?>
 <?php endif; ?>
           </p>
 <?php elseif ($fallback !== []): ?>
@@ -601,13 +666,21 @@ function admin_image_fields(string $field, string $upload, array $image,
           </span>
           <input class="admin__input admin__file" type="file"
                  name="<?= h($upload) ?>"
-                 accept="image/jpeg,image/png,image/webp">
+                 accept="image/jpeg,image/png,image/webp<?= $vector ? ',image/svg+xml' : '' ?>">
           <span class="admin__hint">
-            JPEG, PNG or WebP, up to <?= (int)(UPLOAD_MAX_BYTES / 1048576) ?> MB.
+            JPEG, PNG or WebP<?= $vector ? ' or SVG' : '' ?>, up to
+            <?= (int)(UPLOAD_MAX_BYTES / 1048576) ?> MB.
             It is re-encoded here — which is what removes the location and the
             camera details a photograph carries — reduced to
-            <?= UPLOAD_MAX_DIMENSION ?> pixels on its longest side, given a WebP
+            <?= (int)$maxSide ?> pixels on its longest side, given a WebP
             version, and sent to the live site straight away.
+<?php if ($vector): ?>
+            An SVG is not re-encoded but rewritten: it is read, checked against
+            a list of what a drawing may contain, and saved as the result. Any
+            script, embedded picture, animation or reference to another file
+            makes it refused rather than quietly stripped, so what you publish
+            is the artwork you chose or nothing at all.
+<?php endif; ?>
           </span>
         </label>
 <?php endif; ?>
@@ -847,6 +920,105 @@ function admin_card_head(string $band, int $index, int $total, array $card): voi
 <?php
 }
 
+/**
+ * Remove or reorder one row of a list.
+ *
+ * HERE BECAUSE IT WAS ABOUT TO BE COPIED A THIRD TIME. The docblock on the
+ * copy in sections/branding.php says it best -- "four copies of an
+ * array_splice is four places for an off-by-one to live" -- and there were by
+ * then two copies of that sentence, in branding and in certifications,
+ * byte-identical. The privacy editor moves rows at three levels of nesting and
+ * would have made a third.
+ *
+ * Returns the new list and what to tell the person who pressed the button, or
+ * null when the press cannot be honoured -- a row that is not there, or a move
+ * off either end. Null is not an error: it is a button pressed twice before
+ * the page caught up, and the right answer is to redraw unchanged.
+ */
+function admin_move_row(array $rows, string $what, int $index): ?array
+{
+    if (!isset($rows[$index])) {
+        return null;
+    }
+
+    if ($what === 'remove') {
+        array_splice($rows, $index, 1);
+
+        return [array_values($rows), 'Removed. Nothing is written to the site until you save.'];
+    }
+
+    $to = $index + ($what === 'up' ? -1 : 1);
+    if ($to < 0 || $to >= count($rows)) {
+        return null;
+    }
+
+    [$rows[$index], $rows[$to]] = [$rows[$to], $rows[$index]];
+
+    return [$rows, 'Moved. Nothing is written to the site until you save.'];
+}
+
+/**
+ * A warning that is always there, because what it warns about is always true.
+ *
+ * NOT A FLASH, AND THAT IS THE POINT. admin_notices() reports what just went
+ * wrong and admin_publish_notice() reports what just failed; both answer "what
+ * happened?". This one answers "what should you know before you start?", so it
+ * is drawn on every render and never dismissed. The branding editor wrote one
+ * inline for its disclaimer band; the privacy editor needs one for the whole
+ * page, and two inline copies of a component is how a component stops looking
+ * the same in both places.
+ *
+ * Bare admin__notice, with no --warn or --error modifier: nothing is wrong.
+ */
+function admin_standing_notice(string $text): void
+{
+    ?>
+    <p class="admin__notice admin__notice-line">
+      <?= admin_icon('info-circle', 'icon icon--sm') ?>
+      <span><?= h($text) ?></span>
+    </p>
+    <?php
+}
+
+/**
+ * Where a page's search and sharing settings are edited, which is not here.
+ *
+ * EVERY PAGE EDITOR USED TO CARRY A "How it appears elsewhere" FIELDSET: a tab
+ * title, a search description and a share title, nine near-identical copies of
+ * the same three boxes. They are edited on one screen now -- ?s=seo -- together
+ * with the crawl setting, the breadcrumb, the share card and the sitemap
+ * tuning that never had a box at all, and beside every other page's, which is
+ * the only way a person can see that two pages share a title.
+ *
+ * THE VALUES DID NOT MOVE. They are still in this page's own document, in the
+ * meta band every document has, and are still published with it. Only the
+ * typing moved. See the page metadata block in lib/contract.php.
+ *
+ * A fieldset with nothing in it but a link, rather than nothing at all,
+ * because the outline column on the right lists band-meta and a person who
+ * knows where that setting used to be should find out where it went rather
+ * than find a gap.
+ *
+ * $page is the SEO screen's key for this page: a route key from SEO_ROUTES, or
+ * "service:<id>" for one of the service pages.
+ */
+function admin_meta_band(string $page): void
+{
+    ?>
+    <fieldset class="admin__block" id="band-meta">
+      <?php admin_band_head('How it appears elsewhere',
+          'The browser tab title, the search description and the share card '
+          . 'for this page are edited with every other page\'s, in one place.'); ?>
+
+      <p class="admin__notes">
+        <a href="<?= h(admin_url('seo', ['page' => $page])) ?>">
+          Open SEO Management for this page
+        </a>
+      </p>
+    </fieldset>
+    <?php
+}
+
 /* --------------------------------------------------------------- the page */
 
 /**
@@ -1039,7 +1211,7 @@ function admin_head(string $section, string $user, string $lede = '',
 
     <nav class="rail__nav" aria-label="Pages you can edit">
       <ul class="rail__list" role="list">
-<?php foreach (ADMIN_SECTIONS as $key => $item): ?>
+<?php foreach (ADMIN_RAIL_SECTIONS as $key): $item = ADMIN_SECTIONS[$key]; ?>
 <?php $current = $key === $section; ?>
         <li>
           <a class="rail__item" href="<?= h(admin_url($key)) ?>"<?= $current ? ' aria-current="page"' : '' ?>>
@@ -1504,7 +1676,8 @@ function admin_shell_error(string $message): void
     }
 
     echo '<div class="admin__notice admin__notice--error signin__notice">'
-       . '<p>' . admin_icon('exclamation-circle', 'icon icon--sm') . ' ' . h($message) . '</p>'
+       . '<p class="admin__notice-line">' . admin_icon('exclamation-circle', 'icon icon--sm')
+       . '<span>' . h($message) . '</span></p>'
        . '</div>';
 }
 

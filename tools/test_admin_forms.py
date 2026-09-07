@@ -64,6 +64,11 @@ DOCROOT = ROOT / "public"
 ROUTER = ROOT / "tools" / "dev-router.php"
 DATA = ROOT / "content" / "company.json"
 CONTACT = ROOT / "content" / "contact.json"
+# Pressing a careers button for real writes this one, so it is restored with
+# the other two. Every document the suite saves has to be, or a run leaves the
+# repository holding a revision bump and an "updated" stamp no operator made --
+# and that stamp is what the live sitemap publishes as the page's lastmod.
+CAREERS = ROOT / "content" / "careers.json"
 
 
 class Results:
@@ -365,6 +370,11 @@ def run(b: Browser, base: str, r: Results) -> None:
     for screen in ("/?s=overview", "/?s=careers", "/?s=careers&action=new",
                    "/?s=contact", "/?s=company", "/?s=about", "/?s=home",
                    "/?s=services", "/?s=services&service=cybersecurity",
+                   "/?s=certifications", "/?s=branding", "/?s=privacy",
+                   # Every shape the SEO editor takes: the index, a page
+                   # screen, and the two site-wide ones.
+                   "/?s=seo", "/?s=seo&page=about",
+                   "/?s=seo&site=identity", "/?s=seo&site=crawl",
                    "/?s=account"):
         b.go(base + screen)
         loud = b.js("""
@@ -386,10 +396,104 @@ def run(b: Browser, base: str, r: Results) -> None:
                 f"{loud} — each of these reloads the document and lands back "
                 f"at the top of it")
 
+        # AND THAT SOMETHING IS ACTUALLY READING THE ATTRIBUTE.
+        #
+        # data-async is a request, not a behaviour. The branding editor once
+        # carried it on a form whose page had no JavaScript on it at all: the
+        # section forgot to call admin_foot(), so the document ended after
+        # </form> and the nine scripts below it were never emitted. Every
+        # button on that screen was a full page load, and the check above
+        # passed the whole time, because the attribute was exactly where it
+        # should be.
+        #
+        # This asks the browser instead of the markup.
+        wired = b.js("return !!(window.Tech4Time && window.Tech4Time.adminForms "
+                     "&& window.Tech4Time.adminForms.wired);")
+        r.check(f"{screen}: and the script that honours it is loaded",
+                wired is True,
+                "Tech4Time.adminForms is not wired on this screen — the page's "
+                "scripts did not load. Does the section call admin_foot()?")
+
+        # AND THAT IT ACTUALLY POSTS TO AN ADDRESS THIS SERVER ANSWERS.
+        #
+        # This is the check that was missing, and the gap it left was not
+        # small: every button on the careers screen posted to
+        # /[object%20HTMLInputElement] for ten days, both hosts answered 404 to
+        # all of them, and nothing here noticed — because the two loops above
+        # ask the markup whether it WANTS to be posted asynchronously, and
+        # neither asks where it would go.
+        #
+        # A form's named controls hide the form's own properties
+        # (HTMLFormElement is [LegacyOverrideBuiltIns]), and every form in
+        # sections/careers.php carries <input name="action"> because the
+        # section reads $_POST['action'] to tell save from delete. So
+        # form.action was that input, String() made it
+        # "[object HTMLInputElement]", and fetch() resolved it against the page.
+        #
+        # IT SUBMITS EACH FORM AND READS WHAT fetch() WAS HANDED, rather than
+        # asking the module what it would answer. Those are not the same
+        # question, and the difference is exactly the bug: a helper that
+        # returns the right URL proves nothing about a call site that does not
+        # use it. Nothing is sent — the stub resolves to a page the swap
+        # declines — so no document is written and no publish is attempted.
+        #
+        # A form guarded by data-confirm is left alone: it would open the
+        # dialog rather than post, and what the dialog does is checked
+        # elsewhere in this file.
+        posts = b.js("""
+        var out = [];
+        var real = window.fetch;
+        var seen = [];
+
+        window.fetch = function (url) {
+          seen.push(String(url));
+          return Promise.resolve({
+            ok: true, status: 200, url: String(url),
+            text: function () { return Promise.resolve(''); }
+          });
+        };
+
+        var forms = document.querySelectorAll(
+          '#admin-main form[data-async]:not([data-confirm])');
+
+        Array.prototype.forEach.call(forms, function (form) {
+          form.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
+        });
+
+        window.fetch = real;
+
+        if (seen.length !== forms.length) {
+          return [{sent: seen.length, of: forms.length}];
+        }
+
+        seen.forEach(function (url) {
+          var ok = false;
+          try {
+            var parsed = new URL(url, location.href);
+            ok = parsed.origin === location.origin &&
+                 parsed.pathname === location.pathname;
+          } catch (e) { ok = false; }
+          if (!ok) { out.push(url); }
+        });
+        return out;""")
+        r.check(f"{screen}: and every form posts to an address on this page",
+                posts == [],
+                f"{posts} — this is what fetch() was handed. admin-swap.js only "
+                f"swaps a response whose path matches, and a path the server "
+                f"does not serve is a 404 toast for every press")
+
     r.section("every form in the shell asks to be sent this way")
     for screen in ("/?s=careers", "/?s=contact", "/?s=company", "/?s=about",
                    "/?s=home", "/?s=services",
                    "/?s=services&service=cybersecurity",
+                   "/?s=certifications", "/?s=branding", "/?s=privacy",
+                   # Every SEO screen that posts something. The 404's screen
+                   # is a different form from an ordinary page's -- it has no
+                   # canonical and no sitemap band -- so both are listed. The
+                   # index is not here: it edits nothing, and is checked for
+                   # exactly that below.
+                   "/?s=seo&page=about", "/?s=seo&page=notfound",
+                   "/?s=seo&site=identity", "/?s=seo&site=crawl",
                    "/?s=account"):
         b.go(base + screen)
         counts = b.js(
@@ -400,6 +504,75 @@ def run(b: Browser, base: str, r: Results) -> None:
                 counts["all"] == counts["async"] and counts["all"] > 0,
                 f"{counts['async']} of {counts['all']} — a form without it "
                 f"navigates, and lands back at the top of the page")
+
+    # The index is the one screen in the shell that edits nothing, so the loop
+    # above cannot speak for it: "no form is missing data-async" is true of a
+    # page with no forms, which is why that loop insists on finding at least
+    # one. Assert what the index actually is instead.
+    b.go(base + "/?s=seo")
+    index = b.js(
+        "var rows = document.querySelectorAll('#band-pages .admin-card');"
+        "var linked = 0;"
+        "rows.forEach(function (row) {"
+        "  if (row.querySelector('a[href*=\"page=\"]')) { linked += 1; }"
+        "});"
+        "return {forms: document.querySelectorAll('#admin-main form').length,"
+        " rows: rows.length, linked: linked};")
+    r.check("/?s=seo: the index posts nothing",
+            index["forms"] == 0,
+            f"{index['forms']} forms on a screen that only lists pages — if it "
+            f"has grown one, list it in the roster above instead")
+    r.check(f"/?s=seo: each of its {index['rows']} rows opens its own screen",
+            index["rows"] > 0 and index["linked"] == index["rows"],
+            f"{index['linked']} of {index['rows']} rows carry a link — a row "
+            f"nobody can open is a page nobody can edit")
+
+    # PRESSING ONE FOR REAL, ON THE SCREEN THAT BROKE.
+    #
+    # Everything above is about what the page would do. This does it. The CV
+    # form link is the safe button on that screen — it posts action=settings
+    # and writes back the value already in the field, so the only thing it
+    # changes is the revision and the stamp, and the finally block puts those
+    # back — and it goes through exactly the path that answered 404 to saving,
+    # publishing, unpublishing, reordering and deleting alike.
+    r.section("a careers button, pressed")
+    b.go(base + "/?s=careers")
+    b.js(MARK)
+    before_press = CAREERS.read_bytes()
+    b.click('form.admin__settings button[type="submit"]')
+
+    # .toast--bad, not .admin__status--bad. The BAD class admin-forms.js passes
+    # to adminSwap.status() never reaches the DOM: status() hands it to
+    # admin-toast.js, which turns it into kind "bad" and renders class
+    # "toast toast--bad". Looking for the class the caller uses finds nothing
+    # whatever happened, and a check that cannot fail is worse than no check --
+    # this one passed through the whole of the sabotage run that proved the
+    # other two work.
+    settled = b.js("""
+    var bad = document.querySelector('.toast--bad');
+    return {
+      bad:    bad ? bad.textContent.trim() : '',
+      marked: window.__stillHere === true,
+      link:   !!document.querySelector('input[name="cv_form_url"]')
+    };""")
+
+    r.check("saving the CV link is not refused",
+            settled["bad"] == "",
+            f"the status line reads {settled['bad']!r} — this is the toast a "
+            f"person saw four times over, once per press")
+    r.check("and the page was not navigated", settled["marked"] is True,
+            "window.__stillHere was lost, so the document was replaced")
+    r.check("and the form came back", settled["link"] is True,
+            "the swap did not put a careers screen back")
+
+    # AND THE DOCUMENT ON DISK MOVED. Without this the three checks above pass
+    # on a press that never happened: no toast, no navigation and the form
+    # still there is exactly what a button nobody managed to click looks like.
+    # The file is restored in the finally block with the other two.
+    r.check("and content/careers.json was written",
+            CAREERS.read_bytes() != before_press,
+            "the document is byte-identical, so nothing reached the server — "
+            "a vacuous pass is what the three checks above would give you")
 
     b.go(base + "/?s=company")
     b.js(MARK)
@@ -519,6 +692,11 @@ def navigate(b: Browser, base: str, r: Results) -> None:
     for screen in ("/?s=overview", "/?s=careers", "/?s=careers&action=new",
                    "/?s=contact", "/?s=company", "/?s=about", "/?s=home",
                    "/?s=services", "/?s=services&service=cybersecurity",
+                   "/?s=certifications", "/?s=branding", "/?s=privacy",
+                   # Every shape the SEO editor takes: the index, a page
+                   # screen, and the two site-wide ones.
+                   "/?s=seo", "/?s=seo&page=about",
+                   "/?s=seo&site=identity", "/?s=seo&site=crawl",
                    "/?s=account"):
         b.go(base + screen)
         stragglers = b.js(STRAGGLERS)
@@ -547,6 +725,11 @@ def navigate(b: Browser, base: str, r: Results) -> None:
     for screen in ("/?s=overview", "/?s=careers", "/?s=contact",
                    "/?s=company", "/?s=about", "/?s=home", "/?s=services",
                    "/?s=services&service=cybersecurity",
+                   "/?s=certifications", "/?s=branding", "/?s=privacy",
+                   # Every shape the SEO editor takes: the index, a page
+                   # screen, and the two site-wide ones.
+                   "/?s=seo", "/?s=seo&page=about",
+                   "/?s=seo&site=identity", "/?s=seo&site=crawl",
                    "/?s=account"):
         b.go(base + screen)
         r.check(f"{screen}: there is somewhere to say it",
@@ -816,9 +999,14 @@ def improvements(b: Browser, base: str, r: Results) -> None:
         ("/?s=contact", "offices", "offices[items]"),
         ("/?s=company", "clients", "clients[items]"),
         ("/?s=about", "story", "story[items]"),
+        ("/?s=certifications", "certs", "certs[items]"),
+        ("/?s=branding", "assets", "assets[items]"),
+        ("/?s=privacy", "sections", "sections"),
         ("/?s=about", "whyus", "whyus[items]"),
         ("/?s=home", "tags", "tags[items]"),
         ("/?s=home", "destinations", "destinations[items]"),
+        ("/?s=seo&site=identity", "sameas", "sameas[items]"),
+        ("/?s=seo&site=identity", "hours", "hours[items]"),
         ("/?s=services", "ossf", "ossf[items]"),
         ("/?s=services", "nav", "nav[items]"),
         # The nested case, which nothing else in this list covers: the rows
@@ -982,7 +1170,16 @@ def improvements(b: Browser, base: str, r: Results) -> None:
     # the file. Nothing errors: PHP simply finds nothing in $_FILES, and the
     # editor reports a save that worked while the picture never left the
     # machine. The contact editor was in exactly that state.
-    for screen in ("/?s=contact", "/?s=company", "/?s=account", "/?s=careers"):
+    # Every screen with a file input, not a sample of them: about, home and
+    # branding each carry one and were missing from this list, which is the
+    # same way the contact editor came to be in the state described above.
+    for screen in ("/?s=contact", "/?s=company", "/?s=account", "/?s=careers",
+                   "/?s=about", "/?s=home", "/?s=branding",
+                   "/?s=seo&site=identity"):
+        # The privacy editor is deliberately absent: it has no file input at
+        # all, so it would pass this vacuously and read as though it did. So
+        # are the SEO editor's other screens, for the same reason -- only the
+        # identity screen takes a file, and it takes two.
         b.go(base + screen)
         bad = b.js("""
         var out = [];
@@ -995,6 +1192,32 @@ def improvements(b: Browser, base: str, r: Results) -> None:
         return out;""")
         r.check(f"{screen}: every form holding a file input is multipart",
                 bad == [], f"{bad} — a file input here posts its filename only")
+
+    r.section("no page editor still offers a field it no longer writes")
+    # Every page's title, description, share title and breadcrumb are edited on
+    # ?s=seo now. The values still LIVE in each page's own document and are
+    # still published with it — only the editing moved. So the fault to look
+    # for is a field left behind: an input a person can type into that nothing
+    # reads any more looks exactly like one that works.
+    #
+    # That the values SURVIVE a save is asserted in tools/test_seo_admin.py,
+    # which can read the documents; this is the half a browser can see.
+    for screen in ("/?s=home", "/?s=about", "/?s=services",
+                   "/?s=services&service=cybersecurity", "/?s=company",
+                   "/?s=contact", "/?s=certifications", "/?s=branding",
+                   "/?s=privacy"):
+        b.go(base + screen)
+        left = b.js("""
+        return Array.prototype.map.call(
+            document.querySelectorAll('[name^="meta["], [name*="[meta]["]'),
+            function (el) { return el.name; });""")
+        r.check(f"{screen}: no meta field is left on the form", left == [],
+                f"{left} — these post over the SEO screen's values or, worse, "
+                f"look editable and change nothing")
+        r.check(f"{screen}: and the band points at the screen that owns them",
+                b.js("return !!document.querySelector("
+                     "'#band-meta a[href*=\"s=seo\"]');") is True,
+                "the outline still lists band-meta, so it has to lead somewhere")
 
     r.section("things are where they are supposed to be")
     # MEASURED, NOT EYEBALLED. Both of these shipped and were reported from
@@ -1156,6 +1379,7 @@ def main() -> None:
 
     backup = DATA.read_bytes()
     contact_backup = CONTACT.read_bytes()
+    careers_backup = CAREERS.read_bytes()
     web_port, drv_port = free_port(), free_port()
     work = Path(tempfile.mkdtemp(prefix="t4t-admin-forms-"))
     private = work / "private"
@@ -1215,9 +1439,11 @@ def main() -> None:
         shutil.rmtree(work, ignore_errors=True)
         DATA.write_bytes(backup)
         CONTACT.write_bytes(contact_backup)
-        for stray in (DATA.with_suffix(".json.bak"),):
+        CAREERS.write_bytes(careers_backup)
+        for stray in (DATA.with_suffix(".json.bak"),
+                      CAREERS.with_suffix(".json.bak")):
             stray.unlink(missing_ok=True)
-        print(f"\n{DATA.relative_to(ROOT)} restored")
+        print(f"\n{DATA.relative_to(ROOT)} and {CAREERS.relative_to(ROOT)} restored")
 
     total = r.passed + len(r.failed)
     if r.failed:

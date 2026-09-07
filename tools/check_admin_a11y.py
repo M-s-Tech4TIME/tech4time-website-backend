@@ -100,12 +100,21 @@ MAX_TABS = 60
 PUBLIC_SCREENS = ["/login.php", "/forgot.php", "/reset.php"]
 
 SIGNED_IN_SCREENS = ["/", "/?s=home", "/?s=careers", "/?s=contact", "/?s=company",
-                     "/?s=about", "/?s=services",
+                     "/?s=about", "/?s=services", "/?s=certifications",
+                     "/?s=branding", "/?s=privacy",
                      # Both services screens, because they are different pages
                      # rather than the same one with a filter: one lists the
                      # services and the other edits one, and only the second
                      # has the deeply nested cards.
-                     "/?s=services&service=cybersecurity", "/?s=account"]
+                     "/?s=services&service=cybersecurity",
+                     # All four shapes the SEO editor takes. The index is a
+                     # list of links with no form at all; a page screen and the
+                     # 404's are different forms; and the identity screen is
+                     # the largest on this site, with two repeatable lists and
+                     # two file inputs.
+                     "/?s=seo", "/?s=seo&page=about", "/?s=seo&page=notfound",
+                     "/?s=seo&site=identity", "/?s=seo&site=crawl",
+                     "/?s=account"]
 
 MIN_TARGET = 24          # SC 2.5.8, CSS pixels
 
@@ -954,6 +963,107 @@ def walk_hover(b: Browser, base: str, screens, r: Results) -> None:
     print(f"  {len(seen_kinds)} kinds of control sampled")
 
 
+def check_rail_labels(b: Browser, base: str, r: Results) -> None:
+    """Every rail label sits on ONE LINE and is fully readable.
+
+    NOT A TASTE CHECK. .rail__label sets white-space: nowrap, so a label the
+    rail is too narrow for does not wrap -- it is CUT OFF by text-overflow:
+    ellipsis, and "Resource Certificat…" is a menu item nobody can be sure of.
+    The rail's wide width is set by the longest label, so renaming a section is
+    a change to that width, and this is what says so.
+
+    Measured three ways, because the rail has three shapes: wide, narrowed to
+    icons (where the text is hidden the accessible way and has no box to
+    measure, so it is skipped), and the horizontal chip strip below 60em.
+    """
+    for width, what in ((1200, "the wide rail"), (600, "the chip strip")):
+        b.size(width)
+        b.go(base + "/?s=seo")
+
+        found = b.js("""
+            const out = [];
+            for (const el of document.querySelectorAll('.rail__label')) {
+                const box = el.getBoundingClientRect();
+                if (box.width === 0) { continue; }
+                const line = parseFloat(getComputedStyle(el).lineHeight) || box.height;
+                out.push({
+                    text:  el.textContent.trim(),
+                    lines: Math.round(box.height / line),
+                    over:  el.scrollWidth - el.clientWidth,
+                });
+            }
+            return out;
+        """) or []
+
+        r.check(f"{what}: the rail has labels to measure", len(found) > 0,
+                "no .rail__label was visible, so nothing was checked")
+
+        for row in found:
+            r.check(f"{what}: “{row['text']}” is on one line",
+                    row["lines"] <= 1, f"{row['lines']} lines")
+            # One pixel of slack: sub-pixel text metrics round either way, and
+            # a label that fits is sometimes reported one pixel over.
+            r.check(f"{what}: “{row['text']}” is not cut off",
+                    row["over"] <= 1,
+                    f"{row['over']}px wider than the space it has — widen "
+                    f"--rail-wide in public/assets/css/admin.css")
+
+
+def check_collapsed(b: Browser, base: str, screens, r: Results) -> None:
+    """Nothing in the editing column is squeezed to no width at all.
+
+    THE SHAPE OF A REAL BUG, NOT A TIDINESS RULE. admin_band_head() floats its
+    legend, because a <legend> is otherwise laid out on its fieldset's border.
+    A float escapes any ancestor that is not a block formatting context, and it
+    is 100% wide, so a field placed after one inside a plain <div> is laid out
+    BESIDE it with nothing left to occupy. On the privacy editor that field
+    measured 0px wide inside a 582px card: its label wrapped onto four lines,
+    the select under it was a stub, and the control still worked perfectly --
+    which is why no functional suite noticed and a person had to.
+
+    So the signature is measured rather than the cause: an element that is
+    displayed, has height, and has NO WIDTH. Nothing legitimate on these
+    screens is shaped like that, and anything that becomes so is either
+    unreachable or unreadable.
+
+    Hidden things are excluded by offsetParent, which is null for anything
+    display:none or inside it -- their boxes are zero by right and mean nothing.
+    """
+    for screen in screens:
+        b.size(1200)
+        b.go(base + screen)
+
+        found = b.js("""
+            const out = [];
+            const main = document.getElementById('admin-main');
+            if (!main) { return out; }
+            // <br> and <wbr> are zero-wide by definition -- they are line
+            // behaviour, not boxes, and they are not what this is looking for.
+            const shapeless = { BR: 1, WBR: 1 };
+            for (const el of main.querySelectorAll('*')) {
+                if (el.offsetParent === null || shapeless[el.tagName]) { continue; }
+                const box = el.getBoundingClientRect();
+                if (box.width >= 1 || box.height < 1) { continue; }
+                const parent = el.parentElement
+                    ? Math.round(el.parentElement.getBoundingClientRect().width) : 0;
+                if (parent < 40) { continue; }
+                out.push({
+                    tag: el.tagName.toLowerCase(),
+                    cls: (el.getAttribute('class') || '').split(' ')[0],
+                    height: Math.round(box.height),
+                    parent: parent,
+                });
+            }
+            return out;
+        """) or []
+
+        r.check(f"{screen}: nothing is collapsed to no width",
+                found == [],
+                "; ".join(
+                    f"{row['tag']}.{row['cls']} is 0x{row['height']}px inside a "
+                    f"{row['parent']}px parent" for row in found[:4]))
+
+
 def run(b: Browser, base: str, secret: str, r: Results) -> None:
     prove_reduced_motion(b, base)
 
@@ -986,6 +1096,12 @@ def run(b: Browser, base: str, secret: str, r: Results) -> None:
 
     r.section("spacing")
     check_spacing(b, base, SIGNED_IN_SCREENS, r)
+
+    r.section("the rail's labels")
+    check_rail_labels(b, base, r)
+
+    r.section("nothing is squeezed to nothing")
+    check_collapsed(b, base, SIGNED_IN_SCREENS, r)
 
     r.section("hover")
     walk_hover(b, base, SIGNED_IN_SCREENS, r)

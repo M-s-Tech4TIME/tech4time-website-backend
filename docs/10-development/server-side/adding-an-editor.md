@@ -21,7 +21,7 @@ Five pieces:
 | **data** | `content/<name>.json` |
 | a **renderer** | `pages/<name>/index.php` — replaces `tech4time-website-frontend/index.html` |
 | a **form** | `sections/<name>.php` |
-| a **registry entry** | a row in `ADMIN_SECTIONS` |
+| a **registry entry** | a row in `ADMIN_SECTIONS`, and usually one in `ADMIN_RAIL_SECTIONS` |
 
 The shell needs to know nothing else. The rail draws itself from the registry.
 
@@ -226,13 +226,41 @@ const ADMIN_SECTIONS = [
 ];
 
 const ADMIN_PAGE_SECTIONS = ['careers', 'contact', 'company', 'about', 'partners'];
+
+const ADMIN_RAIL_SECTIONS = [ …, 'privacy', 'partners', 'seo'];
 ```
 
 If the icon is not already in `ADMIN_ICONS`, add it there too — the admin inlines that whole list on
 every page.
 
-Order in the registry is rail order. `ADMIN_PAGE_SECTIONS` is the subset that edits a page of the
-website, and is what anything counting "the pages you can edit" asks.
+**Three constants, and they are not the same list.**
+
+| | |
+|---|---|
+| `ADMIN_SECTIONS` | every section that exists — the label, icon, description and view link |
+| `ADMIN_RAIL_SECTIONS` | **which of them the rail shows, and in what order** |
+| `ADMIN_PAGE_SECTIONS` | the subset that edits a page of the website; what anything counting "the pages you can edit" asks |
+
+Registry order is **not** rail order any more. `ADMIN_RAIL_SECTIONS` decides that, and it holds
+eleven of the twelve sections: `account` is registered and deliberately absent, because it is about
+the person rather than a page and is reached from the avatar menu at the foot of the rail.
+
+**Do not "simplify" that by deleting the entry from the registry.** `admin_section()` returns
+`'overview'` for any name `ADMIN_SECTIONS` does not list, so `?s=account` would land silently on the
+Overview and the password and two-factor screens would become unreachable. A new section must be in
+`ADMIN_SECTIONS`, and in `ADMIN_RAIL_SECTIONS` if it should appear in the rail.
+
+### The label has to fit on one line
+
+`.rail__label` is `white-space: nowrap`, and `--rail-wide` is sized to the longest label there is —
+*Resource Certifications*, at present. A longer one is not ellipsised into something a person can
+still guess at: it is a rail row that does not say what it is.
+
+`check_admin_a11y.py` measures it. Every rail label must render as exactly one line box whose
+`scrollWidth` does not exceed its `clientWidth`, at both rail widths and in the 320px chip strip. So
+a label that no longer fits fails a check instead of being noticed by eye — and if a name genuinely
+needs the room, `--rail-wide` in `admin.css` is what to widen. That token is the grid's first
+column, so widening it moves the editing column too; re-run the 320px reflow measurement after.
 
 ## 6. Teach the checks
 
@@ -285,12 +313,33 @@ the reason beside it. `test_careers_admin.py` is the worked example.
 - [ ] every band head is `admin_band_head()`, with the add button's prefix matching the field names
 - [ ] `enctype="multipart/form-data"` on any form holding a file input
 - [ ] an `id` on every `<fieldset>` the outline names
-- [ ] `ADMIN_SECTIONS` and `ADMIN_PAGE_SECTIONS` updated; icon in `ADMIN_ICONS`
+- [ ] `ADMIN_SECTIONS`, `ADMIN_RAIL_SECTIONS` and `ADMIN_PAGE_SECTIONS` updated; icon in `ADMIN_ICONS`
+- [ ] the rail label fits on one line — `check_admin_a11y.py` measures it
+- [ ] a card in `sections/overview.php`'s `$cards`, in the same order. **Nothing checks this** — the Overview would simply not mention the new editor
+- [ ] **no `meta` fieldset in the form.** A new page's title and description are edited on the SEO screen; the editor renders `admin_meta_band()` in that place instead, and its `*_from_post()` iterates `contract_page_bands()` so a save cannot blank them
 - [ ] `check_content_model.py`: a `SUBJECTS` entry, or a `COVERED_ELSEWHERE` one naming the test
 - [ ] `test_<name>_admin.py`
 - [ ] `test_admin_forms.py` still passes — it asserts every form in the shell is async, and every link in it swappable
 - [ ] Docs updated
 - [ ] `.gitignore` covers `content/<name>.json.bak`
+
+---
+
+## Three things the privacy editor learnt, if yours nests
+
+**A list inside a list inside a list works, and the parent indices go in the BAND name.** The verb
+that `admin_card_head()` builds is `<band>-<verb>:<index>`, and the index is cast to an `int` — so
+two coordinates cannot both live there. `block-3-up:2` and `row-3-2-remove:1` are what the privacy
+editor sends; `$band` is a free string and carries as many parents as you need.
+
+**Move a row with `admin_move_row()`, not with your own `array_splice`.** Three editors had written
+that function before it was one function, and each copy carried the same comment saying four copies
+of an `array_splice` is four places for an off-by-one to live.
+
+**If a row's id is an ANCHOR, assign ids with `contract_identify_rows()`.** It claims every id
+somebody already chose before it mints anything new. Minting in row order instead lets a row added
+above an existing one with the same name take that row's id, silently renaming the incumbent — and
+if the id is a fragment somebody linked to, that link now lands in the wrong place.
 
 ---
 

@@ -52,6 +52,7 @@ import fnmatch
 import json
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -124,6 +125,15 @@ REQUIRED = [
     "sections/company.php",
     "sections/about.php",
     "sections/home.php",
+    # These four were never added as each editor landed. They still shipped --
+    # sections/ is not in FORBIDDEN_TREES, so the sweep picked them up -- but
+    # the assertion read as though it covered every editor and did not. A list
+    # that is silently incomplete is worse than no list.
+    "sections/services.php",
+    "sections/certifications.php",
+    "sections/branding.php",
+    "sections/privacy.php",
+    "lib/privacy.php",               # the privacy editor's model
 ]
 
 # Never in the set, whatever else changes. Stated separately from "not in
@@ -325,6 +335,34 @@ def check(paths: list[str], out_dir: Path) -> tuple[int, int]:
                 "cv_form_url" in data)
     except (OSError, ValueError) as exc:
         assert_("the careers seed is readable JSON", False, str(exc))
+
+    # Every shipped .php file must COMPILE with short_open_tag=On.
+    #
+    # It is off by default in php-cli and on by default on the host, as on most
+    # cPanel installs, and the difference is invisible until a deploy: with it
+    # on, PHP reads the "<?" of a literal "<?xml" as an open tag and tries to
+    # run the rest as code. The file then fails to compile, so the response is
+    # a 500 with an empty body and nothing to read anywhere.
+    #
+    # This is here because it happened to the other half: the public site's
+    # sitemap.php shipped that way and answered 500 until it was found from
+    # outside. Nothing in this repository parses differently today, and the
+    # point of the check is that it stays that way -- a guard on one side of a
+    # pair is the arrangement that let content/company.json go missing from
+    # this host for a fortnight.
+    php = shutil.which("php")
+    if php is None:
+        assert_("php is available to parse the shipped files", False,
+                "install php-cli — this check cannot run without it")
+    else:
+        for rel in sorted(m for m in paths if m.endswith(".php")):
+            result = subprocess.run(
+                [php, "-d", "short_open_tag=1", "-l", str(ROOT / rel)],
+                capture_output=True, text=True)
+            assert_(f"{rel} parses with short_open_tag=On",
+                    result.returncode == 0,
+                    result.stdout.strip().splitlines()[0]
+                    if result.stdout.strip() else result.stderr.strip())
 
     return run, len(failed)
 

@@ -71,6 +71,7 @@ in the other repository.
 | Post a job, change a phone number | [30-operations/content-runbook.md](30-operations/content-runbook.md) |
 | What does this script do? | [40-reference/tools.md](40-reference/tools.md) |
 | What fields does this JSON have? | [40-reference/content-schemas.md](40-reference/content-schemas.md) |
+| Where does a page's title live, and who can change it? | [40-reference/seo.md](40-reference/seo.md) |
 | What protects what? | [40-reference/security-model.md](40-reference/security-model.md) |
 | Live host facts — mail, DNS, PHP | [40-reference/host-facts.md](40-reference/host-facts.md) |
 | What does that word mean? | [40-reference/glossary.md](40-reference/glossary.md) |
@@ -117,6 +118,7 @@ half that rots silently.
 | Add a section to `ADMIN_SECTIONS` | [10-development/server-side/adding-an-editor.md](10-development/server-side/adding-an-editor.md) |
 | Add or remove a page under `pages/` | [00-orientation/repository-map.md](00-orientation/repository-map.md) |
 | Change a field in `content/*.json` | [40-reference/content-schemas.md](40-reference/content-schemas.md) |
+| Change anything a search engine reads | [40-reference/seo.md](40-reference/seo.md) |
 | Change a constant in `lib/auth.php`, `lib/reset.php`, `lib/throttle.php` | [10-development/server-side/authentication.md](10-development/server-side/authentication.md) and [40-reference/security-model.md](40-reference/security-model.md) |
 | Change `public/.htaccess` | [40-reference/security-model.md](40-reference/security-model.md) |
 | Change the deploy procedure | [20-deployment/](20-deployment/) |

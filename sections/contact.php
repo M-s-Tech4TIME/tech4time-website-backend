@@ -48,7 +48,7 @@ function contact_from_post(array $current): array
 {
     $data = $current;
 
-    foreach (CONTACT_TEXT_FIELDS as $section => $fields) {
+    foreach (contract_page_bands(CONTACT_TEXT_FIELDS) as $section => $fields) {
         foreach ($fields as $field) {
             $data[$section][$field] = trim((string)($_POST[$section][$field] ?? ''));
         }
@@ -324,7 +324,7 @@ if (!$errors && $pending !== '') {
 <?php /* ----------------------------------------------------------- drift */ ?>
 <?php if (!$inStep): ?>
   <div class="admin__notice admin__notice--warn">
-    <p><?= admin_icon('info-circle', 'icon icon--sm') ?>
+    <p class="admin__notice-line"><?= admin_icon('info-circle', 'icon icon--sm') ?>
        <strong>The site footer is showing older details.</strong></p>
     <p>
       Every page repeats the email address, phone numbers, addresses and opening
@@ -699,36 +699,7 @@ if (!$errors && $pending !== '') {
   </fieldset>
 
   <!-- ==================== search and sharing ==================== -->
-  <fieldset class="admin__block" id="band-meta">
-    <?php admin_band_head('Search results and shared links',
-        'What Google shows, and what appears when someone pastes the address '
-        . 'of this page into a chat. Nobody sees these on the page itself.'); ?>
-
-    <div class="admin__grid">
-      <label class="admin__field admin__field--wide">
-        <span class="admin__label">Browser tab and search result title</span>
-        <input class="admin__input" type="text" name="meta[title]" required
-               value="<?= h($data['meta']['title']) ?>">
-        <span class="admin__hint">Around 60 characters before Google cuts it off.</span>
-      </label>
-
-      <label class="admin__field admin__field--wide">
-        <span class="admin__label">Search description</span>
-        <textarea class="admin__input" name="meta[description]" rows="3"><?= h($data['meta']['description']) ?></textarea>
-        <span class="admin__hint">Around 155 characters. Longer is not an error, it is just not shown.</span>
-      </label>
-
-      <label class="admin__field admin__field--wide">
-        <span class="admin__label">Title on a shared link</span>
-        <input class="admin__input" type="text" name="meta[share_title]"
-               value="<?= h($data['meta']['share_title']) ?>">
-        <span class="admin__hint">
-          Used by WhatsApp, LinkedIn and the rest. Usually shorter and warmer
-          than the search title.
-        </span>
-      </label>
-    </div>
-  </fieldset>
+  <?php admin_meta_band('contact'); ?>
 
 </form>
 

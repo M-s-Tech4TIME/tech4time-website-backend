@@ -20,8 +20,13 @@ store they read from is outside the document root entirely.
 | [`contact.php`](#contactphp) | what this side does with the contact page | `contract`, `store` |
 | [`company.php`](#companyphp) | what this side does with the company profile | `contract`, `store` |
 | [`about.php`](#aboutphp) | what this side does with the about page | `contract`, `store` |
+| [`certifications.php`](#certificationsphp) | what this side does with the certifications page | `contract`, `store` |
+| [`branding.php`](#brandingphp) | what this side does with the branding page | `contract`, `store` |
+| [`privacy.php`](#privacyphp) | what this side does with the privacy policy | `contract`, `store`, `contact` |
+| [`svg.php`](#svgphp) **shared** | what a publishable vector file is | — |
 | [`home.php`](#homephp) | what this side does with the home page | `contract`, `store` |
 | [`services.php`](#servicesphp) | what this side does with the services document | `contract`, `store`, `publish_client` |
+| [`seo.php`](#seophp) | what every page says about itself in its `<head>` — read from ten documents, written to whichever one owns the field | `contract`, `store`, `services`, `publish_client` |
 | [`upload.php`](#uploadphp) *(backend)* | a file somebody chose, turned into a picture this site will show | `publish` |
 | [`publish.php`](#publishphp) **shared** | how a document is signed and checked on the wire | `private`, `contract` |
 | [`publish_client.php`](#publish_clientphp) *(backend)* | sending one | `publish` |
@@ -240,12 +245,189 @@ headed once for the whole page, not per card — every card on the cloud page sa
 includes"*. So a card that lists things on a page with no heading set for that list would render
 loose text with no explanation, and it is refused with the two ways out named.
 
+### `certifications.php`
+
+`certifications_load()` · `certifications_save()` · `certifications_validate()`
+
+**A list inside a list.** `content/certifications.json` holds four role groups; each group holds its
+own role names and its own certifications. All three levels add, remove, reorder and hide
+independently, and a group added in the editor arrives hidden so a half-filled category is never
+live.
+
+**It fits in one form, and that was measured.** `admin_form_truncated()` exists because
+`max_input_vars` defaults to 1000 and PHP drops the tail of a larger POST in silence. This page
+posts about 240 inputs — 54 certifications at three each is most of it — so unlike the services
+editor it is not split by row. Roughly 250 more certifications would be needed to reach the limit.
+
+**Validation counts the description AFTER the tokens are filled in.** `{certifications}` is fifteen
+characters that publish as two, so measuring the stored string would refuse a description that fits
+and accept one that does not.
+
+**A group's anchor is minted once and then frozen.** It comes from the first role name, because a
+group has no title of its own — it *is* its roles. Renaming a role afterwards does not move it: a
+link into the page is a promise. The one exception is a group still carrying the placeholder id it
+was created with, which has never been a real address and is still up for grabs.
+
+### `branding.php`
+
+`branding_load()` · `branding_save()` · `branding_validate()`
+
+**A list inside a list.** `content/branding.json` holds the logo variants; each variant holds the
+files it offers for download. Both levels add, remove, reorder and hide independently, and a
+variant added in the editor arrives **hidden** so a half-filled card is never live.
+
+**Two pictures per variant, and they are not the same picture.** `image` is the preview drawn on
+the card; `files[].file` is what a visitor came for. On the page as it ships those are an 800px
+preview and a 1600px download of the same mark, so collapsing them would either serve the big file
+to everyone who merely looks at the page or hand out the small one to everyone who came for the
+logo.
+
+**A download may be a vector.** The download slots take an SVG and the preview slot does not,
+because the public page *links* to a vector file and never draws one. `svg.php` is what makes one
+publishable at all.
+
+**A download gets a bigger ceiling than a preview.** A preview is reduced to
+`UPLOAD_MAX_DIMENSION`, like every other picture on the site; a download is the deliverable, so it
+may be up to `UPLOAD_MAX_DOWNLOAD_DIMENSION` (3000). Nothing else about the path differs — both are
+still read and replaced rather than checked and kept.
+
+**The disclaimer is the page's only rich text**, and it carries a standing warning on the screen:
+it is legal text, and the person editing it is not necessarily the person who chose the words.
+
+**Validation refuses what would make the page wrong rather than merely empty** — a preview with no
+description, a download row with no file, a saved-as name with a separator in it, and an empty
+breadcrumb, which is what a search result calls this page in a trail.
+
+
+### `seo.php`
+
+`seo_load()` · `seo_pages()` · `seo_page_meta()` · `seo_effective_description()` · `seo_edit()` ·
+`seo_meta_edit()` · `seo_service_meta_edit()` · `seo_validate()` · `seo_validate_meta()`
+
+The one library here that **does not own a document**. It owns a *field* — the `meta` band — across
+ten of them, plus one document of its own, `content/seo.json`, for what belongs to the whole site
+rather than to any page. That split is ADR 0020 and it is the thing to understand before reading
+anything else in this file: **a page's title lives with that page's content, and only the editing
+moved.**
+
+So there are three save paths, not one:
+
+| | Writes | Used by |
+|---|---|---|
+| `seo_edit()` | `content/seo.json` | the two site screens |
+| `seo_meta_edit()` | the `meta` band of one page's own document | `?s=seo&page=<key>` |
+| `seo_service_meta_edit()` | the `meta` band of one row of `content/services.json` | `?s=seo&page=service:<id>` |
+
+The last two are **read-modify-writes under `store_edit()`'s `flock`**, modelled on
+`services_edit()`, so an SEO save and a page save landing at the same moment cannot lose one
+another. Each mutates only the `meta` key and hands the rest of the document back untouched — which
+is what makes it safe for two screens to own different parts of one file.
+
+`seo_pages()` is what the index screen lists: the ten fixed routes from `SEO_ROUTES`, then every
+service read out of `content/services.json`. A service added this morning has a row this afternoon,
+with no key to register anywhere, because **its record is its row** — there is nothing to orphan
+when somebody renames a slug.
+
+`seo_effective_description()` exists because one page's description is not literal: the
+certifications page fills a `{certifications}` token with a live count. The editor shows what a
+search engine will actually see, and its length check measures *that* — a description that fits
+before the substitution and overruns after it is the failure this prevents. It shipped once, as the
+token itself, visible in the page source.
+
+**Validation is the gate the site never had.** `seo_validate_meta()` refuses a title over
+`SEO_TITLE_MAX`, a description outside `SEO_DESC_MIN`–`SEO_DESC_MAX`, and a title or description
+that **duplicates another page's** — `audit_pages.py` in the other half has always enforced
+site-wide uniqueness and could only ever find out afterwards. Between 150 and 160 characters is a
+hint, not a refusal; `SEO_DESC_IDEAL` is advice and says so.
+
+The canonical is not here, in any form. It is derived from the route and cannot be edited, because
+a canonical pointing at another page tells Google to index that one and drop this one, and nothing
+on this side would show it.
+
+
+### `privacy.php`
+
+`privacy_load()` · `privacy_save()` · `privacy_validate()` · `privacy_facts()` *(backend)* · the renderers *(frontend)*
+
+One document, `content/privacy.json`, holding the whole privacy policy: twelve headed sections, a
+summary callout, a retention table and an address block. It was the last hand-written page on the
+site, and the one that most needed not to be — a privacy policy is the page most likely to need a
+correction at short notice, and every correction used to need a developer and a deploy.
+
+**Structure is a kind, not markup.** `rt_sanitise_html()` allows nine tags and no heading, no
+`<address>` and no `<table>` among them, so structure cannot live in a rich field: somebody typing
+`<h3>` into one would watch it disappear on save with no way to tell that from a bug. Each block
+instead declares which of six kinds it is — `paragraph`, `list`, `subheading`, `note`, `address`,
+`table` — and the renderer owns the markup. See `PRIVACY_BLOCK_KINDS` and `privacy_block()`.
+
+**Every rich field is inline-only**, through `rt_sanitise_inline()`. All of them render *inside* an
+element the renderer supplies — a `<p>`, a `<p class="legal__notice">`, an `<address>`, an `<li>` —
+so a `<p>` arriving from the editor is not emphasis somebody added, it is a paragraph inside a
+paragraph. Pressing Enter in a textarea is how it would arrive, which is not a corner case.
+
+**Three lists deep**, one deeper than any editor before it: sections hold blocks, and a list, an
+address or a table holds rows. The verbs carry the parents in the band name — `block-3-up:2`,
+`row-3-2-remove:1` — because the index is cast to an int.
+
+**A section's id is its anchor, and an anchor is a promise.** Ids are assigned by
+`contract_identify_rows()`, which claims every id somebody already chose *before* it mints anything
+new. The one-pass version has a bug that only bites a page whose ids are anchors: a section added
+above an existing one with the same heading takes the existing one's fragment, and the incumbent is
+silently renamed. Nine of the twelve shipped ids are hand-authored and are not what the slug
+algorithm would produce, so there is nothing to recover them from.
+
+**The effective date is never stamped.** `updated` records when the document was last published; an
+effective date is a claim about when the *policy* changed. Fixing a typo is not a new policy, so
+nothing writes that field but a person.
+
+**The policy band cannot be hidden.** `PRIVACY_BANDS` holds only `cta`. Hiding the policy would
+leave a page headed *"Privacy Policy"* with no policy on it, still linked from the footer of all
+sixteen pages and still in the sitemap — not a configuration anybody wants. The callout and any
+single section can be hidden.
+
+**What it repeats from the contact page is compared, never enforced.** The policy states the
+offices, the email and the telephone, and so does `content/contact.json`. `privacy_shared_facts()`
+asks by containment whether the policy still states the current values, on a normalised form —
+`&nbsp;` and whitespace collapsed, commas dropped, case folded — so it reports a different street
+and stays quiet about a different comma. The editor draws it as a standing notice.
+**It never refuses a save**: after an office move whichever page you edited first could not be
+saved, and an unrelated typo fix would be blocked by an address that drifted months earlier.
+
+### `svg.php`
+
+**Shared — byte-identical in both repositories.**
+
+`svg_sanitise()` · `svg_problem()` · `svg_looks_like()`
+
+What a publishable vector file is. ADR 0019 refused SVG outright and its reasoning was right — an
+SVG is a document, and re-encoding does not make it not one. This answers that rather than avoiding
+it, twice over.
+
+**It is read and replaced, not checked and kept.** The same rule `upload.php` follows for a raster:
+the file is parsed into a DOM, walked against an allow-list, and re-serialised, and what is stored
+is *that* — never the bytes that arrived. Anything outside the list makes the whole file refused,
+with a sentence naming what was found, because silently dropping an element would hand somebody
+back a different logo than the one they published.
+
+**And it is never served as a document.** `/uploads/*.svg` goes out with `Content-Disposition:
+attachment` and `default-src 'none'; sandbox` on both hosts, so it downloads and never renders in
+either origin.
+
+**It is idempotent, and that is load-bearing.** `svg_sanitise(svg_sanitise(x))` equals
+`svg_sanitise(x)`. The receiving host relies on it: it sanitises what arrived and refuses anything
+that is not already its own output — proving the bytes are clean *without changing them*, which it
+could not do otherwise, because the file's name is a hash of its contents and both hosts compute it
+independently.
+
+**It needs `ext-dom`**, which the live hosts have and Ubuntu's `php-cli` does not. `svg_problem()`
+says so plainly and the byte-level refusals still hold without it; CI installs `php-xml`.
+
 ### `upload.php`
 
 **Backend only.** The frontend has no upload form and must never gain one.
 
 `upload_problem()` · `upload_accept()` · `upload_store()` · `upload_held()` ·
-`upload_unused()` · `upload_delete()`
+`upload_in_use()` · `upload_unused()` · `upload_delete()`
 
 The only code in either repository that takes a file from somebody's computer and puts it on a web
 server. **The rule it works to is that nothing the browser sent is ever written.** An upload is
@@ -256,13 +438,29 @@ That one step is what removes EXIF — including the coordinates a phone puts in
 anything appended after the image data, and a file that is a valid JPEG *and* a valid PHP script.
 A validator could do none of it: it can only decide it did not find what it knew to look for.
 
-JPEG, PNG and WebP, decided from the file's own header. **No SVG:** an SVG is a document, it can
-carry script, and re-encoding does not make it not a document. Full reasoning in
+JPEG, PNG and WebP, decided from the file's own header. **An SVG takes the other branch** — it has
+no pixels to re-encode, so it is parsed, allow-listed and re-serialised by [`svg.php`](#svgphp)
+instead, which is the same rule by a different route. Full reasoning in
 [0019](../../90-decisions/0019-uploaded-images-travel-their-own-channel.md); the proof is
-[`test_upload.py`](../../40-reference/tools.md).
+[`test_upload.py`](../../40-reference/tools.md) and [`test_svg.py`](../../40-reference/tools.md).
+
+**A picture is drawn from any of a dozen sizes, but the ceiling depends on what it is for.**
+`UPLOAD_MAX_DIMENSION` (1600) for something a page displays; `UPLOAD_MAX_DOWNLOAD_DIMENSION` (3000)
+for something a visitor takes away, which today is only the branding page's downloads. The caller
+says which.
+
+**`upload_in_use()` asks every document, not the one on screen — and that is a fix, not a
+nicety.** `public/uploads/` is one directory shared by every editor, but each editor used to pass
+only its own document's pictures to `upload_unused()`. So the about screen counted the home page's
+uploads as *"not used by any row"* and its sweep button offered to delete them: three editors, each
+able to delete the other two's artwork, and nothing anywhere said so. The set of pictures in use is
+a property of the site, so it is asked of the site. `contract_images()` is the per-document half,
+and a document it does not know answers with none — which is what stops a new document becoming a
+new way to lose files.
 
 `upload_unused()` never deletes anything on its own. A reference count taken from a document
-somebody is halfway through editing is not a fact.
+somebody is halfway through editing is not a fact — which is also why `upload_in_use()` takes the
+current screen's unsaved document rather than reading it back off disk.
 
 ### `publish.php`
 

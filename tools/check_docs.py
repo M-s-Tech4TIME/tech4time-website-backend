@@ -263,9 +263,14 @@ def check_assets() -> None:
         # whole path is what stops "it is in the other one" from becoming a way
         # to keep a dead name in the prose forever -- the same bargain
         # check_tools() strikes.
+        # The (?:dir/)* allows a nested one -- assets/css/pages/about.css. Without
+        # it the other repository's per-page stylesheets could not be attributed
+        # at all, only its top-level ones, so a doc that names one correctly and
+        # in full still failed. The repository name and the whole path are still
+        # required, which is the part that does the work.
         attributed = set(re.findall(
             rf"tech4time-website-(?:frontend|backend)/(?:public/)?assets/{sub}/"
-            rf"([a-z0-9_-]+\.{sub})(?![a-z0-9])",
+            rf"(?:[a-z0-9_-]+/)*([a-z0-9_-]+\.{sub})(?![a-z0-9])",
             body,
         ))
 

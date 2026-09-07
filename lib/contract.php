@@ -53,7 +53,8 @@ require_once __DIR__ . '/html.php';
 const CONTRACT_VERSION = 1;
 
 /** Every document that is published, by name. The endpoint refuses any other. */
-const CONTRACT_DOCUMENTS = ['careers', 'contact', 'company', 'about', 'home', 'services'];
+const CONTRACT_DOCUMENTS = ['careers', 'contact', 'company', 'about', 'home', 'services',
+                            'certifications', 'branding', 'privacy', 'seo'];
 
 /**
  * Where a document's record lives, on either host.
@@ -95,6 +96,39 @@ function contract_path(string $document): string
  * point. That is exactly how 'revision' announced itself.
  */
 const CONTRACT_BOOKKEEPING = ['updated', 'revision', 'footer_synced'];
+
+/* ---------------------------------------------------- page metadata
+
+   THE meta BAND IS THE SAME SHAPE IN EVERY DOCUMENT, AND ONE SCREEN EDITS
+   IT. These live up here rather than beside their functions because a
+   file-scope const is evaluated where it stands, and the first document to
+   name CONTRACT_META_TEXT is the contact page a couple of hundred lines
+   below. The functions that use them are further down, with the other
+   cross-document helpers -- those are hoisted and do not care. */
+
+/** The band that belongs to the SEO screen rather than to the page's editor. */
+const CONTRACT_META_BAND = 'meta';
+
+/** Its free-text fields, the same five in every document. */
+const CONTRACT_META_TEXT = ['title', 'description', 'share_title', 'breadcrumb',
+                            'keywords'];
+
+/**
+ * What a page tells a crawler, as the two states somebody chooses between.
+ *
+ * The directive STRING is the renderer's business and is longer than this: an
+ * indexed page also asks for large image previews and full snippets. Two
+ * states rather than five directives, because SITEMAP MEMBERSHIP IS DERIVED
+ * FROM THIS -- so there is no second switch that can be set to contradict it,
+ * and a noindex URL cannot end up in the sitemap, which is a Search Console
+ * warning against the whole file.
+ */
+const CONTRACT_ROBOTS = ['index', 'noindex'];
+
+/** The sitemap's changefreq vocabulary, fixed by the sitemap schema. */
+const CONTRACT_CHANGEFREQ = ['always', 'hourly', 'daily', 'weekly', 'monthly',
+                             'yearly', 'never'];
+
 
 /* ==========================================================================
    1. Careers — the shape of a job post
@@ -140,6 +174,27 @@ function careers_defaults(): array
         'cv_form_url' => '',
         'updated'     => '',
         'revision'    => 0,
+        /* THE CAREERS PAGE WAS THE ONE PAGE NOBODY COULD RETITLE. Its <title>
+           and description were literal strings in pages/careers/index.php,
+           because this document grew around a list of job posts and never had
+           a band for the page itself. It has the same meta band as every other
+           document now, and the same screen edits it. */
+        'meta'        => [
+            'title'       => 'Careers | Tech4TIME',
+            'description' => 'Open roles at Tech4TIME in cybersecurity, software and '
+                           . 'infrastructure. See what is available now, or send us '
+                           . 'your CV for the roles we open next.',
+            'share_title' => 'Careers | Tech4TIME',
+            'breadcrumb'  => 'Careers',
+'keywords'    => 'IT jobs Bangladesh, cybersecurity careers, '
+               . 'software developer jobs Dhaka, IT recruitment, '
+               . 'Tech4TIME careers',
+            'robots'      => 'index',
+            'changefreq'  => 'weekly',
+            'priority'    => '0.7',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
+        ],
         'jobs'        => [],
     ];
 }
@@ -153,6 +208,9 @@ function careers_defaults(): array
 function careers_normalise(array $data): array
 {
     $data += careers_defaults();
+
+    $data['meta'] = contract_meta_defaults($data['meta'] ?? [],
+                                           careers_defaults()['meta']);
 
     $data['revision'] = max(0, (int)($data['revision'] ?? 0));
     $data['jobs'] = is_array($data['jobs'] ?? null) ? array_values($data['jobs']) : [];
@@ -290,7 +348,7 @@ const CONTACT_ICONS = [
 
 /* Free-text single-line fields, by section. */
 const CONTACT_TEXT_FIELDS = [
-    'meta'    => ['title', 'description', 'share_title'],
+    'meta'    => CONTRACT_META_TEXT,
     'hero'    => ['title', 'subtitle'],
     'form'    => ['title', 'subject_hint', 'note'],
     'reach'   => ['title'],
@@ -322,6 +380,14 @@ function contact_defaults(): array
             'title'       => 'Contact Us | Tech4TIME',
             'description' => 'Get in touch with Tech4TIME.',
             'share_title' => 'Ask for a quote or just contact us',
+            'breadcrumb'  => 'Contact Us',
+'keywords'    => 'contact Tech4TIME, IT company Dhaka, IT support Bangladesh, '
+               . 'request a quote, IT services enquiry',
+            'robots'      => 'index',
+            'changefreq'  => 'yearly',
+            'priority'    => '0.7',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
         ],
         'hero' => [
             'title'    => 'Contact Us',
@@ -370,6 +436,9 @@ function contact_normalise(array $data): array
         }
         $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
     }
+
+    $data['meta'] = contract_meta_defaults($data['meta'] ?? [],
+                                          $defaults['meta']);
 
     /* Clamped the same way COMPANY_BANDS are, and for the same reason: this
        arrives from a file as often as from a form, and "banana" is not a
@@ -675,7 +744,7 @@ const COMPANY_ICONS = [
 
 /* Free-text single-line fields, by band. */
 const COMPANY_TEXT_FIELDS = [
-    'meta'       => ['title', 'description', 'share_title'],
+    'meta'       => CONTRACT_META_TEXT,
     'hero'       => ['title', 'subtitle'],
     'milestones' => ['eyebrow', 'title'],
     'background' => ['eyebrow', 'title'],
@@ -746,6 +815,15 @@ function company_defaults(): array
             'title'       => 'Company Profile | Tech4TIME',
             'description' => 'Our milestones, the clients we serve, and the technology our engagements are built on.',
             'share_title' => 'Milestones in Technological Excellence',
+            'breadcrumb'  => 'Company Profile',
+'keywords'    => 'Tech4TIME company profile, IT company Bangladesh, '
+               . 'technology partners, corporate clients, '
+               . 'engineering capability',
+            'robots'      => 'index',
+            'changefreq'  => 'monthly',
+            'priority'    => '0.7',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
         ],
         'hero' => [
             'title'    => 'Company Profile',
@@ -829,6 +907,9 @@ function company_normalise(array $data): array
         }
         $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
     }
+
+    $data['meta'] = contract_meta_defaults($data['meta'] ?? [],
+                                          $defaults['meta']);
 
     foreach (COMPANY_BANDS as $band) {
         $data[$band]['status'] =
@@ -1024,6 +1105,271 @@ function contract_image_defaults(mixed $image): array
     return $image;
 }
 
+/* ------------------------------------------------- rows, ids and bands
+
+   SIX DOCUMENTS ASKED THE SAME FOUR QUESTIONS, so they are asked once here.
+
+   Whether a band is shown; which rows of a list a visitor sees; whether an id
+   is one somebody chose; what a name slugs to. Every document since the company
+   profile has carried its own copy of all four, and every copy was
+   character-for-character the same once the document's own prefix was taken
+   off -- checked, not assumed. A seventh copy is not a seventh answer.
+
+   The PLACEHOLDER stays a per-document constant and is passed in, because that
+   part really is the document's own: an id vocabulary that moved because
+   another page changed would be a fragment link broken by a page nobody
+   touched. Each document keeps its named wrapper too, so no renderer, no
+   editor and no test has to learn a new name for something it already calls. */
+
+/** Whether a band of the page is shown at all. */
+function contract_band_shown(array $data, string $band): bool
+{
+    return ($data[$band]['status'] ?? 'shown') !== 'hidden';
+}
+
+/**
+ * Only the rows of a list a visitor should see, wherever the list is.
+ *
+ * Takes the rows rather than the band, because by the sixth document the lists
+ * that matter are no longer all one level down: a list inside a block inside a
+ * section of the privacy policy is three deep, and there is no band to name it
+ * by.
+ */
+function contract_rows_shown(mixed $rows): array
+{
+    return array_values(array_filter(
+        is_array($rows) ? $rows : [],
+        static fn($row): bool => is_array($row) && ($row['status'] ?? 'shown') !== 'hidden'
+    ));
+}
+
+/** An id nobody has chosen: empty, or the placeholder the Add button leaves. */
+function contract_provisional(string $id, string $placeholder): bool
+{
+    return $id === '' || preg_match('/^' . $placeholder . '(-\d+)?$/', $id) === 1;
+}
+
+/** The same id, suffixed until nothing else in the list has it. */
+function contract_unique(string $slug, array $taken): string
+{
+    $base = $slug;
+    $n    = 2;
+    while (in_array($slug, $taken, true)) {
+        $slug = $base . '-' . $n++;
+    }
+    return $slug;
+}
+
+/** A URL-safe id from a name, falling back to the document's placeholder. */
+function contract_slug(string $name, string $placeholder, array $taken = []): string
+{
+    $slug = strtolower(trim($name));
+    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
+    $slug = trim($slug, '-') ?: $placeholder;
+
+    return contract_unique($slug, $taken);
+}
+
+/**
+ * Keep a real id; replace a placeholder once there is a name to replace it with.
+ *
+ * THE FREEZE RULE, and the reason this is worth having in one place. A row that
+ * has been named keeps its id for good: it is the handle a fragment link, an
+ * upload and a test all hold the row by, and re-minting it because somebody
+ * reworded a heading breaks a link that was a promise.
+ */
+function contract_mint(string $id, string $name, string $placeholder, array $taken): string
+{
+    $id   = trim($id);
+    $name = trim($name);
+
+    if ((contract_provisional($id, $placeholder) && $name !== '') || in_array($id, $taken, true)) {
+        return contract_slug($name, $placeholder, $taken);
+    }
+    if ($id === '') {
+        return contract_slug('', $placeholder, $taken);
+    }
+    return $id;
+}
+
+/**
+ * Ids for a whole list at once, in two passes, so a newcomer cannot take one.
+ *
+ * THE ONE-PASS VERSION HAS A BUG, and it is the kind that only bites a page
+ * whose ids are anchors. Add a section titled "Your rights" above the existing
+ * one and mint in row order: the newcomer is provisional, so it slugs to
+ * "your-rights" and claims it; the real section then finds its own id already
+ * taken and is renamed to "your-rights-2". The incumbent loses the anchor, the
+ * empty newcomer inherits it, and every link anyone ever made lands in the
+ * wrong place.
+ *
+ * So everything already named claims its id first, and only then is anything
+ * provisional minted around what is left. A published fragment is a promise,
+ * and the row that made the promise keeps it.
+ *
+ * $name is asked for a row's name rather than given a field, because what
+ * names a row differs by list -- a heading here, a label there, the words
+ * themselves in a bullet.
+ */
+function contract_identify_rows(array $rows, string $placeholder, callable $name): array
+{
+    $ids   = [];
+    $taken = [];
+
+    foreach ($rows as $i => $row) {
+        $id = trim((string)($row['id'] ?? ''));
+        if ($id !== ''
+            && !contract_provisional($id, $placeholder)
+            && !in_array($id, $taken, true)
+        ) {
+            $ids[$i] = $id;
+            $taken[] = $id;
+        }
+    }
+
+    foreach ($rows as $i => $row) {
+        if (isset($ids[$i])) {
+            continue;
+        }
+        $ids[$i] = contract_mint((string)($row['id'] ?? ''), (string)$name($row),
+                                 $placeholder, $taken);
+        $taken[] = $ids[$i];
+    }
+
+    ksort($ids);
+
+    return $ids;
+}
+
+
+/* ------------------------------------------------------ page metadata
+
+   THE meta BAND IS THE SAME SHAPE IN EVERY DOCUMENT, AND ONE SCREEN EDITS IT.
+
+   Every page's title, description, share title, breadcrumb, crawl directive
+   and sitemap tuning live in that page's OWN document, beside its content, and
+   are edited at admin.tech4time.bd/?s=seo -- one screen for the whole site.
+   The values stayed where they were; only the typing moved. See
+   docs/40-reference/seo.md and ADR 0020.
+
+   THE meta BAND IS THEREFORE NOT A BAND THE PAGE'S OWN EDITOR WRITES, and that
+   distinction is load-bearing rather than tidy. Every *_from_post() starts from
+   the stored document and then overwrites each band named in its *_TEXT_FIELDS
+   from $_POST. A form that has stopped RENDERING the meta fieldset while still
+   naming it in that loop reads $_POST['meta']['title'] as absent, ?? ''
+   supplies an empty string, and the page's title is blanked on every save --
+   silently, because empty is a valid value and nothing throws.
+   contract_page_bands() is what the page editors iterate instead, and
+   sections/seo.php iterates the meta band alone. */
+
+/**
+ * Bring a meta band to the current shape, whatever it arrived as.
+ *
+ * $fallback is the document's own defaults, so a key that has never been
+ * written comes back as the value the page ships with rather than as a blank --
+ * the same floor every other band already has.
+ */
+function contract_meta_defaults(mixed $meta, array $fallback): array
+{
+    $meta = is_array($meta) ? $meta : [];
+    $meta += $fallback;
+
+    foreach (CONTRACT_META_TEXT as $field) {
+        $meta[$field] = is_string($meta[$field] ?? null)
+            ? trim($meta[$field])
+            : (string)($fallback[$field] ?? '');
+    }
+
+    $meta['robots'] = in_array($meta['robots'] ?? '', CONTRACT_ROBOTS, true)
+        ? $meta['robots']
+        : (string)($fallback['robots'] ?? 'index');
+
+    $meta['changefreq'] = in_array($meta['changefreq'] ?? '', CONTRACT_CHANGEFREQ, true)
+        ? $meta['changefreq']
+        : (string)($fallback['changefreq'] ?? 'monthly');
+
+    /* One decimal, clamped. A priority outside 0.0-1.0 is a schema error
+       against the whole sitemap, not a bad value on one line of it. */
+    $meta['priority'] = number_format(
+        min(1.0, max(0.0, (float)($meta['priority'] ?? $fallback['priority'] ?? 0.5))), 1);
+
+    /* A comma-separated list, kept as the string it is edited and emitted as.
+       Turning it into an array here and back again in the form would be one
+       more shape for the two ends to disagree about, and there is nothing to
+       address a single keyword by. Tidied rather than validated: empties and
+       repeats dropped, one space after each comma. */
+    $meta['keywords'] = contract_keywords((string)($meta['keywords'] ?? ''));
+
+    /* Empty means "use the site-wide share card", which is what all seventeen
+       pages do today -- so a document that has never been given one renders
+       exactly the bytes it renders now. */
+    $meta['share']     = contract_image_defaults($meta['share'] ?? []);
+    $meta['share_alt'] = is_string($meta['share_alt'] ?? null)
+        ? trim($meta['share_alt']) : '';
+
+    return $meta;
+}
+
+/**
+ * A keyword list, tidied into the one form the page will emit.
+ *
+ * Case-insensitively de-duplicated, because "Cloud" and "cloud" in one list is
+ * a typo rather than two keywords, and the first spelling is the one kept.
+ *
+ * strtolower() and not mb_strtolower(), for the reason privacy_fold() already
+ * records further down: nothing in either repository requires mbstring, and it
+ * is not loaded where the tests run. Byte-wise folding leaves non-ASCII alone,
+ * and it leaves it alone identically for every entry in the list, which is all
+ * a de-duplication key asks of it.
+ */
+function contract_keywords(string $value): string
+{
+    $kept = [];
+    foreach (explode(',', $value) as $word) {
+        $word = trim((string)preg_replace('/\s+/', ' ', $word));
+        if ($word === '') {
+            continue;
+        }
+        $kept[strtolower($word)] ??= $word;
+    }
+
+    return implode(', ', $kept);
+}
+
+/**
+ * Every band of a document the PAGE's own editor writes.
+ *
+ * Which is all of them except meta. See the note above: this is what stops a
+ * form that no longer renders a field from posting an empty string over it.
+ */
+function contract_page_bands(array $text_fields): array
+{
+    unset($text_fields[CONTRACT_META_BAND]);
+    return $text_fields;
+}
+
+/**
+ * The share-card override a meta band points at, as web paths.
+ *
+ * Every document has one now, including the five that carry no other artwork,
+ * so every document needs an arm in contract_images() -- see the note there
+ * about one screen offering to delete another's uploads.
+ */
+function contract_meta_images(mixed $meta): array
+{
+    $meta = is_array($meta) ? $meta : [];
+    $seen = [];
+
+    foreach ([$meta['share']['src'] ?? '', $meta['share']['webp'] ?? ''] as $path) {
+        $path = trim((string)$path);
+        if ($path !== '') {
+            $seen[$path] = true;
+        }
+    }
+
+    return array_keys($seen);
+}
+
 /** Only the rows of a list a visitor should see. */
 function company_shown(array $data, string $band): array
 {
@@ -1036,8 +1382,7 @@ function company_shown(array $data, string $band): array
 /** Whether a band of the page is shown at all. */
 function company_band_shown(array $data, string $band): bool
 {
-    return ($data[$band]['status'] ?? 'shown') !== 'hidden';
-}
+    return contract_band_shown($data, $band);}
 
 function company_find(array $data, string $band, string $id): ?array
 {
@@ -1071,17 +1416,7 @@ function company_images(array $data): array
 /** A URL-safe id from a name, unique against the ids already in use. */
 function company_slug(string $name, array $taken = []): string
 {
-    $slug = strtolower(trim($name));
-    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
-    $slug = trim($slug, '-') ?: COMPANY_ID_PLACEHOLDER;
-
-    $base = $slug;
-    $n = 2;
-    while (in_array($slug, $taken, true)) {
-        $slug = $base . '-' . $n++;
-    }
-    return $slug;
-}
+    return contract_slug($name, COMPANY_ID_PLACEHOLDER, $taken);}
 
 /* ==========================================================================
    4. About page — the shape of the about page
@@ -1147,7 +1482,7 @@ const ABOUT_SIDES = [
 /* Free-text single-line fields, by band. The story band has none: every
    heading on that part of the page belongs to a row, not to the band. */
 const ABOUT_TEXT_FIELDS = [
-    'meta'        => ['title', 'description', 'share_title'],
+    'meta'        => CONTRACT_META_TEXT,
     'hero'        => ['title', 'subtitle'],
     'specialties' => ['title'],
     'whyus'       => ['title'],
@@ -1206,6 +1541,15 @@ function about_defaults(): array
             'title'       => 'About Tech4TIME | Trusted IT & Cybersecurity Solutions',
             'description' => 'Founded in 2018, Tech4TIME delivers cybersecurity, software development, cloud infrastructure, HRaaS and IT training — orchestrating technology with time.',
             'share_title' => 'About Tech4TIME',
+            'breadcrumb'  => 'About Us',
+'keywords'    => 'about Tech4TIME, IT company Bangladesh, '
+               . 'cybersecurity company Dhaka, managed IT services, '
+               . 'technology consultancy',
+            'robots'      => 'index',
+            'changefreq'  => 'monthly',
+            'priority'    => '0.8',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
         ],
         'hero' => [
             'title'    => 'About Us',
@@ -1258,6 +1602,9 @@ function about_normalise(array $data): array
         }
         $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
     }
+
+    $data['meta'] = contract_meta_defaults($data['meta'] ?? [],
+                                          $defaults['meta']);
 
     foreach (ABOUT_BANDS as $band) {
         $data[$band]['status'] =
@@ -1384,8 +1731,7 @@ function about_shown(array $data, string $band): array
 /** Whether a band of the page is shown at all. */
 function about_band_shown(array $data, string $band): bool
 {
-    return ($data[$band]['status'] ?? 'shown') !== 'hidden';
-}
+    return contract_band_shown($data, $band);}
 
 function about_find(array $data, string $band, string $id): ?array
 {
@@ -1425,17 +1771,7 @@ function about_images(array $data): array
 /** A URL-safe id from a name, unique against the ids already in use. */
 function about_slug(string $name, array $taken = []): string
 {
-    $slug = strtolower(trim($name));
-    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
-    $slug = trim($slug, '-') ?: ABOUT_ID_PLACEHOLDER;
-
-    $base = $slug;
-    $n = 2;
-    while (in_array($slug, $taken, true)) {
-        $slug = $base . '-' . $n++;
-    }
-    return $slug;
-}
+    return contract_slug($name, ABOUT_ID_PLACEHOLDER, $taken);}
 
 /* ==========================================================================
    5. Home page — the shape of the home page
@@ -1518,7 +1854,7 @@ const HOME_PROMPT_DEFAULT = 'tech4time@soc:~$';
 /* Free-text single-line fields, by band. The list bands carry only their own
    headings here; everything inside them belongs to a row. */
 const HOME_TEXT_FIELDS = [
-    'meta'         => ['title', 'description', 'share_title'],
+    'meta'         => CONTRACT_META_TEXT,
     'hero'         => ['title', 'accent', 'cta_label', 'cta_href'],
     'terminal'     => ['title', 'summary'],
     'capabilities' => ['title', 'lead'],
@@ -1594,6 +1930,15 @@ function home_defaults(): array
             'title'       => 'Tech4TIME | Orchestrating Technology with Time',
             'description' => 'Enterprise-grade cybersecurity, software development, cloud infrastructure and HR solutions from Tech4TIME. Orchestrate, build, maintain and protect your business.',
             'share_title' => 'Tech4TIME | Orchestrating Technology with Time',
+            'breadcrumb'  => 'Home',
+'keywords'    => 'IT services Bangladesh, cybersecurity, '
+               . 'software development, cloud infrastructure, HRaaS, '
+               . 'IT consultancy, Tech4TIME',
+            'robots'      => 'index',
+            'changefreq'  => 'weekly',
+            'priority'    => '1.0',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
         ],
         'hero' => [
             'title'     => 'Orchestrating Technology with Time',
@@ -1683,6 +2028,9 @@ function home_normalise(array $data): array
         }
         $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
     }
+
+    $data['meta'] = contract_meta_defaults($data['meta'] ?? [],
+                                          $defaults['meta']);
 
     foreach (HOME_BANDS as $band) {
         $data[$band]['status'] =
@@ -1854,8 +2202,7 @@ function home_shown(array $data, string $band): array
 /** Whether a band of the page is shown at all. */
 function home_band_shown(array $data, string $band): bool
 {
-    return ($data[$band]['status'] ?? 'shown') !== 'hidden';
-}
+    return contract_band_shown($data, $band);}
 
 function home_find(array $data, string $band, string $id): ?array
 {
@@ -1895,17 +2242,7 @@ function home_images(array $data): array
 /** A URL-safe id from a name, unique against the ids already in use. */
 function home_slug(string $name, array $taken = []): string
 {
-    $slug = strtolower(trim($name));
-    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
-    $slug = trim($slug, '-') ?: HOME_ID_PLACEHOLDER;
-
-    $base = $slug;
-    $n = 2;
-    while (in_array($slug, $taken, true)) {
-        $slug = $base . '-' . $n++;
-    }
-    return $slug;
-}
+    return contract_slug($name, HOME_ID_PLACEHOLDER, $taken);}
 
 /* ==========================================================================
    6. Services — the shape of the services index AND its detail pages
@@ -2023,7 +2360,7 @@ const SERVICES_GROUP_WIDTHS = [
 
 /* Free-text single-line fields of the INDEX document, by band. */
 const SERVICES_TEXT_FIELDS = [
-    'meta' => ['title', 'description', 'share_title'],
+    'meta' => CONTRACT_META_TEXT,
     'hero' => ['title', 'subtitle'],
     'nav'  => ['eyebrow', 'title', 'lead'],
     'ossf' => ['eyebrow', 'title', 'lead'],
@@ -2033,7 +2370,7 @@ const SERVICES_TEXT_FIELDS = [
 /* Free-text single-line fields of ONE SERVICE, by band. */
 const SERVICES_PAGE_TEXT_FIELDS = [
     'service' => ['name', 'slug', 'schema_type', 'schema_description'],
-    'meta'   => ['title', 'description', 'share_title'],
+    'meta'   => CONTRACT_META_TEXT,
     'hero'   => ['title', 'subtitle'],
     'core'   => ['eyebrow', 'title', 'lead'],
     'layers' => ['eyebrow', 'title', 'lead'],
@@ -2110,6 +2447,15 @@ function services_defaults(): array
             'title'       => 'Services — Cybersecurity, Software, Cloud & HRaaS | Tech4TIME',
             'description' => "Software development, cybersecurity and SOC build-out, private cloud on OpenStack, HRaaS, IT equipment supply, consultancy and training — Tech4TIME's six practices.",
             'share_title' => 'Our Comprehensive Technological Solutions',
+            'breadcrumb'  => 'Services',
+'keywords'    => 'IT services, cybersecurity services, software development, '
+               . 'cloud infrastructure, HRaaS, IT consultancy and training, '
+               . 'IT equipment supply',
+            'robots'      => 'index',
+            'changefreq'  => 'weekly',
+            'priority'    => '0.9',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
         ],
         'hero' => [
             'title'    => 'Services',
@@ -2176,6 +2522,9 @@ function services_normalise(array $data): array
         $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
     }
 
+    $data['meta'] = contract_meta_defaults($data['meta'] ?? [],
+                                          $defaults['meta']);
+
     foreach (SERVICES_BANDS as $band) {
         $data[$band]['status'] =
             ($data[$band]['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown';
@@ -2222,8 +2571,29 @@ function services_service_defaults(array $row): array
         'schema_description' => '',
     ];
 
-    $row['meta'] = is_array($row['meta'] ?? null) ? $row['meta'] : [];
-    $row['meta'] += ['title' => '', 'description' => '', 'share_title' => ''];
+    /* A service page's own metadata, edited on the SEO screen like every other
+       page's. THE BREADCRUMB FALLS BACK TO THE SERVICE'S NAME, which is what
+       services_breadcrumbs() used before this field existed -- so the six
+       services that have never been given one render the trail they render
+       today, and a seventh added by the Add button gets a sensible one without
+       anybody visiting a second screen. changefreq and priority are the values
+       sitemap.php applied to every service from one pair of constants; they
+       are per-service now because a seventh service is not obliged to be worth
+       the same as the first six. */
+    $row['meta'] = contract_meta_defaults($row['meta'] ?? [], [
+        'title'       => '',
+        'description' => '',
+        'share_title' => '',
+        'breadcrumb'  => (string)$row['name'],
+        /* Its own name, so a seventh service arrives with a keyword list that
+           says something rather than an empty field nobody will notice. */
+        'keywords'    => (string)$row['name'],
+        'robots'      => 'index',
+        'changefreq'  => 'monthly',
+        'priority'    => '0.9',
+        'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+        'share_alt'   => '',
+    ]);
 
     $row['hero'] = is_array($row['hero'] ?? null) ? $row['hero'] : [];
     $row['hero'] += ['title' => '', 'subtitle' => ''];
@@ -2541,45 +2911,22 @@ function services_identify(array $data): array
 /** Whether an id is one this file minted as a placeholder rather than a name. */
 function services_provisional(string $id): bool
 {
-    return $id === ''
-        || preg_match('/^' . SERVICES_ID_PLACEHOLDER . '(-\d+)?$/', $id) === 1;
-}
+    return contract_provisional($id, SERVICES_ID_PLACEHOLDER);}
 
 /** Keep a real id, replace a placeholder once there is a name to replace it with. */
 function services_mint(string $id, string $name, array $taken): string
 {
-    $id   = trim($id);
-    $name = trim($name);
-
-    if ((services_provisional($id) && $name !== '') || in_array($id, $taken, true)) {
-        return services_slug($name, $taken);
-    }
-    if ($id === '') {
-        return services_slug('', $taken);
-    }
-    return $id;
-}
+    return contract_mint($id, $name, SERVICES_ID_PLACEHOLDER, $taken);}
 
 /** A URL-safe id from a name. */
 function services_slug(string $name, array $taken = []): string
 {
-    $slug = strtolower(trim($name));
-    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
-    $slug = trim($slug, '-') ?: SERVICES_ID_PLACEHOLDER;
-
-    return services_unique($slug, $taken);
-}
+    return contract_slug($name, SERVICES_ID_PLACEHOLDER, $taken);}
 
 /** The same id, suffixed until nothing else in the list has it. */
 function services_unique(string $slug, array $taken): string
 {
-    $base = $slug;
-    $n    = 2;
-    while (in_array($slug, $taken, true)) {
-        $slug = $base . '-' . $n++;
-    }
-    return $slug;
-}
+    return contract_unique($slug, $taken);}
 
 /** Only the rows of an index list a visitor should see. */
 function services_shown(array $data, string $band): array
@@ -2593,16 +2940,33 @@ function services_shown(array $data, string $band): array
 /** Whether a band of the index is shown at all. */
 function services_band_shown(array $data, string $band): bool
 {
-    return ($data[$band]['status'] ?? 'shown') !== 'hidden';
-}
+    return contract_band_shown($data, $band);}
 
 /** Only the rows of a list a visitor should see, wherever the list is. */
 function services_rows_shown(array $rows): array
 {
-    return array_values(array_filter(
-        is_array($rows) ? $rows : [],
-        static fn($row): bool => is_array($row) && ($row['status'] ?? 'shown') !== 'hidden'
-    ));
+    return contract_rows_shown($rows);}
+
+/**
+ * Every picture this document points at, as web paths, without duplicates.
+ *
+ * Which today means the share-card override on each of the seven pages it
+ * holds -- the index and the six services -- and nothing else: the services
+ * pages draw icons from the sprite, not uploads. It still has to exist and
+ * still has to be complete, because contract_images() is what tells the sweep
+ * on every OTHER screen which uploads are spoken for.
+ */
+function services_images(array $data): array
+{
+    $seen = [];
+
+    foreach (services_all($data) as $service) {
+        foreach (contract_meta_images($service['meta'] ?? []) as $path) {
+            $seen[$path] = true;
+        }
+    }
+
+    return array_keys($seen);
 }
 
 /** Every service, hidden ones included. The editor lists these. */
@@ -2683,7 +3047,2164 @@ function services_by_id(array $data, string $id): ?array
 }
 
 /* ==========================================================================
-   7. Revisions
+   7. Resource certifications — the shape of the certifications page
+   ========================================================================== */
+
+/**
+ * Icons a role group may carry.
+ *
+ * The four the page ships with are the first four; the rest are offered
+ * because a new role group needs something to wear and picking from a list is
+ * the only way to add one without a deploy.
+ *
+ * A certification does NOT choose an icon. All 54 on the page carry the same
+ * glyph and always did, so it is a constant in the renderer
+ * (CERTIFICATIONS_CERT_GLYPH) rather than 54 copies of one answer.
+ *
+ * tools/inject_icons.py scans the MARKUP for a literal href="#name", and a
+ * name chosen at run time is invisible to that scan. Every icon offered here
+ * is therefore also listed in a comment in the frontend's
+ * pages/resource-certifications/index.php, where the scanner can see it.
+ *
+ * Every name here must also be in ADMIN_ICONS in the backend's lib/admin.php,
+ * or the editor's live preview draws an empty box for it.
+ */
+const CERTIFICATIONS_ICONS = [
+    'shield-halved'  => 'Shield',
+    'crosshairs'     => 'Crosshairs',
+    'first-aid'      => 'First aid',
+    'cogs'           => 'Cogs',
+    'certificate'    => 'Certificate',
+    'users'          => 'People',
+    'server'         => 'Server',
+    'lock'           => 'Padlock',
+    'eye'            => 'Eye',
+    'graduation-cap' => 'Graduation cap',
+    'code'           => 'Code',
+    'cloud'          => 'Cloud',
+];
+
+/**
+ * The glyph every certification carries.
+ *
+ * Not a field. All 54 certifications on the page use #certificate, so storing
+ * it 54 times would be 54 chances for them to stop matching each other and no
+ * chance of the page looking better for it. The renderer emits it.
+ */
+const CERTIFICATIONS_CERT_GLYPH = 'certificate';
+
+/* Free-text single-line fields, by band. A group's own heading belongs to the
+   group, not to the band, so 'certs' carries only the band header. */
+const CERTIFICATIONS_TEXT_FIELDS = [
+    'meta'  => CONTRACT_META_TEXT,
+    'hero'  => ['title', 'subtitle'],
+    'certs' => ['eyebrow', 'title', 'lead'],
+    'cta'   => ['title', 'text'],
+];
+
+/* Every band that can be hidden whole, in the order it renders. The hero is
+   not here, for the reason the about page's hero is not in ABOUT_BANDS: a page
+   with no title is not a page with a section switched off, it is a broken
+   page. */
+const CERTIFICATIONS_BANDS = ['certs', 'cta'];
+
+/**
+ * The bands that hold a list, and the function that fills one of its rows.
+ *
+ * 'certs' is not here. Its rows are role groups, which nest two further lists
+ * of their own, so they are normalised by certifications_group_defaults()
+ * rather than by a flat map — the same reason services.items is handled apart
+ * from SERVICES_LISTS.
+ */
+const CERTIFICATIONS_LISTS = [
+    'cta' => 'certifications_button_defaults',
+];
+
+/* What a row is called before it is called anything. Deliberately its own
+   constant: each document owns its id vocabulary, and one changing must not
+   move another. See certifications_identify(). */
+const CERTIFICATIONS_ID_PLACEHOLDER = 'row';
+
+/**
+ * The tokens any text field may carry, and what each counts.
+ *
+ * The page states its own totals in prose -- "54 certifications across the
+ * four specialist roles we staff" -- and a typed number is wrong the moment
+ * somebody adds a certification. Nothing on the page would notice, and no
+ * check could: it is a true sentence that has quietly stopped being true.
+ *
+ * So the numbers are not typed. A field holds a token, and the renderer puts
+ * the live figure in as it draws.
+ *
+ * WATCH THE ARITHMETIC. The page's "four specialist roles" is the number of
+ * GROUPS, not the number of role names -- there are ten of those, spread two,
+ * three, four and one across the four groups. Both counts are offered because
+ * the page's own copy means different things by "role" in different sentences,
+ * and the editor shows what each one resolves to so nobody has to guess.
+ */
+const CERTIFICATIONS_TOKENS = ['certifications', 'groups', 'roles'];
+
+/**
+ * The same three counts, spelled out.
+ *
+ * The page does not write its two numbers the same way. The lead says
+ * "54 certifications across the four specialist roles" -- a numeral and then a
+ * word, which is ordinary English and how a person would type it. A token that
+ * could only produce digits would quietly reword that sentence to "the 4
+ * specialist roles" the first time it rendered, and the page would have been
+ * edited by the migration rather than by anybody who meant to.
+ *
+ * So every token has a -word form: {groups} is 4 and {groups-word} is "four".
+ * Above twenty it gives up and returns the numeral, because "fifty-four
+ * certifications" is a style decision no one asked this file to make, and a
+ * count that far up is being read, not narrated.
+ */
+const CERTIFICATIONS_TOKEN_WORD_SUFFIX = '-word';
+
+const CERTIFICATIONS_NUMBER_WORDS = [
+    0  => 'no',       1  => 'one',      2  => 'two',       3  => 'three',
+    4  => 'four',     5  => 'five',     6  => 'six',       7  => 'seven',
+    8  => 'eight',    9  => 'nine',     10 => 'ten',       11 => 'eleven',
+    12 => 'twelve',   13 => 'thirteen', 14 => 'fourteen',  15 => 'fifteen',
+    16 => 'sixteen',  17 => 'seventeen',18 => 'eighteen',  19 => 'nineteen',
+    20 => 'twenty',
+];
+
+/**
+ * The page as it ships, and the fallback for anything missing from the file.
+ *
+ * Every scalar the renderer reads exists here, so a truncated or hand-edited
+ * certifications.json degrades to the shipped headings rather than emptying
+ * the page. The lists default to empty: the page keeps its shape and has
+ * nothing in it, which is the same bargain about and company make.
+ */
+function certifications_defaults(): array
+{
+    return [
+        'updated'  => '',
+        'revision' => 0,
+        'meta'     => [
+            'title'       => 'Resource Certifications | Tech4TIME',
+            'description' => 'The {certifications} security certifications our analysts, '
+                           . 'incident responders, threat hunters and security engineers hold, '
+                           . 'grouped by the role they are deployed in.',
+            'share_title' => 'Resource Certifications',
+            'breadcrumb'  => 'Resource Certifications',
+'keywords'    => 'security certifications, certified security analysts, '
+               . 'incident response, threat hunting, security engineering, '
+               . 'Tech4TIME',
+            'robots'      => 'index',
+            'changefreq'  => 'monthly',
+            'priority'    => '0.6',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
+        ],
+        'hero'     => [
+            'title'    => 'Resource Certifications',
+            'subtitle' => 'The Qualifications Our People Hold, by Role',
+        ],
+        'certs'    => [
+            'status'  => 'shown',
+            'eyebrow' => 'Our People',
+            'title'   => 'Certifications by Role',
+            'lead'    => '{certifications} certifications across the {groups-word} specialist '
+                       . 'roles we staff, from the vendors and standards bodies that set them.',
+            'items'   => [],
+        ],
+        'cta'      => [
+            'status' => 'shown',
+            'title'  => 'Need a certified resource on your team?',
+            'text'   => '',
+            'items'  => [],
+        ],
+    ];
+}
+
+/**
+ * Fill in everything the renderer reads, whatever the file happens to hold.
+ */
+function certifications_normalise(array $data): array
+{
+    $defaults = certifications_defaults();
+
+    foreach ($defaults as $key => $value) {
+        if ($key === 'revision') {
+            $data[$key] = max(0, (int)($data[$key] ?? 0));
+            continue;
+        }
+        if (!is_array($value)) {
+            $data[$key] = is_string($data[$key] ?? null) ? $data[$key] : $value;
+            continue;
+        }
+        $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
+    }
+
+    $data['meta'] = contract_meta_defaults($data['meta'] ?? [],
+                                          $defaults['meta']);
+
+    foreach (CERTIFICATIONS_BANDS as $band) {
+        $data[$band]['status'] =
+            ($data[$band]['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown';
+    }
+
+    foreach (CERTIFICATIONS_LISTS as $band => $filler) {
+        $rows = is_array($data[$band]['items'] ?? null) ? $data[$band]['items'] : [];
+        $data[$band]['items'] = array_map(
+            $filler,
+            array_values(array_filter($rows, 'is_array'))
+        );
+    }
+
+    $groups = is_array($data['certs']['items'] ?? null) ? $data['certs']['items'] : [];
+    $data['certs']['items'] = array_map(
+        'certifications_group_defaults',
+        array_values(array_filter($groups, 'is_array'))
+    );
+
+    return certifications_identify($data);
+}
+
+/**
+ * One role group: a <details> on the page, holding role names and the
+ * certifications the people in those roles hold.
+ *
+ * 'open' is the group that starts expanded. It is authored rather than
+ * derived -- the page ships with the first group open and the other three
+ * shut, and which one greets a visitor is an editorial decision, not an
+ * accident of ordering.
+ *
+ * 'slug' is the anchor the <details> carries. It is minted once from the
+ * first role name and then left alone, because a link into the page is a
+ * promise and renaming a role must not break it.
+ */
+function certifications_group_defaults(array $row): array
+{
+    $row += [
+        'id'     => '',
+        'slug'   => '',
+        'icon'   => '',
+        'blurb'  => '',
+        'status' => 'shown',
+        'open'   => false,
+    ];
+
+    $row['open'] = (bool)$row['open'];
+
+    $roles = is_array($row['roles'] ?? null) ? $row['roles'] : [];
+    $row['roles'] = array_map(
+        'certifications_role_defaults',
+        array_values(array_filter($roles, 'is_array'))
+    );
+
+    $certs = is_array($row['items'] ?? null) ? $row['items'] : [];
+    $row['items'] = array_map(
+        'certifications_cert_defaults',
+        array_values(array_filter($certs, 'is_array'))
+    );
+
+    return $row;
+}
+
+/** One role name inside a group. The page prints these separated by a slash. */
+function certifications_role_defaults(array $row): array
+{
+    return $row + [
+        'id'     => '',
+        'name'   => '',
+        'status' => 'shown',
+    ];
+}
+
+/**
+ * One certification.
+ *
+ * A name and nothing else. There is no icon field: see
+ * CERTIFICATIONS_CERT_GLYPH.
+ */
+function certifications_cert_defaults(array $row): array
+{
+    return $row + [
+        'id'     => '',
+        'name'   => '',
+        'status' => 'shown',
+    ];
+}
+
+/** One button in the closing band. The page ships with two. */
+function certifications_button_defaults(array $row): array
+{
+    return $row + [
+        'id'     => '',
+        'label'  => '',
+        'href'   => '',
+        'icon'   => '',
+        'style'  => 'primary',
+        'status' => 'shown',
+    ];
+}
+
+/**
+ * Give every row an id, and every group a stable anchor.
+ *
+ * Group ids and slugs share the page's fragment namespace, because a group is
+ * a <details id="..."> a visitor can be linked straight to. Roles and
+ * certifications are numbered WITHIN their group: they are form handles and
+ * never fragment targets, so two groups may each hold a "cissp" without
+ * either having to be renamed.
+ */
+function certifications_identify(array $data): array
+{
+    foreach (CERTIFICATIONS_LISTS as $band => $_filler) {
+        $taken = [];
+        foreach ($data[$band]['items'] as $i => $row) {
+            $name = (string)($row['label'] ?? $row['title'] ?? '');
+            $id   = certifications_mint((string)($row['id'] ?? ''), $name, $taken);
+            $data[$band]['items'][$i]['id'] = $id;
+            $taken[] = $id;
+        }
+    }
+
+    $anchors = [];
+    foreach ($data['certs']['items'] as $g => $group) {
+        /* A group is named by its first role -- "Security Analyst / Threat
+           Analyst" is headed security-analyst -- because a group has no title
+           of its own. It is the roles, and the first one is the one that
+           names it. */
+        $first = '';
+        foreach ($group['roles'] as $role) {
+            $first = (string)($role['name'] ?? '');
+            if (trim($first) !== '') {
+                break;
+            }
+        }
+
+        $id = certifications_mint((string)($group['id'] ?? ''), $first, $anchors);
+        $data['certs']['items'][$g]['id'] = $id;
+        $anchors[] = $id;
+
+        /* The slug is the anchor. It follows the id until the id is a real
+           one, and is left alone from then on: changing it breaks every link
+           anyone has ever made into this page.
+
+           "Until the id is REAL" is the whole subtlety. A group added by the
+           Add button has no roles yet, so there is no name to mint from and
+           the id is the placeholder. Freezing the slug to that would leave a
+           group answering to #row for the rest of its life, named after
+           nothing, and the first person to add a second one would get #row-2.
+           A placeholder slug is therefore still up for grabs; a slug somebody
+           has actually been given is not. */
+        $slug = trim((string)($group['slug'] ?? ''));
+        $data['certs']['items'][$g]['slug'] =
+            ($slug !== '' && !certifications_provisional($slug)) ? $slug : $id;
+
+        foreach (['roles', 'items'] as $list) {
+            $taken = [];
+            foreach ($group[$list] as $i => $row) {
+                $rid = certifications_mint(
+                    (string)($row['id'] ?? ''), (string)($row['name'] ?? ''), $taken);
+                $data['certs']['items'][$g][$list][$i]['id'] = $rid;
+                $taken[] = $rid;
+            }
+        }
+    }
+
+    return $data;
+}
+
+/** An id nobody has chosen: empty, or the placeholder the Add button leaves. */
+function certifications_provisional(string $id): bool
+{
+    return contract_provisional($id, CERTIFICATIONS_ID_PLACEHOLDER);}
+
+/** Keep a real id, replace a placeholder once there is a name to replace it with. */
+function certifications_mint(string $id, string $name, array $taken): string
+{
+    return contract_mint($id, $name, CERTIFICATIONS_ID_PLACEHOLDER, $taken);}
+
+/** A URL-safe id from a name. */
+function certifications_slug(string $name, array $taken = []): string
+{
+    return contract_slug($name, CERTIFICATIONS_ID_PLACEHOLDER, $taken);}
+
+/** The same id, suffixed until nothing else in the list has it. */
+function certifications_unique(string $slug, array $taken): string
+{
+    return contract_unique($slug, $taken);}
+
+/** Whether a band is shown at all. */
+function certifications_band_shown(array $data, string $band): bool
+{
+    return contract_band_shown($data, $band);}
+
+/** Only the rows of a list a visitor should see, wherever the list is. */
+function certifications_rows_shown(array $rows): array
+{
+    return contract_rows_shown($rows);}
+
+/** Every role group, hidden ones included. The editor lists these. */
+function certifications_groups(array $data): array
+{
+    return is_array($data['certs']['items'] ?? null) ? $data['certs']['items'] : [];
+}
+
+/**
+ * What the page currently holds, for the tokens to resolve to.
+ *
+ * SHOWN ROWS ONLY, and that is the whole point. A hidden certification is not
+ * on the page, so a sentence saying how many certifications there are must not
+ * count it -- and the "27 certifications" label the renderer puts on each
+ * group counts the same way. Two numbers on one page derived from two
+ * different rules is worse than no numbers at all.
+ *
+ * 'groups' and 'roles' are genuinely different figures: four groups, ten role
+ * names. The page's own lead means the first when it says "the four specialist
+ * roles we staff".
+ */
+function certifications_counts(array $data): array
+{
+    $groups = certifications_rows_shown(certifications_groups($data));
+
+    $certifications = 0;
+    $roles          = 0;
+
+    foreach ($groups as $group) {
+        $certifications += count(certifications_rows_shown($group['items'] ?? []));
+        $roles          += count(certifications_rows_shown($group['roles'] ?? []));
+    }
+
+    return [
+        'certifications' => $certifications,
+        'groups'         => count($groups),
+        'roles'          => $roles,
+    ];
+}
+
+/**
+ * Put the live figures into a piece of text.
+ *
+ * THIS LIVES HERE, IN THE SHARED FILE, ON PURPOSE. The public page renders it
+ * and the editor previews it, and lib/contract.php is byte-identical across
+ * both repositories -- checked by tools/check_shared_lib.py and
+ * tools/check_shared_repos.py. So the preview an editor is shown and the
+ * sentence a visitor reads cannot disagree about what a token means. Two
+ * copies of this function in two repositories could, and one day would.
+ *
+ * SUBSTITUTE FIRST, ESCAPE AFTER. Every value is a decimal integer, so the
+ * order is safe either way -- but one order has to be chosen, and this is it:
+ * callers pass the result through h() exactly as they would any other stored
+ * string, and nothing about a token changes that habit.
+ *
+ * An unknown token is left exactly as it was typed. Somebody experimenting
+ * with {certificates} gets their own text back rather than an empty space
+ * where a word used to be.
+ */
+function certifications_word(int $n): string
+{
+    return CERTIFICATIONS_NUMBER_WORDS[$n] ?? (string)$n;
+}
+
+function certifications_fill(string $text, array $counts): string
+{
+    foreach (CERTIFICATIONS_TOKENS as $token) {
+        $n = (int)($counts[$token] ?? 0);
+
+        /* The spelled form first. Replacing {groups} before
+           {groups-word} would leave the string holding "4-word". */
+        $text = str_replace(
+            '{' . $token . CERTIFICATIONS_TOKEN_WORD_SUFFIX . '}',
+            certifications_word($n),
+            $text
+        );
+        $text = str_replace('{' . $token . '}', (string)$n, $text);
+    }
+
+    return $text;
+}
+
+/* ==========================================================================
+   8. Branding & advertisement — the shape of the branding page
+   ========================================================================== */
+
+/**
+ * The plate a logo preview sits on.
+ *
+ * Not a theme token, and deliberately so. assets/css/pages/branding.css
+ * hard-codes the light and dark plates because the ink in a transparent logo
+ * does NOT change with the site's colour mode: put the light-theme mark on a
+ * dark plate in dark mode and it is black ink on black. Each preview shows the
+ * background the file is actually for, in both modes, which is what makes the
+ * preview honest -- you are seeing where it works.
+ *
+ * So this is an authored property of the artwork, not a display preference,
+ * and it belongs in the document.
+ */
+const BRANDING_PLATES = [
+    'light'   => 'Pale plate, for a mark in dark ink',
+    'dark'    => 'Dark plate, for a mark in pale ink',
+    'neutral' => 'Neutral, for a file that carries its own background',
+];
+
+/**
+ * The glyph on every download button.
+ *
+ * Not a field. All four buttons on the page carry #arrow-down and always did,
+ * so it is a constant in the renderer rather than four copies of one answer --
+ * the same call CERTIFICATIONS_CERT_GLYPH makes.
+ *
+ * Because it is constant it also stays a literal <use href="#arrow-down"> in
+ * pages/branding-and-advertisement/index.php, where tools/inject_icons.py can
+ * see it. Nothing on this page picks an icon at run time, so unlike the
+ * certifications page it needs no second sprite.
+ */
+const BRANDING_DOWNLOAD_GLYPH = 'arrow-down';
+
+/* Free-text single-line fields, by band. An asset's own heading belongs to the
+   asset, not to the band, so 'assets' carries only the band header; the legal
+   band carries only its title, because its paragraphs are rows. */
+const BRANDING_TEXT_FIELDS = [
+    'meta'   => CONTRACT_META_TEXT,
+    'hero'   => ['title', 'subtitle'],
+    'assets' => ['eyebrow', 'title', 'lead'],
+    'legal'  => ['title'],
+    'cta'    => ['title', 'text'],
+];
+
+/**
+ * Rich fields that live on a ROW rather than on a band.
+ *
+ * The disclaimer's paragraphs. They are plain prose today, but this is a legal
+ * notice: a bolded clause, or a link to the contact page from the sentence
+ * that asks a rights holder to get in touch, is exactly what someone will
+ * eventually want, and rt_sanitise_html() already decides what is allowed.
+ * Shaped like ABOUT_ROW_RICH_FIELDS, which contract_sanitise() already knows
+ * how to walk.
+ */
+const BRANDING_ROW_RICH_FIELDS = ['legal' => ['text']];
+
+/* Every band that can be hidden whole, in the order it renders. The hero is
+   not here, for the reason the about page's hero is not in ABOUT_BANDS: a page
+   with no title is not a page with a section switched off, it is a broken
+   page. */
+const BRANDING_BANDS = ['assets', 'legal', 'cta'];
+
+/**
+ * The bands that hold a list, and the function that fills one of its rows.
+ *
+ * 'assets' is not here. Its rows nest a further list of their own -- the files
+ * a visitor can download -- so they are normalised by branding_asset_defaults()
+ * rather than by a flat map, the same reason certifications.certs is handled
+ * apart from CERTIFICATIONS_LISTS.
+ */
+const BRANDING_LISTS = [
+    'legal' => 'branding_note_defaults',
+    'cta'   => 'branding_button_defaults',
+];
+
+/* What a row is called before it is called anything. Deliberately its own
+   constant: each document owns its id vocabulary, and one changing must not
+   move another. See branding_identify(). */
+const BRANDING_ID_PLACEHOLDER = 'row';
+
+/**
+ * The longest a download's saved-as name may be.
+ *
+ * It goes in a download="" attribute, which is a suggestion to the visitor's
+ * operating system rather than a path here, but a name of unbounded length is
+ * still a thing this document should not carry.
+ */
+const BRANDING_FILENAME_MAX = 120;
+
+/**
+ * The page as it ships, and the fallback for anything missing from the file.
+ *
+ * Every scalar the renderer reads exists here, so a truncated or hand-edited
+ * branding.json degrades to the shipped headings rather than emptying the
+ * page. The lists default to empty: the page keeps its shape and has nothing
+ * in it, which is the same bargain about and certifications make.
+ */
+function branding_defaults(): array
+{
+    return [
+        'updated'  => '',
+        'revision' => 0,
+        'meta'     => [
+            'title'       => 'Branding Assets & Guidelines | Tech4TIME',
+            'description' => 'Download the Tech4TIME logo in four variants for light and '
+                           . 'dark backgrounds, transparent or plated, with the terms '
+                           . 'covering their use.',
+            'share_title' => 'Branding Assets & Guidelines | Tech4TIME',
+
+            /* WHAT THE SITE CALLS THIS PAGE, WHICH IS NOT WHAT THE PAGE CALLS
+               ITSELF. The hero is titled "Branding Assets & Guidelines"; every
+               link to it -- the footer's, and this breadcrumb -- says
+               "Branding & Advertisement". That is a real distinction and an
+               authored one: a breadcrumb names a place in a hierarchy, and a
+               heading introduces a page.
+
+               This page and the privacy policy were the only two that carried
+               the field, because they were the only two whose two strings
+               differed; the about, company and certifications pages let their
+               breadcrumb follow hero.title instead. Every page has the field
+               now -- the SEO screen edits one shape, not seven -- and each of
+               those three was seeded with the string it was already
+               rendering. */
+            'breadcrumb'  => 'Branding & Advertisement',
+'keywords'    => 'Tech4TIME logo, brand assets, logo download, brand guidelines, press kit',
+            'robots'      => 'index',
+            'changefreq'  => 'yearly',
+            'priority'    => '0.4',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
+        ],
+        'hero'     => [
+            'title'    => 'Branding Assets & Guidelines',
+            'subtitle' => 'Our Logo, and How to Use It',
+        ],
+        'assets'   => [
+            'status'  => 'shown',
+            'eyebrow' => 'Downloads',
+            'title'   => 'Tech4TIME Logos for Branding & Advertisement',
+            'lead'    => 'Four variants of the mark. Pick the one that matches the '
+                       . 'background it will sit on.',
+            'items'   => [],
+        ],
+        'legal'    => [
+            'status' => 'shown',
+            'title'  => 'Disclaimer',
+            'items'  => [],
+        ],
+        'cta'      => [
+            'status' => 'shown',
+            'title'  => 'Need something not listed here?',
+            'text'   => '',
+            'items'  => [],
+        ],
+    ];
+}
+
+/**
+ * Fill in everything the renderer reads, whatever the file happens to hold.
+ */
+function branding_normalise(array $data): array
+{
+    $defaults = branding_defaults();
+
+    foreach ($defaults as $key => $value) {
+        if ($key === 'revision') {
+            $data[$key] = max(0, (int)($data[$key] ?? 0));
+            continue;
+        }
+        if (!is_array($value)) {
+            $data[$key] = is_string($data[$key] ?? null) ? $data[$key] : $value;
+            continue;
+        }
+        $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
+    }
+
+    $data['meta'] = contract_meta_defaults($data['meta'] ?? [],
+                                          $defaults['meta']);
+
+    foreach (BRANDING_BANDS as $band) {
+        $data[$band]['status'] =
+            ($data[$band]['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown';
+    }
+
+    foreach (BRANDING_LISTS as $band => $filler) {
+        $rows = is_array($data[$band]['items'] ?? null) ? $data[$band]['items'] : [];
+        $data[$band]['items'] = array_map(
+            $filler,
+            array_values(array_filter($rows, 'is_array'))
+        );
+    }
+
+    $assets = is_array($data['assets']['items'] ?? null) ? $data['assets']['items'] : [];
+    $data['assets']['items'] = array_map(
+        'branding_asset_defaults',
+        array_values(array_filter($assets, 'is_array'))
+    );
+
+    return branding_identify($data);
+}
+
+/**
+ * One logo variant: a card on the page, with a preview and the files to take.
+ *
+ * TWO PICTURES, AND THEY ARE NOT THE SAME PICTURE. 'image' is the preview
+ * drawn on the card -- small, lazy-loaded, with a WebP sibling, and never
+ * larger than it needs to be. The files under 'files' are what a visitor
+ * actually downloads, and on the page as it ships those are a different and
+ * much larger set: an 800px preview against a 1600px download.
+ *
+ * Collapsing the two would mean either serving the big file to everybody who
+ * merely looks at the page, or handing out the small one to everybody who came
+ * for the logo. Both are real losses, so both slots exist.
+ */
+function branding_asset_defaults(array $row): array
+{
+    $row += [
+        'id'     => '',
+        'title'  => '',
+        'text'   => '',
+        'alt'    => '',
+        'plate'  => 'neutral',
+        'status' => 'shown',
+    ];
+
+    $row['plate'] = isset(BRANDING_PLATES[$row['plate']]) ? $row['plate'] : 'neutral';
+    $row['image'] = contract_image_defaults($row['image'] ?? []);
+
+    $files = is_array($row['files'] ?? null) ? $row['files'] : [];
+    $row['files'] = array_map(
+        'branding_file_defaults',
+        array_values(array_filter($files, 'is_array'))
+    );
+
+    return $row;
+}
+
+/**
+ * One downloadable file belonging to a logo variant.
+ *
+ * A list rather than a single slot, so one mark can offer a raster AND a
+ * vector -- and, later, whatever else somebody needs -- without the page being
+ * rebuilt for it.
+ *
+ * 'label' is the adjective in the meta line, "Transparent PNG". The dimensions
+ * beside it are NOT stored: branding_meta_line() reads them off the file, so
+ * they cannot claim 1600 x 570 about a file that is no longer that size.
+ *
+ * 'filename' is the download="" attribute -- what the visitor's computer calls
+ * the file once it lands. Without it a browser saves an uploaded file under
+ * its content-addressed name, and somebody's Downloads folder fills up with
+ * a1b2c3d4e5f60718.png.
+ */
+function branding_file_defaults(array $row): array
+{
+    $row += [
+        'id'       => '',
+        'label'    => '',
+        'filename' => '',
+        'status'   => 'shown',
+    ];
+
+    $row['filename'] = branding_safe_filename((string)$row['filename']);
+    $row['file']     = contract_image_defaults($row['file'] ?? []);
+
+    return $row;
+}
+
+/** One paragraph of the disclaimer. 'text' is sanitised HTML; see BRANDING_ROW_RICH_FIELDS. */
+function branding_note_defaults(array $row): array
+{
+    return $row + [
+        'id'     => '',
+        'text'   => '',
+        'status' => 'shown',
+    ];
+}
+
+/** One button in the closing band. The page ships with one. */
+function branding_button_defaults(array $row): array
+{
+    return $row + [
+        'id'     => '',
+        'label'  => '',
+        'href'   => '',
+        'style'  => 'primary',
+        'status' => 'shown',
+    ];
+}
+
+/**
+ * A saved-as name, or '' if it is not one this page will offer.
+ *
+ * This never touches a filesystem on either host -- it is a hint to the
+ * visitor's browser -- but it is still author-supplied text that ends up in an
+ * attribute, so it is bounded here rather than trusted. A separator would let
+ * a name read as a path when it reaches the other end; a control character has
+ * no business in a filename anywhere.
+ */
+function branding_safe_filename(string $name): string
+{
+    $name = trim($name);
+
+    if ($name === '' || strlen($name) > BRANDING_FILENAME_MAX) {
+        return '';
+    }
+    if (preg_match('~[\x00-\x1f\x7f/\\\\]|\.\.~', $name)) {
+        return '';
+    }
+    if ($name === '.' || str_starts_with($name, '.')) {
+        return '';
+    }
+
+    return $name;
+}
+
+/**
+ * Give every row an id.
+ *
+ * Assets are numbered across the band; the files inside one are numbered
+ * WITHIN it, exactly as certifications numbers roles within a group. Nothing
+ * on this page is a fragment target -- an asset card carries no anchor -- so
+ * two variants may each offer a "png" without either being renamed.
+ */
+function branding_identify(array $data): array
+{
+    foreach (BRANDING_LISTS as $band => $_filler) {
+        $taken = [];
+        foreach ($data[$band]['items'] as $i => $row) {
+            $name = (string)($row['label'] ?? $row['title'] ?? '');
+            $id   = branding_mint((string)($row['id'] ?? ''), $name, $taken);
+            $data[$band]['items'][$i]['id'] = $id;
+            $taken[] = $id;
+        }
+    }
+
+    $taken = [];
+    foreach ($data['assets']['items'] as $a => $asset) {
+        $id = branding_mint((string)($asset['id'] ?? ''), (string)($asset['title'] ?? ''), $taken);
+        $data['assets']['items'][$a]['id'] = $id;
+        $taken[] = $id;
+
+        $held = [];
+        foreach ($asset['files'] as $f => $file) {
+            /* A file is named for the format it is, which is the one thing
+               about it that is always known -- the label may be empty on a row
+               somebody has only just added. */
+            $name = (string)($file['label'] ?? '');
+            if (trim($name) === '') {
+                $name = branding_file_ext($file);
+            }
+            $fid = branding_mint((string)($file['id'] ?? ''), $name, $held);
+            $data['assets']['items'][$a]['files'][$f]['id'] = $fid;
+            $held[] = $fid;
+        }
+    }
+
+    return $data;
+}
+
+/** An id nobody has chosen: empty, or the placeholder the Add button leaves. */
+function branding_provisional(string $id): bool
+{
+    return contract_provisional($id, BRANDING_ID_PLACEHOLDER);}
+
+/** Keep a real id, replace a placeholder once there is a name to replace it with. */
+function branding_mint(string $id, string $name, array $taken): string
+{
+    return contract_mint($id, $name, BRANDING_ID_PLACEHOLDER, $taken);}
+
+/** A URL-safe id from a name. */
+function branding_slug(string $name, array $taken = []): string
+{
+    return contract_slug($name, BRANDING_ID_PLACEHOLDER, $taken);}
+
+/** The same id, suffixed until nothing else in the list has it. */
+function branding_unique(string $slug, array $taken): string
+{
+    return contract_unique($slug, $taken);}
+
+/** Whether a band is shown at all. */
+function branding_band_shown(array $data, string $band): bool
+{
+    return contract_band_shown($data, $band);}
+
+/** Only the rows of a list a visitor should see, wherever the list is. */
+function branding_rows_shown(array $rows): array
+{
+    return contract_rows_shown($rows);}
+
+/** Every logo variant, hidden ones included. The editor lists these. */
+function branding_assets(array $data): array
+{
+    return is_array($data['assets']['items'] ?? null) ? $data['assets']['items'] : [];
+}
+
+/**
+ * Every picture this document points at, as web paths, without duplicates.
+ *
+ * BOTH SLOTS OF EVERY ROW. A card's preview and each of its downloads are
+ * separate files, and a hidden row's are counted too: hiding is not deleting,
+ * and a sweep that dropped the file the moment somebody hid the card would
+ * lose it for good.
+ */
+function branding_images(array $data): array
+{
+    $seen = [];
+
+    foreach ($data['assets']['items'] ?? [] as $asset) {
+        $paths = [$asset['image']['src'] ?? '', $asset['image']['webp'] ?? ''];
+
+        foreach ($asset['files'] ?? [] as $file) {
+            $paths[] = $file['file']['src'] ?? '';
+            $paths[] = $file['file']['webp'] ?? '';
+        }
+
+        foreach ($paths as $path) {
+            $path = trim((string)$path);
+            if ($path !== '') {
+                $seen[$path] = true;
+            }
+        }
+    }
+
+    return array_keys($seen);
+}
+
+/**
+ * The format a downloadable file is, in upper case, read from the file itself.
+ *
+ * From the stored path rather than from anything typed. Both hosts compute
+ * that path from the bytes -- publish_asset_name() gives it the extension the
+ * header said it was -- so the extension here is as trustworthy as the file.
+ */
+function branding_file_ext(array $file): string
+{
+    $src = (string)($file['file']['src'] ?? $file['src'] ?? '');
+    $ext = strtoupper(pathinfo($src, PATHINFO_EXTENSION));
+
+    return $ext === 'JPG' ? 'JPEG' : $ext;
+}
+
+/**
+ * The line above a download button: what the file is, and how big.
+ *
+ * DERIVED, and that is the point. The page says "Transparent PNG - 1600 x 570"
+ * today and the number is typed, so it is wrong the moment the file behind it
+ * is replaced -- and nothing on the page or in any check would notice. The
+ * adjective stays authored, because "Transparent" is editorial; the dimensions
+ * come off the record.
+ *
+ * They are omitted rather than guessed when the file does not carry them,
+ * which is the rule about_picture() already follows for width and height. A
+ * line that says less is better than one that says something untrue.
+ */
+function branding_meta_line(array $file): string
+{
+    $label = trim((string)($file['label'] ?? ''));
+    if ($label === '') {
+        $label = branding_file_ext($file);
+    }
+
+    $width  = (int)($file['file']['width'] ?? 0);
+    $height = (int)($file['file']['height'] ?? 0);
+
+    if ($width > 0 && $height > 0) {
+        $size = $width . ' × ' . $height;
+        return $label === '' ? $size : $label . ' · ' . $size;
+    }
+
+    return $label;
+}
+
+/**
+ * The words on a download button.
+ *
+ * Derived, not stored: "Download PNG" states the file's own format, and a
+ * stored copy is one more thing that can stop matching the file it describes.
+ */
+function branding_download_label(array $file): string
+{
+    $ext = branding_file_ext($file);
+
+    return $ext === '' ? 'Download' : 'Download ' . $ext;
+}
+
+/* ==========================================================================
+   9. Privacy policy — the shape of a legal document
+   ========================================================================== */
+
+/**
+ * The kinds of block a section may hold, and what the editor calls each one.
+ *
+ * A CLOSED SET, and forced as much as chosen. rt_sanitise_html() allows nine
+ * tags -- p, br, strong, em, u, ul, ol, li, a -- and no heading, no <address>
+ * and no <table> among them. Structure therefore cannot live in a rich-text
+ * field: somebody typing <h3> into one would watch it disappear on save, with
+ * no way to tell that from a bug. So structure is a KIND, and the renderer
+ * owns the markup for it; the rich field carries only what may appear inside a
+ * paragraph.
+ *
+ * The list is what the page already contains and nothing more. A seventh shape
+ * costs a row here and an arm in privacy_block_defaults(), which is the whole
+ * price of adding one.
+ */
+const PRIVACY_BLOCK_KINDS = [
+    'paragraph'  => 'Paragraph',
+    'list'       => 'Bulleted list',
+    'subheading' => 'Subheading',
+    'note'       => 'Highlighted note',
+    'address'    => 'Address block',
+    'table'      => 'Two-column table',
+];
+
+/**
+ * The kinds whose own 'text' is markup rather than plain words.
+ *
+ * INLINE MARKUP ONLY, THROUGH rt_sanitise_inline(). Every one of these is
+ * rendered INSIDE an element the renderer supplies -- a <p>, a
+ * <p class="legal__notice">, an <address> -- so a <p> arriving from the editor
+ * is not emphasis somebody added, it is a paragraph inside a paragraph. And
+ * pressing Enter in a textarea is how it would arrive, which is not a corner
+ * case. The same goes for a list row and a summary point, both of which land
+ * in an <li>.
+ *
+ * 'address' is here, and that is the interesting one. Two of its five lines
+ * carry links -- a mailto: and a tel: -- and rt_safe_href() permits exactly
+ * those schemes, so the block round-trips as written, <strong>, <br> and all.
+ * Holding it as a list of plain lines instead would have thrown both links
+ * away.
+ */
+const PRIVACY_RICH_BLOCKS = ['paragraph', 'note', 'address'];
+
+/** 'subheading' is the one kind whose text is plain: it becomes an <h3>. */
+const PRIVACY_PLAIN_BLOCKS = ['subheading'];
+
+/** The kinds that hold rows of their own, and the function that fills one row. */
+const PRIVACY_ROW_BLOCKS = [
+    'list'  => 'privacy_item_defaults',
+    'table' => 'privacy_cell_defaults',
+];
+
+/* Free-text single-line fields, by band. The sections carry their own
+   headings, so 'policy' holds only the effective date and the callout. */
+const PRIVACY_TEXT_FIELDS = [
+    'meta'   => CONTRACT_META_TEXT,
+    'hero'   => ['title', 'subtitle'],
+    'policy' => ['label', 'effective'],
+    'cta'    => ['title', 'text'],
+];
+
+/**
+  * Every band that can be hidden whole, in the order it renders.
+  *
+  * NEITHER THE HERO NOR THE POLICY IS HERE. The hero is excluded for the
+  * reason it is excluded from ABOUT_BANDS and BRANDING_BANDS -- a page with no
+  * title is not a page with a section switched off, it is a broken page.
+  *
+  * The policy band is excluded for a stronger reason. Hiding it would leave a
+  * page headed "Privacy Policy" with no policy on it, still linked from the
+  * footer of all sixteen pages and still in the sitemap. That is not a
+  * configuration anybody wants; it is a compliance incident with a switch. The
+  * callout inside it can be hidden, and so can any single section.
+  */
+const PRIVACY_BANDS = ['cta'];
+
+/* The bands that hold a flat list. 'policy' is not here: its sections nest
+   blocks, and blocks nest rows, so they are normalised by
+   privacy_section_defaults() rather than by a flat map -- the same reason
+   branding.assets and certifications.certs are handled apart. */
+const PRIVACY_LISTS = ['cta' => 'privacy_button_defaults'];
+
+/* What a block or a row is called before it is called anything. */
+const PRIVACY_ID_PLACEHOLDER = 'row';
+
+/**
+ * What a SECTION is called before it is called anything, and a separate
+ * constant on purpose.
+ *
+ * A section's id is its anchor. #row-4 is a fragment somebody could link to
+ * and then find renamed; #section-4 at least says what it is while it waits
+ * for a heading. Blocks and rows are not fragment targets and keep the plain
+ * placeholder.
+ */
+const PRIVACY_SECTION_PLACEHOLDER = 'section';
+
+/**
+ * The page as it ships, and the fallback for anything missing from the file.
+ *
+ * The sections default to EMPTY, as every list-bearing document's do: a
+ * truncated or hand-edited privacy.json degrades to a page with its headings
+ * and no policy in it, which is visibly broken, rather than to a page carrying
+ * a stale policy nobody can see is stale. For a legal document that is the
+ * safer of the two failures.
+ */
+function privacy_defaults(): array
+{
+    return [
+        'updated'  => '',
+        'revision' => 0,
+        'meta'     => [
+            'title'       => 'Privacy Policy | Tech4TIME',
+            'description' => 'What Tech4TIME collects, why, how long it is kept and what '
+                           . 'you can ask us to do about it. No cookies, no analytics, no '
+                           . 'tracking.',
+            'share_title' => 'Privacy Policy | Tech4TIME',
+            'breadcrumb'  => 'Privacy Policy',
+'keywords'    => 'privacy policy, data protection, personal data, GDPR, Tech4TIME privacy',
+            'robots'      => 'index',
+            'changefreq'  => 'yearly',
+            'priority'    => '0.3',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
+        ],
+        'hero'     => [
+            'title'    => 'Privacy Policy',
+            'subtitle' => 'What We Collect, Why, and What You Can Ask Us to Do About It',
+        ],
+        'policy'   => [
+            /* THE NAME OF THE SECTION, READ OUT AND SHOWN TO NOBODY. The
+               <section> is labelled by a visually-hidden <h2>, which is how a
+               screen reader announces the region and the only heading on the
+               page that a sighted reader never sees. It is authored text bound
+               to an id, so it is a field: hard-coding it in the renderer would
+               put a string on the page that nothing in the model accounts for,
+               which is exactly what check_content_model.py exists to notice. */
+            'label'     => 'Privacy policy',
+
+            /* THE DATE THE POLICY TOOK EFFECT, AND NEVER A STAMP. 'updated'
+               already records when this document was last published. An
+               effective date is a different claim -- when the policy itself
+               changed -- and a save that quietly moved it would misstate the
+               one fact a reader checks first. Fixing a typo is not a new
+               policy. */
+            'effective' => '',
+            'callout'   => [],
+            'sections'  => [],
+        ],
+        'cta'      => [
+            'status' => 'shown',
+            'title'  => 'Questions about your data?',
+            'text'   => '',
+            'items'  => [],
+        ],
+    ];
+}
+
+/** Fill in everything the renderer reads, whatever the file happens to hold. */
+function privacy_normalise(array $data): array
+{
+    $defaults = privacy_defaults();
+
+    foreach ($defaults as $key => $value) {
+        if ($key === 'revision') {
+            $data[$key] = max(0, (int)($data[$key] ?? 0));
+            continue;
+        }
+        if (!is_array($value)) {
+            $data[$key] = is_string($data[$key] ?? null) ? $data[$key] : $value;
+            continue;
+        }
+        $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
+    }
+
+    $data['meta'] = contract_meta_defaults($data['meta'] ?? [],
+                                          $defaults['meta']);
+
+    foreach (PRIVACY_BANDS as $band) {
+        $data[$band]['status'] =
+            ($data[$band]['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown';
+    }
+
+    foreach (PRIVACY_LISTS as $band => $filler) {
+        $rows = is_array($data[$band]['items'] ?? null) ? $data[$band]['items'] : [];
+        $data[$band]['items'] = array_map(
+            $filler,
+            array_values(array_filter($rows, 'is_array'))
+        );
+    }
+
+    $data['policy']['callout'] = privacy_callout_defaults($data['policy']['callout'] ?? []);
+
+    $sections = is_array($data['policy']['sections'] ?? null) ? $data['policy']['sections'] : [];
+    $data['policy']['sections'] = array_map(
+        'privacy_section_defaults',
+        array_values(array_filter($sections, 'is_array'))
+    );
+
+    return privacy_identify($data);
+}
+
+/**
+ * The summary box at the top, "The short version".
+ *
+ * Its own structure rather than a section, because it is not one: it has no
+ * anchor, it renders inside .legal__callout, and its heading is an <h2> that
+ * is deliberately NOT a direct child of .legal__body. That last point is
+ * load-bearing -- assets/css/pages/legal.css zeroes the top margin of the
+ * first direct-child heading, and a flattened callout would steal the match
+ * from the first real section.
+ */
+function privacy_callout_defaults(mixed $callout): array
+{
+    $callout = is_array($callout) ? $callout : [];
+    $callout += [
+        'status' => 'shown',
+        'title'  => '',
+        'note'   => '',
+    ];
+
+    $items = is_array($callout['items'] ?? null) ? $callout['items'] : [];
+    $callout['items'] = array_map(
+        'privacy_item_defaults',
+        array_values(array_filter($items, 'is_array'))
+    );
+
+    return $callout;
+}
+
+/** One headed section of the policy: an <h2> with an anchor, and its blocks. */
+function privacy_section_defaults(array $row): array
+{
+    $row += [
+        'id'      => '',
+        'heading' => '',
+        'status'  => 'shown',
+    ];
+
+    $blocks = is_array($row['blocks'] ?? null) ? $row['blocks'] : [];
+    $row['blocks'] = array_map(
+        'privacy_block_defaults',
+        array_values(array_filter($blocks, 'is_array'))
+    );
+
+    return $row;
+}
+
+/**
+ * One block, normalised down to the fields its kind actually uses.
+ *
+ * NARROWED, not merely filled. A block that was a list and is now a paragraph
+ * would otherwise keep its items[] for ever -- invisible on the page, carried
+ * in the document, and published every time. Keeping only what the kind reads
+ * means what is stored is what is rendered, which is the same bargain
+ * upload_store() makes with a picture.
+ *
+ * An unknown kind becomes a paragraph rather than being dropped. Dropping it
+ * would lose words somebody wrote; a paragraph shows them, which is the
+ * failure that can be seen and fixed.
+ */
+function privacy_block_defaults(array $row): array
+{
+    $kind = (string)($row['kind'] ?? '');
+    $kind = isset(PRIVACY_BLOCK_KINDS[$kind]) ? $kind : 'paragraph';
+
+    $block = [
+        'id'     => (string)($row['id'] ?? ''),
+        'kind'   => $kind,
+        'status' => ($row['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown',
+    ];
+
+    if (in_array($kind, PRIVACY_RICH_BLOCKS, true) || in_array($kind, PRIVACY_PLAIN_BLOCKS, true)) {
+        $block['text'] = (string)($row['text'] ?? '');
+    }
+
+    if (isset(PRIVACY_ROW_BLOCKS[$kind])) {
+        $rows = is_array($row['rows'] ?? null) ? $row['rows'] : [];
+        $block['rows'] = array_map(
+            PRIVACY_ROW_BLOCKS[$kind],
+            array_values(array_filter($rows, 'is_array'))
+        );
+    }
+
+    if ($kind === 'table') {
+        /* The caption is read out before the table and shown to nobody. It is
+           not decoration: a table with no caption is announced as "table" and
+           the listener has to infer what it holds from the first cell. */
+        $block['caption'] = (string)($row['caption'] ?? '');
+        $columns = is_array($row['columns'] ?? null) ? array_values($row['columns']) : [];
+        $block['columns'] = [
+            (string)($columns[0] ?? ''),
+            (string)($columns[1] ?? ''),
+        ];
+    }
+
+    return $block;
+}
+
+/** One bullet, in a list block or in the callout. 'text' is sanitised HTML. */
+function privacy_item_defaults(array $row): array
+{
+    return $row + [
+        'id'     => '',
+        'text'   => '',
+        'status' => 'shown',
+    ];
+}
+
+/**
+ * One row of a two-column table: the <th scope="row"> and the <td> beside it.
+ *
+ * Both plain. A retention period is a fact, and the one thing a legal table
+ * should not invite is a link or an emphasis that changes what the row appears
+ * to promise.
+ */
+function privacy_cell_defaults(array $row): array
+{
+    return $row + [
+        'id'     => '',
+        'label'  => '',
+        'value'  => '',
+        'status' => 'shown',
+    ];
+}
+
+/** One button in the closing band. The page ships with two. */
+function privacy_button_defaults(array $row): array
+{
+    return $row + [
+        'id'     => '',
+        'label'  => '',
+        'href'   => '',
+        'style'  => 'primary',
+        'status' => 'shown',
+    ];
+}
+
+/**
+ * Give every row an id.
+ *
+ * Through contract_identify_rows(), which claims every id somebody already
+ * chose before it mints anything new. That matters here more than anywhere
+ * else on the site: a SECTION's id is its anchor, and the one-pass version
+ * lets a section added above an existing one take the existing one's fragment
+ * and rename it.
+ *
+ * Sections are numbered across the policy, because two of them may not answer
+ * to the same fragment. Blocks are numbered within their section and rows
+ * within their block, as certifications numbers roles within a group -- two
+ * sections may each hold a "paragraph-2" without either being renamed, because
+ * neither is a link target.
+ *
+ * A block is named for its KIND rather than for its words. Minting an id out
+ * of a sentence gives the longest field on the page the ugliest handle, and
+ * then freezes it.
+ */
+function privacy_identify(array $data): array
+{
+    foreach (PRIVACY_LISTS as $band => $_filler) {
+        $ids = contract_identify_rows($data[$band]['items'], PRIVACY_ID_PLACEHOLDER,
+                                      static fn(array $r): string => (string)($r['label'] ?? ''));
+        foreach ($ids as $i => $id) {
+            $data[$band]['items'][$i]['id'] = $id;
+        }
+    }
+
+    $ids = contract_identify_rows(
+        $data['policy']['callout']['items'], PRIVACY_ID_PLACEHOLDER,
+        static fn(array $r): string => privacy_row_name((string)($r['text'] ?? ''))
+    );
+    foreach ($ids as $i => $id) {
+        $data['policy']['callout']['items'][$i]['id'] = $id;
+    }
+
+    $sections = contract_identify_rows(
+        $data['policy']['sections'], PRIVACY_SECTION_PLACEHOLDER,
+        static fn(array $r): string => (string)($r['heading'] ?? '')
+    );
+
+    foreach ($sections as $s => $id) {
+        $data['policy']['sections'][$s]['id'] = $id;
+
+        $blocks = contract_identify_rows(
+            $data['policy']['sections'][$s]['blocks'], PRIVACY_ID_PLACEHOLDER,
+            static fn(array $r): string => (string)($r['kind'] ?? '')
+        );
+
+        foreach ($blocks as $b => $bid) {
+            $data['policy']['sections'][$s]['blocks'][$b]['id'] = $bid;
+
+            if (!isset($data['policy']['sections'][$s]['blocks'][$b]['rows'])) {
+                continue;
+            }
+
+            $rows = contract_identify_rows(
+                $data['policy']['sections'][$s]['blocks'][$b]['rows'], PRIVACY_ID_PLACEHOLDER,
+                static function (array $r): string {
+                    $name = trim((string)($r['label'] ?? ''));
+                    return $name !== '' ? $name : privacy_row_name((string)($r['text'] ?? ''));
+                }
+            );
+            foreach ($rows as $r => $rid) {
+                $data['policy']['sections'][$s]['blocks'][$b]['rows'][$r]['id'] = $rid;
+            }
+        }
+    }
+
+    return $data;
+}
+
+/**
+ * A short name for a row that has only prose to be named after.
+ *
+ * Bounded, because contract_slug() will happily turn a forty-word bullet into
+ * a forty-word id and then that id is frozen for good.
+ */
+function privacy_row_name(string $text): string
+{
+    $words = preg_split('/\s+/', trim(rt_plain($text))) ?: [];
+
+    return implode(' ', array_slice($words, 0, 6));
+}
+
+/** Whether a band of the page is shown at all. */
+function privacy_band_shown(array $data, string $band): bool
+{
+    return contract_band_shown($data, $band);
+}
+
+/** Only the rows of a list a visitor should see, wherever the list is. */
+function privacy_rows_shown(mixed $rows): array
+{
+    return contract_rows_shown($rows);
+}
+
+/** Every section, hidden ones included. The editor lists these. */
+function privacy_sections(array $data): array
+{
+    return is_array($data['policy']['sections'] ?? null) ? $data['policy']['sections'] : [];
+}
+
+/**
+ * Re-sanitise every rich field this document carries.
+ *
+ * Its own function rather than a branch inside contract_sanitise(), because
+ * the walk is three levels deep and the knowledge of which of six kinds hold
+ * markup belongs beside the constant that says so.
+ */
+function privacy_sanitise(array $data): array
+{
+    $callout = $data['policy']['callout'] ?? [];
+    $data['policy']['callout']['note'] = rt_sanitise_inline((string)($callout['note'] ?? ''));
+
+    foreach ($callout['items'] ?? [] as $i => $row) {
+        $data['policy']['callout']['items'][$i]['text'] =
+            rt_sanitise_inline((string)($row['text'] ?? ''));
+    }
+
+    foreach ($data['policy']['sections'] ?? [] as $s => $section) {
+        foreach ($section['blocks'] ?? [] as $b => $block) {
+            $kind = (string)($block['kind'] ?? '');
+
+            if (in_array($kind, PRIVACY_RICH_BLOCKS, true)) {
+                $data['policy']['sections'][$s]['blocks'][$b]['text'] =
+                    rt_sanitise_inline((string)($block['text'] ?? ''));
+            }
+
+            if ($kind !== 'list') {
+                continue;
+            }
+
+            foreach ($block['rows'] ?? [] as $r => $row) {
+                $data['policy']['sections'][$s]['blocks'][$b]['rows'][$r]['text'] =
+                    rt_sanitise_inline((string)($row['text'] ?? ''));
+            }
+        }
+    }
+
+    return $data;
+}
+
+/* ------------------------------------------------ what this page repeats
+
+   THE POLICY STATES FACTS ANOTHER DOCUMENT ALREADY MANAGES: the offices, the
+   email, the telephone. They are authored here on purpose -- a controller's
+   details are a legal statement, and one that changed because somebody edited
+   the contact page would be a statement nobody made. But two copies of a fact
+   drift, and this page has already done it: the telephone reads
+   "+880 1320 571562" here and "+880 1320571562" there, and the Brussels office
+   has a comma on one page and not on the other. Nothing told anyone.
+
+   So the copies stay and the DIVERGENCE is reported. What follows answers one
+   question -- does the policy still state the current value? -- and answers it
+   by containment rather than by field, because these facts live inside prose
+   and an address block, not in slots of their own.
+
+   IT IS A NOTICE, NOT A REFUSAL. The editor draws it; nothing here blocks a
+   save. Requiring the two to agree before either could be saved would mean
+   that after an office move, whichever page you edited first could not be
+   saved -- and there is no order that avoids that. */
+
+/**
+ * A string reduced to what a comparison should care about.
+ *
+ * Tags go, entities are decoded, a non-breaking space becomes a space, runs of
+ * space collapse, commas and full stops go, and case stops mattering. That is
+ * what makes this useful rather than noisy: it reports a different street and
+ * stays quiet about a different comma.
+ */
+function privacy_fact_key(string $text): string
+{
+    $text = rt_plain($text);
+    $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = str_replace(["\u{00a0}", ',', '.'], [' ', '', ''], $text);
+    $text = preg_replace('/\s+/u', ' ', $text) ?? '';
+
+    /* strtolower() and not mb_strtolower(): this is the only place in either
+       repository that would have needed mbstring, and the host having it is
+       not a reason to require it -- a check that cannot run where the tests
+       run is a check that stops being run. Byte-wise folding leaves non-ASCII
+       alone, and it leaves it alone identically on both sides of a comparison,
+       which is all a containment test asks of it. */
+    return trim(strtolower($text));
+}
+
+/**
+ * Every telephone number in a string, as bare digits.
+ *
+ * Run by run rather than by stripping every non-digit from the whole document,
+ * which would join the "12 months" of one paragraph to the "2000" of the next
+ * and find numbers nobody wrote.
+ */
+function privacy_fact_numbers(string $text): array
+{
+    $text = html_entity_decode(strip_tags($text, '<a>'), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+    /* A LIST AND NOT A SET, and that is not a style choice. Using the digits
+       as an array key makes PHP cast "8801320571562" to an int, and the
+       caller's strict in_array() against a string then never matches. The
+       comparison silently reported that the policy had lost the telephone it
+       was in fact still printing. */
+    $found = [];
+
+    if (preg_match_all('/\+?[0-9][0-9\s\x{00a0}()\-]{6,}/u', $text, $m)) {
+        foreach ($m[0] as $run) {
+            $digits = preg_replace('/\D+/', '', $run) ?? '';
+            if (strlen($digits) >= 7) {
+                $found[] = $digits;
+            }
+        }
+    }
+
+    /* tel: hrefs too. strip_tags() above keeps <a> for exactly this: the
+       number a visitor presses is in the attribute, not in the words. */
+    if (preg_match_all('/tel:([+0-9()\s\x{00a0}\-]+)/ui', $text, $m)) {
+        foreach ($m[1] as $run) {
+            $digits = preg_replace('/\D+/', '', $run) ?? '';
+            if (strlen($digits) >= 7) {
+                $found[] = $digits;
+            }
+        }
+    }
+
+    return array_values(array_unique($found));
+}
+
+/** Every word of the policy a reader sees, markup included, in one string. */
+function privacy_source_text(array $data): string
+{
+    $parts = [(string)($data['policy']['effective'] ?? '')];
+
+    $callout = $data['policy']['callout'] ?? [];
+    $parts[] = (string)($callout['title'] ?? '');
+    $parts[] = (string)($callout['note'] ?? '');
+    foreach ($callout['items'] ?? [] as $row) {
+        $parts[] = (string)($row['text'] ?? '');
+    }
+
+    foreach ($data['policy']['sections'] ?? [] as $section) {
+        $parts[] = (string)($section['heading'] ?? '');
+        foreach ($section['blocks'] ?? [] as $block) {
+            $parts[] = (string)($block['text'] ?? '');
+            $parts[] = (string)($block['caption'] ?? '');
+            foreach ($block['columns'] ?? [] as $column) {
+                $parts[] = (string)$column;
+            }
+            foreach ($block['rows'] ?? [] as $row) {
+                $parts[] = (string)($row['text'] ?? '');
+                $parts[] = (string)($row['label'] ?? '');
+                $parts[] = (string)($row['value'] ?? '');
+            }
+        }
+    }
+
+    $parts[] = (string)($data['cta']['text'] ?? '');
+    foreach ($data['cta']['items'] ?? [] as $row) {
+        $parts[] = (string)($row['label'] ?? '');
+        $parts[] = (string)($row['href'] ?? '');
+    }
+
+    return implode(' ', $parts);
+}
+
+/**
+ * Which facts the contact document manages, and whether the policy still says
+ * them.
+ *
+ * Read off the contact document rather than listed here, so an office added
+ * there is a fact checked here without anybody remembering to add it. An email
+ * is the reach value with an "@" and no slash -- the LinkedIn address has
+ * both; a telephone is one that is mostly digits. Neither is found by its
+ * label, because a label is editable text and renaming "Phone" to "Call us"
+ * must not switch a check off.
+ *
+ * Returns one row per fact: what it is, the current value, where it is
+ * managed, and whether this policy still contains it.
+ */
+function privacy_shared_facts(array $privacy, array $contact): array
+{
+    $text    = privacy_source_text($privacy);
+    $haystack = privacy_fact_key($text);
+    $numbers = privacy_fact_numbers($text);
+    $facts   = [];
+
+    /* ONE ROW PER ROUTE, NOT ONE PER VALUE. The contact page lists three
+       telephone numbers; the policy prints one, and that is correct -- a
+       privacy policy names a way to reach the controller, not the whole
+       switchboard. Reporting the other two as missing would be an alarm about
+       something nobody did wrong, and an alarm nobody can silence is an alarm
+       everybody learns to ignore. So a route is satisfied by any of its
+       values, and what is shown is the first. */
+    $emails = [];
+    $phones = [];
+
+    foreach (contract_rows_shown($contact['reach']['items'] ?? []) as $row) {
+        foreach ($row['values'] ?? [] as $value) {
+            $value = trim((string)$value);
+
+            /* Classified by SHAPE, never by label. A label is editable text,
+               and renaming "Phone" to "Call us" must not switch a check off.
+               The slash keeps the LinkedIn address out of the emails. */
+            if (str_contains($value, '@') && !str_contains($value, '/')) {
+                $emails[] = $value;
+                continue;
+            }
+            if (preg_match('/^[+0-9()\s\-]+$/', $value)
+                && strlen((string)preg_replace('/\D+/', '', $value)) >= 7
+            ) {
+                $phones[] = $value;
+            }
+        }
+    }
+
+    if ($emails !== []) {
+        $facts[] = [
+            'label' => 'Email address',
+            'value' => $emails[0],
+            'found' => (bool)array_filter(
+                $emails,
+                static fn(string $e): bool => str_contains($haystack, privacy_fact_key($e))
+            ),
+        ];
+    }
+
+    if ($phones !== []) {
+        $facts[] = [
+            'label' => 'Telephone',
+            'value' => $phones[0],
+            'found' => (bool)array_filter(
+                $phones,
+                static fn(string $p): bool =>
+                    in_array((string)preg_replace('/\D+/', '', $p), $numbers, true)
+            ),
+        ];
+    }
+
+    foreach (contract_rows_shown($contact['offices']['items'] ?? []) as $office) {
+        $address = trim((string)($office['address'] ?? ''));
+        if ($address === '') {
+            continue;
+        }
+        $facts[] = [
+            'label' => trim((string)($office['name'] ?? '')) !== ''
+                     ? 'Office — ' . $office['name']
+                     : 'Office',
+            'value' => $address,
+            'found' => str_contains($haystack, privacy_fact_key($address)),
+        ];
+    }
+
+    return $facts;
+}
+
+/* ==========================================================================
+   10. SEO — the site-wide half, and the map of what a page is
+   ========================================================================== */
+
+/*
+   WHAT IS HERE, AND WHAT IS DELIBERATELY NOT.
+
+   A PAGE's own metadata is not here. Its title, description, share title,
+   breadcrumb, crawl directive and sitemap tuning live in that page's own
+   document, in the meta band every document has -- see the page metadata block
+   near the top of this file. One screen edits all of them, and the values stay
+   with the page they describe. Moving them into this document was considered
+   and rejected: content/ is never synced by a deploy, so a document assembled
+   from the repository's committed seeds would carry SEED titles onto a host
+   whose live copies hold titles edited since, and the reversion would be
+   silent. Leaving them where they are removes that failure mode rather than
+   managing it.
+
+   What IS here is everything that belongs to the SITE rather than to any one
+   page: the Organization graph, the default share card, the colours, the
+   crawl file and the web manifest -- plus the 404 page's record, because that
+   page renders no content document and never will.
+
+   ROUTES ARE CODE. SEO_ROUTES below cannot be added to, renamed, removed or
+   reordered from the editor. Adding a page is a code change, as it always was,
+   and its card then appears by itself -- which is what makes it impossible to
+   orphan a record or point one at a URL that does not resolve.
+*/
+
+/** Where the public site lives. The canonical of every page is built on it. */
+const SEO_ORIGIN = 'https://tech4time.bd';
+
+/**
+ * Every page that is a FILE in the frontend repository: key => [route, name,
+ * document].
+ *
+ *   route     the address, with its trailing slash. '' for a page that has no
+ *             canonical URL and must not be given one -- the 404, which is
+ *             served at every address that does not exist.
+ *   name      what the SEO screen calls it, and the fallback breadcrumb.
+ *   document  which content document holds this page's meta band. '' means
+ *             this document holds it, which is true of the 404 alone.
+ *
+ * THE SERVICE PAGES ARE NOT HERE, and that is the point of them. A service is
+ * a row of content/services.json, a seventh can be added in the editor, and
+ * its metadata is its row's own meta band -- so there is no key to keep in
+ * step, and renaming a slug cannot orphan a record because there is no record
+ * apart from the row.
+ *
+ * Order is sitemap order and screen order.
+ */
+const SEO_ROUTES = [
+    'home'           => ['/',                                  'Home',                    'home'],
+    'services'       => ['/pages/services/',                   'Services',                'services'],
+    'about'          => ['/pages/about/',                      'About Us',                'about'],
+    'company'        => ['/pages/company-profile/',            'Company Profile',         'company'],
+    'careers'        => ['/pages/careers/',                    'Careers',                 'careers'],
+    'contact'        => ['/pages/contact/',                    'Contact',                 'contact'],
+    'certifications' => ['/pages/resource-certifications/',    'Resource Certifications', 'certifications'],
+    'branding'       => ['/pages/branding-and-advertisement/', 'Branding & Advertisement','branding'],
+    'privacy'        => ['/pages/privacy-policy/',             'Privacy Policy',          'privacy'],
+    'notfound'       => ['',                                   'Page not found',          ''],
+];
+
+/*
+   HOW LONG A TITLE AND A DESCRIPTION MAY BE, IN ONE PLACE.
+
+   tools/audit_pages.py enforced 65 / 50 / 165 as literals of its own while
+   docs/10-development/frontend/adding-a-page.md advised 150-160, and the two
+   had drifted apart with nothing to notice. The audit reads these now, the way
+   tools/check_content_model.py already reads CONTRACT_BOOKKEEPING, and the
+   editor refuses outside the hard range and hints outside the ideal one.
+*/
+const SEO_TITLE_MAX  = 65;
+const SEO_DESC_MIN   = 50;
+const SEO_DESC_MAX   = 165;
+const SEO_DESC_IDEAL = [150, 160];
+
+/** Free-text single-line fields of the site-wide document, by band. */
+const SEO_TEXT_FIELDS = [
+    'site'     => ['name', 'description', 'locale', 'lang', 'og_type', 'twitter_card',
+                   'theme_light', 'theme_dark', 'share_alt'],
+    'identity' => ['legal_name', 'alternate_name', 'slogan', 'description',
+                   'founded', 'price_range', 'area_served'],
+    'crawl'    => ['verify_google', 'verify_bing', 'analytics_id'],
+    'manifest' => ['short_name', 'background', 'theme', 'display'],
+    'notfound' => ['title', 'description', 'share_title'],
+];
+
+/**
+ * Fields typed one entry per line into a textarea, and stored as a list.
+ *
+ * Same reasoning as SERVICES_LINE_FIELDS: twenty short strings as twenty
+ * inputs is twenty inputs, and it is not how anybody wants to type a list.
+ */
+const SEO_LINE_FIELDS = [
+    'identity' => ['service_types', 'knows_about'],
+    'crawl'    => ['robots_extra'],
+];
+
+/**
+ * What a Google measurement id may look like.
+ *
+ * NARROW ON PURPOSE. This string is interpolated into the src of a <script>
+ * tag pointing at another origin, so it is the one editable value on this site
+ * that ends up inside a URL a browser will execute. Four prefixes Google
+ * actually issues, then letters, digits and dashes -- anything else is refused
+ * rather than escaped, because there is no legitimate id this rejects and no
+ * safe way to carry one that needs escaping into that position.
+ */
+const SEO_ANALYTICS_ID = '/^(G|GT|UA|AW)-[A-Z0-9][A-Z0-9-]{3,20}$/i';
+
+/** The bands that hold a list, and the function that fills one of their rows. */
+const SEO_LISTS = ['sameas' => 'seo_link_defaults', 'hours' => 'seo_hours_defaults'];
+
+/** What a row is called before it is called anything. See seo_identify(). */
+const SEO_ID_PLACEHOLDER = 'row';
+
+/** schema.org's day names, in week order, which is the order they render. */
+const SEO_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday',
+                  'Friday', 'Saturday'];
+
+/** The display modes a web manifest understands. */
+const SEO_DISPLAY = ['standalone', 'fullscreen', 'minimal-ui', 'browser'];
+
+/**
+ * What a page tells a crawler, as the string that actually goes in the tag.
+ *
+ * Two states in, two strings out, and both are the exact bytes the seventeen
+ * hand-written heads carried before this file emitted them -- which is what
+ * lets the conversion be proved byte-identical. An indexed page also asks for
+ * large image previews and full snippets, so a rich result may use the branded
+ * share card; a noindex page asks only not to be listed, and still follows its
+ * links, because a page nobody indexes is still a page whose links matter.
+ */
+function seo_robots_directive(string $robots): string
+{
+    return $robots === 'noindex'
+        ? 'noindex, follow'
+        : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1';
+}
+
+/**
+ * The route keys above this route, outermost first.
+ *
+ * Found by prefix match over SEO_ROUTES, so a breadcrumb trail is never
+ * hand-numbered and a page added to the constant joins the trails below it by
+ * having been added. A service page passes its own address and gets
+ * ['home', 'services'] without being in the constant at all.
+ */
+function seo_ancestors(string $route): array
+{
+    $found = [];
+
+    foreach (SEO_ROUTES as $key => [$path, $_name, $_document]) {
+        if ($path !== '' && $path !== $route && str_starts_with($route, $path)) {
+            $found[$key] = strlen($path);
+        }
+    }
+
+    asort($found);
+
+    return array_keys($found);
+}
+
+/** A list typed one entry per line. Blank lines are dropped. */
+function seo_lines(mixed $value): array
+{
+    if (is_array($value)) {
+        $value = implode("\n", array_map(static fn($v) => (string)$v, $value));
+    }
+
+    $out = [];
+    foreach (preg_split('/\R/', (string)(is_scalar($value) ? $value : '')) ?: [] as $line) {
+        $line = trim($line);
+        if ($line !== '') {
+            $out[] = $line;
+        }
+    }
+
+    return $out;
+}
+
+/** One profile the Organization says is also it. */
+function seo_link_defaults(array $row): array
+{
+    $row += ['id' => '', 'label' => '', 'url' => '', 'status' => 'shown'];
+
+    $row['id']     = trim((string)$row['id']);
+    $row['label']  = trim((string)$row['label']);
+    $row['url']    = rt_safe_href(trim((string)$row['url']));
+    $row['status'] = $row['status'] === 'hidden' ? 'hidden' : 'shown';
+
+    return $row;
+}
+
+/**
+ * One opening-hours block of the ProfessionalService graph.
+ *
+ * The hours on the contact page are free prose -- "Sun - Thu: 9:00 AM - 6:00
+ * PM" -- because that is what reads well to a person. schema.org wants days
+ * and 24-hour times, so they are authored here rather than parsed out of a
+ * sentence somebody is free to reword. tools/check_shared_facts.py reports it
+ * when the two stop agreeing; it never refuses a save over it.
+ */
+function seo_hours_defaults(array $row): array
+{
+    $row += ['id' => '', 'label' => '', 'days' => [], 'opens' => '',
+             'closes' => '', 'status' => 'shown'];
+
+    $row['id']    = trim((string)$row['id']);
+    $row['label'] = trim((string)$row['label']);
+
+    $days = is_array($row['days']) ? $row['days'] : [];
+    $row['days'] = array_values(array_filter(
+        SEO_DAYS,
+        static fn(string $day): bool => in_array($day, $days, true)
+    ));
+
+    foreach (['opens', 'closes'] as $field) {
+        $time = trim((string)$row[$field]);
+        $row[$field] = preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time) === 1 ? $time : '';
+    }
+
+    $row['status'] = $row['status'] === 'hidden' ? 'hidden' : 'shown';
+
+    return $row;
+}
+
+/**
+ * The site-wide document as it ships, and the fallback for anything missing.
+ *
+ * THESE ARE THE REAL VALUES, NOT PLACEHOLDERS, and that is the safety net for
+ * the deploy: if content/seo.json is ever missing on the host, every page
+ * still emits the correct Organization graph, the correct share card and the
+ * correct colours -- exactly as contact_defaults() and company_defaults()
+ * already do for their pages. Every string below was read out of the rendered
+ * <head> the seventeen pages carried before this file replaced them.
+ */
+function seo_defaults(): array
+{
+    return [
+        'updated'  => '',
+        'revision' => 0,
+
+        /* What every page says about the site rather than about itself. */
+        'site' => [
+            'name'         => 'Tech4TIME',
+            'description'  => 'Cybersecurity, software development, cloud infrastructure and HR solutions.',
+            'locale'       => 'en_US',
+            'lang'         => 'en',
+            'og_type'      => 'website',
+            'twitter_card' => 'summary_large_image',
+            'theme_light'  => '#fafafa',
+            'theme_dark'   => '#0b0b0c',
+            /* The default share card. A page may override it in its own meta
+               band; none does today, which is why all seventeen carry these
+               same bytes. */
+            'share'        => [
+                'src'    => '/assets/images/og/tech4time-og.png',
+                'webp'   => '',
+                'width'  => 1200,
+                'height' => 630,
+            ],
+            'share_alt'    => 'Tech4TIME — Orchestrating Technology with Time',
+        ],
+
+        /* The Organization, WebSite and ProfessionalService graph. Addresses
+           and telephone numbers are NOT here: they belong to the contact page
+           and are read from content/contact.json at render time, which is what
+           stopped this graph going stale on sixteen pages at once. */
+        'identity' => [
+            'legal_name'     => 'Tech4TIME',
+            'alternate_name' => 'M/s. Tech4TIME',
+            'slogan'         => 'Orchestrating Technology with Time',
+            'description'    => 'Open-Source and enterprise-grade cybersecurity, software '
+                              . 'development, cloud infrastructure and IT solutions. '
+                              . 'Orchestrate, build, maintain and protect your business.',
+            'founded'        => '2018-05-15',
+            'price_range'    => '$$',
+            'area_served'    => 'Worldwide',
+            'logo'           => [
+                'src'    => '/assets/images/logo/logo-light-540.png',
+                'webp'   => '',
+                'width'  => 540,
+                'height' => 192,
+            ],
+            'service_types'  => [
+                'Cybersecurity Services',
+                'Software Development',
+                'Cloud Infrastructure',
+                'IT Consulting',
+                'Managed Services',
+                'Human Resources as a Service',
+                'DevOps Services',
+                'Security Operations Center',
+            ],
+            'knows_about'    => [
+                'Cybersecurity',
+                'Penetration Testing',
+                'Security Operations Center',
+                'Incident Response',
+                'Digital Forensics',
+                'Software Development',
+                'DevSecOps',
+                'Cloud Computing',
+                'OpenStack',
+                'Kubernetes',
+                'IT Staffing',
+                'HR as a Service',
+            ],
+        ],
+
+        /* The profiles the Organization says are also it. The footer links to
+           the same two in literal markup on every page; check_shared_facts.py
+           reports it when they part. */
+        'sameas' => [
+            'items' => [
+                ['id' => 'linkedin', 'label' => 'LinkedIn',
+                 'url' => 'https://www.linkedin.com/company/tech4time-bd/', 'status' => 'shown'],
+                ['id' => 'github', 'label' => 'GitHub',
+                 'url' => 'https://github.com/M-s-Tech4TIME', 'status' => 'shown'],
+            ],
+        ],
+
+        'hours' => [
+            'items' => [
+                ['id' => 'bangladesh', 'label' => 'Bangladesh office',
+                 'days' => ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
+                 'opens' => '09:00', 'closes' => '18:00', 'status' => 'shown'],
+                ['id' => 'malaysia', 'label' => 'Malaysia office',
+                 'days' => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+                 'opens' => '09:00', 'closes' => '18:00', 'status' => 'shown'],
+            ],
+        ],
+
+        /* robots.txt, and the two tags that let somebody claim this site in a
+           search engine's console. Empty means the tag is not emitted at all,
+           which is the right default: a verification tag naming nobody is
+           noise in every head on the site. */
+        'crawl' => [
+            'verify_google' => '',
+            'verify_bing'   => '',
+            /* Google Analytics. Empty means no measurement code is emitted and
+               no external origin is reached at all, which is the state this
+               site shipped in and the state it returns to the moment this is
+               cleared. See ADR 0021. */
+            'analytics_id'  => '',
+            /* The form endpoint has nothing to index. This is the one rule
+               robots.txt carried before it was rendered. */
+            'robots_extra'  => ['/contact-handler.php'],
+        ],
+
+        /* site.webmanifest. name and description come from the site band, so
+           the app name and the share card cannot disagree; the icon list stays
+           in code because it names files that must exist. */
+        'manifest' => [
+            'short_name' => 'Tech4TIME',
+            'background' => '#0b0b0c',
+            'theme'      => '#0b0b0c',
+            'display'    => 'standalone',
+        ],
+
+        /* The 404 page's own record. It is the one page with no content
+           document to keep its meta band in, and it never will have one: there
+           is nothing on it to edit but the words in this block. */
+        'notfound' => [
+            'title'       => 'Page Not Found | Tech4TIME',
+            'description' => "The page you are looking for could not be found. Browse "
+                           . "Tech4TIME's cybersecurity, software development, cloud and "
+                           . "HR services, or contact our team.",
+            'share_title' => 'Page Not Found',
+            'breadcrumb'  => 'Page not found',
+'keywords'    => '',
+            'robots'      => 'noindex',
+            'changefreq'  => 'yearly',
+            'priority'    => '0.0',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
+        ],
+    ];
+}
+
+/** Bring the site-wide document to the current shape, whatever it arrived as. */
+function seo_normalise(array $data): array
+{
+    $defaults = seo_defaults();
+
+    foreach ($defaults as $key => $value) {
+        if ($key === 'revision') {
+            $data[$key] = max(0, (int)($data[$key] ?? 0));
+            continue;
+        }
+        if (!is_array($value)) {
+            $data[$key] = is_string($data[$key] ?? null) ? $data[$key] : $value;
+            continue;
+        }
+        $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
+    }
+
+    foreach (SEO_TEXT_FIELDS as $band => $fields) {
+        foreach ($fields as $field) {
+            $data[$band][$field] = is_string($data[$band][$field] ?? null)
+                ? trim($data[$band][$field])
+                : (string)($defaults[$band][$field] ?? '');
+        }
+    }
+
+    foreach (SEO_LINE_FIELDS as $band => $fields) {
+        foreach ($fields as $field) {
+            $data[$band][$field] = seo_lines($data[$band][$field] ?? []);
+        }
+    }
+
+    /* REFUSED HERE, NOT ONLY IN THE EDITOR. This value is interpolated into a
+       <script src> pointing at another origin, and contract_normalise() is what
+       every reader goes through -- the page, the publish endpoint, and the
+       editor alike. A malformed id therefore becomes no id at all rather than
+       a malformed URL, on both sides of the wire and however it got there. */
+    if (preg_match(SEO_ANALYTICS_ID, $data['crawl']['analytics_id']) !== 1) {
+        $data['crawl']['analytics_id'] = '';
+    }
+
+    $data['site']['share']     = contract_image_defaults($data['site']['share'] ?? []);
+    $data['identity']['logo']  = contract_image_defaults($data['identity']['logo'] ?? []);
+
+    /* The 404's record is a full meta band, the same shape every page's is, so
+       the head emitter takes any of them and does not need to know which. Only
+       three of its fields are editable -- see SEO_TEXT_FIELDS -- because a page
+       with no address has no breadcrumb, no canonical and no sitemap row. */
+    $data['notfound'] = contract_meta_defaults($data['notfound'] ?? [],
+                                               $defaults['notfound']);
+    $data['notfound']['robots'] = 'noindex';
+
+    if (!in_array($data['manifest']['display'], SEO_DISPLAY, true)) {
+        $data['manifest']['display'] = 'standalone';
+    }
+
+    foreach (SEO_LISTS as $band => $filler) {
+        $rows = is_array($data[$band]['items'] ?? null) ? $data[$band]['items'] : [];
+        $data[$band]['items'] = array_map(
+            $filler,
+            array_values(array_filter($rows, 'is_array'))
+        );
+    }
+
+    return seo_identify($data);
+}
+
+/** Give every row an id, unique within its own list. Same contract as the rest. */
+function seo_identify(array $data): array
+{
+    foreach (SEO_LISTS as $band => $_filler) {
+        $rows = $data[$band]['items'] ?? [];
+        $ids  = contract_identify_rows(
+            $rows,
+            SEO_ID_PLACEHOLDER,
+            static fn(array $row): string => (string)($row['label'] ?? '')
+        );
+
+        foreach ($ids as $i => $id) {
+            $data[$band]['items'][$i]['id'] = $id;
+        }
+    }
+
+    return $data;
+}
+
+/** Only the rows of a list a visitor should see. */
+function seo_shown(array $data, string $band): array
+{
+    return contract_rows_shown($data[$band]['items'] ?? []);
+}
+
+/** Every picture this document points at, as web paths, without duplicates. */
+function seo_images(array $data): array
+{
+    $seen = [];
+
+    foreach ([$data['site']['share'] ?? [], $data['identity']['logo'] ?? []] as $image) {
+        foreach ([$image['src'] ?? '', $image['webp'] ?? ''] as $path) {
+            $path = trim((string)$path);
+            if ($path !== '') {
+                $seen[$path] = true;
+            }
+        }
+    }
+
+    foreach (contract_meta_images($data['notfound'] ?? []) as $path) {
+        $seen[$path] = true;
+    }
+
+    return array_keys($seen);
+}
+
+/* ==========================================================================
+   11. Revisions
    ========================================================================== */
 
 /**
@@ -2706,7 +5227,7 @@ function contract_next_revision(array $data): int
 }
 
 /* ==========================================================================
-   8. Normalising and re-sanitising on receipt
+   12. Normalising and re-sanitising on receipt
    ========================================================================== */
 
 /**
@@ -2733,6 +5254,48 @@ function contract_normalise(string $document, array $data): array
         'about'    => about_normalise($data),
         'home'     => home_normalise($data),
         'services' => services_normalise($data),
+        'certifications' => certifications_normalise($data),
+        'branding' => branding_normalise($data),
+        'privacy'  => privacy_normalise($data),
+        'seo'      => seo_normalise($data),
+        default    => throw new RuntimeException('Unknown document: ' . $document),
+    };
+}
+
+/**
+ * Every picture a document points at, whichever document it is.
+ *
+ * WHY THIS EXISTS, AND WHY IT IS NOT OPTIONAL. public/uploads/ is ONE
+ * directory shared by every editor, but each editor used to ask
+ * upload_unused() with only its own document's pictures — so the about screen
+ * counted the home page's uploads as "not used by any row" and its sweep
+ * button offered to delete them. Three editors, each able to delete the other
+ * two's artwork, and nothing anywhere said so.
+ *
+ * The set of pictures in use is a property of the SITE, not of one screen. So
+ * it is asked here, over every document, and a document with no pictures
+ * answers with none rather than being left out — which is what keeps a new
+ * document from being a new way to lose files.
+ */
+function contract_images(string $document, array $data): array
+{
+    /* EVERY DOCUMENT CARRIES ARTWORK NOW. The meta band gained a per-page
+       share-card override, so the five documents that used to fall through to
+       the empty default would each have had one picture nothing claimed --
+       and an unclaimed upload is one the sweep on another screen offers to
+       delete. There is no default any more, and there must not be: a new
+       document must be listed here or fail loudly rather than quietly lose a
+       file. */
+    $meta = contract_meta_images($data['meta'] ?? []);
+
+    return match ($document) {
+        'company'  => array_values(array_unique([...company_images($data), ...$meta])),
+        'about'    => array_values(array_unique([...about_images($data), ...$meta])),
+        'home'     => array_values(array_unique([...home_images($data), ...$meta])),
+        'branding' => array_values(array_unique([...branding_images($data), ...$meta])),
+        'services' => array_values(array_unique([...services_images($data), ...$meta])),
+        'careers', 'contact', 'certifications', 'privacy' => $meta,
+        'seo'      => seo_images($data),
         default    => throw new RuntimeException('Unknown document: ' . $document),
     };
 }
@@ -2818,6 +5381,60 @@ function contract_sanitise(string $document, array $data): array
        below is a refusal, and "nothing to sanitise" must not arrive at the same
        line as "document I do not know". */
     if ($document === 'services') {
+        return $data;
+    }
+
+    /* The certifications page has none either, and the check is easy to make:
+       there is not one <strong>, <em> or <br> anywhere in its body. It is a
+       hero, three headings, four short blurbs and fifty-four proper nouns.
+       The branch is still explicit, for the reason home's and services' are --
+       the default below is a refusal, and "nothing to sanitise" must not
+       arrive at the same line as "document I do not know".
+
+       The tokens are not an exception to this. {certifications} is stored as
+       the literal characters somebody typed and stays text all the way to
+       certifications_fill(), which puts a decimal integer in its place. There
+       is no markup in the substitution and nothing here to strip. */
+    if ($document === 'certifications') {
+        return $data;
+    }
+
+    /* The branding page's disclaimer is the one place on these three static
+       pages that genuinely wants markup: it is a legal notice, and the
+       sentence asking a rights holder to get in touch is a link waiting to
+       happen. Its paragraphs are rows rather than a band field, so this is the
+       same walk as the about page's -- see BRANDING_ROW_RICH_FIELDS. Nothing
+       else on the page is rich: an asset's title, blurb and meta label are all
+       plain text and go out through h(). */
+    if ($document === 'branding') {
+        foreach (BRANDING_ROW_RICH_FIELDS as $band => $fields) {
+            foreach ($data[$band]['items'] ?? [] as $i => $row) {
+                foreach ($fields as $field) {
+                    $data[$band]['items'][$i][$field] =
+                        rt_sanitise_html((string)($row[$field] ?? ''));
+                }
+            }
+        }
+        return $data;
+    }
+
+    /* The walk is three levels deep and reaches four different fields, so it
+       lives beside the constants that say which kinds hold markup rather than
+       being spelled out again here. A rich field this function fails to reach
+       is a rich field published unsanitised, which is the one thing it exists
+       to prevent -- so test_publish.py asserts that every field the model
+       calls rich is a field this reaches. */
+    if ($document === 'privacy') {
+        return privacy_sanitise($data);
+    }
+
+    /* The site-wide SEO document has no rich text and cannot grow any: a meta
+       description that carried markup would be printed as characters in a
+       search result, and the Organization graph is JSON, not HTML. The branch
+       is still explicit, for the reason home's and services' are -- the throw
+       below is a refusal, and "nothing to sanitise" must not arrive at the
+       same line as "document I do not know". */
+    if ($document === 'seo') {
         return $data;
     }
 

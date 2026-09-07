@@ -136,17 +136,13 @@ function services_validate(array $data): array
     if (trim((string)$data['hero']['title']) === '') {
         $errors[] = 'The services page needs a heading — the banner title cannot be empty.';
     }
-    if (trim((string)$data['meta']['title']) === '') {
-        $errors[] = 'The browser tab title cannot be empty.';
-    }
-
-    /* strlen and not mb_strlen: bytes, as company_validate() counts them. It
-       undercounts the characters allowed in a description with accents, which
-       for a soft search-engine limit is the safe direction to be wrong in. */
-    if (strlen(trim((string)$data['meta']['description'])) > 320) {
-        $errors[] = 'The search description is longer than 320 characters. '
-                  . 'Search engines will cut it off.';
-    }
+    /* NOTHING ABOUT THE meta BAND IS CHECKED HERE ANY MORE. Its title,
+       description, breadcrumb and crawl setting are edited on the SEO screen
+       and validated by seo_validate(), which is the only place that can see
+       all of them at once -- two pages sharing a title is a fault neither page
+       can detect on its own. Leaving the checks here as well would refuse a
+       save on THIS page for a field this page no longer offers, which is a
+       dead end rather than a warning. */
 
     foreach (SERVICES_BANDS as $band) {
         if (!in_array($data[$band]['status'] ?? 'shown', ['shown', 'hidden'], true)) {
@@ -227,13 +223,8 @@ function services_validate_one(array $service, string $where): array
     if (trim((string)$service['hero']['title']) === '') {
         $errors[] = "$where has no banner title.";
     }
-    if (trim((string)$service['meta']['title']) === '') {
-        $errors[] = "$where has no browser tab title.";
-    }
-    if (strlen(trim((string)$service['meta']['description'])) > 320) {
-        $errors[] = "$where has a search description longer than 320 characters. "
-                  . 'Search engines will cut it off.';
-    }
+    /* A service's meta band is not checked here either. Same reason as the
+       index's above: the SEO screen owns it. */
 
     $slug = trim((string)$service['slug']);
     if ($slug === '') {

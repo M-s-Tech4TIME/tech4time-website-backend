@@ -55,6 +55,18 @@ const RT_DROP_CONTENT_TAGS = [
 ];
 
 /** The only class values that survive, and the only ones the CSS styles. */
+/**
+ * The tags allowed where a BLOCK would be wrong.
+ *
+ * A list item's text is rendered inside an <li>, an address's inside an
+ * <address>, and a paragraph's inside a <p> the renderer supplies. In all
+ * three, a <p> or a <ul> arriving from the editor is not emphasis somebody
+ * added -- it is a stray Enter, and it nests a list inside a list item or a
+ * paragraph inside a paragraph. Pressing Enter is the normal thing to do, so
+ * this is not a corner case; it is Tuesday.
+ */
+const RT_INLINE_TAGS = ['br' => false, 'strong' => true, 'em' => true, 'u' => true, 'a' => true];
+
 const RT_ALLOWED_CLASSES = ['ta-left', 'ta-center', 'ta-right', 'ta-justify'];
 
 /** Tags that may carry an alignment class. */
@@ -82,6 +94,14 @@ function rt_safe_href(string $href): ?string
     if (preg_match('#^(https?://|mailto:|tel:)#i', $href)) {
         return $href;
     }
+    /* A SAME-DOCUMENT FRAGMENT. It navigates nowhere and cannot execute, and
+       without it an in-page link does not merely lose its href -- it keeps the
+       <a>, so .legal__body a still paints it underlined and accent-coloured
+       and it looks exactly like a link that does nothing. The privacy policy
+       is the first page here whose prose links into itself. */
+    if (preg_match('/^#[A-Za-z][A-Za-z0-9_:.-]*$/', $href)) {
+        return $href;
+    }
     /* Site-relative links are fine; anything else — javascript:, data:, vbscript: — is not. */
     if (str_starts_with($href, '/') && !str_starts_with($href, '//')) {
         return $href;
@@ -91,8 +111,9 @@ function rt_safe_href(string $href): ?string
 
 /* --------------------------------------------------------------- sanitising */
 
-function rt_sanitise_html(string $html): string
+function rt_sanitise_html(string $html, ?array $allowed = null): string
 {
+    $allowed = $allowed ?? RT_ALLOWED_TAGS;
     $out = '';
     $open = [];
     $skip = '';      /* set to a tag name while its content is being discarded */
@@ -155,7 +176,7 @@ function rt_sanitise_html(string $html): string
             continue;
         }
 
-        if (!isset(RT_ALLOWED_TAGS[$name])) {
+        if (!isset($allowed[$name])) {
             continue;
         }
 
@@ -189,6 +210,24 @@ function rt_sanitise_html(string $html): string
     $out = preg_replace('#<p[^>]*>(\s|&nbsp;|<br>)*</p>#', '', $out) ?? $out;
 
     return trim($out);
+}
+
+/**
+ * The same walker, for a field that is rendered inside something else.
+ *
+ * Same refusals, same attribute rebuilding, same escaping -- only the set of
+ * tags that may survive is smaller. A <p> or a <ul> in here is dropped and its
+ * words are kept, which is the failure that can be seen and corrected rather
+ * than the one that quietly changes the shape of the page.
+ */
+function rt_sanitise_inline(string $html): string
+{
+    /* A block boundary is worth a space once the tag itself is gone.
+       Without this "<p>one</p><p>two</p>" comes back as "onetwo", which is
+       two words somebody wrote joined into one they did not. */
+    $html = preg_replace('#</(p|li|ul|ol|div|h[1-6])\s*>#i', ' ', $html) ?? $html;
+
+    return rt_sanitise_html($html, RT_INLINE_TAGS);
 }
 
 /** Rebuild the attributes a tag is allowed to keep, from scratch. */

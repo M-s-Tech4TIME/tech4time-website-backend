@@ -6,7 +6,8 @@
 # top of tools/check_shared_lib.py. The guarantee is CONTRACT_VERSION,
 # checked at run time by the side receiving the payload.
 
-56706cb84488f74ae207a746173ce3ec631a798e323ef900a17e2ab92b9c73c2  html.php
-10398b175c0c47dd01ad76ba90065c788f59a78dc046fd8187ba604bd5786b42  contract.php
-962daac993fb603d6fa294344cee463d517e1aca68e519dba86e93b78781ebeb  publish.php
+8a54b93553eba6f0e9172335c2e758df1dadd4a5e89e29dc415ac289ffaf9d99  html.php
+3c44843dd8c54c8a756ad3c7cc43aef53a86feb3ea15937dc4142e1864fc8ef1  contract.php
+779e46e947c4d7e28624cfa8ffcf97ff166c1faa78c56c12322ada2260631a86  publish.php
+5f75df6dfd4b910f83ffcd3cbd3c0d3287f62cf9cf6ffead922489fc8e2d1ec2  svg.php
 4ba291f49f915bbc88559fbcabf587141a46ddccf89ba5906cece8064e7603ea  sprite.svg

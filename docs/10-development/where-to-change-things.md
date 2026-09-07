@@ -27,6 +27,7 @@ breath**.
 | The about page's sections, specialities and why-us cards | `/?s=about` |
 | The home page's hero, badges, tags, terminal and cards | `/?s=home` |
 | What the enquiry form says | `/?s=contact` |
+| Anything the privacy policy says — a clause, the retention table, the effective date | `/?s=privacy` |
 
 Saving writes `content/careers.json` or `content/contact.json` here — **the system of record** —
 and then pushes a signed copy to the public site, which verifies it, re-sanitises it and writes its
@@ -54,6 +55,7 @@ The public site's palette, layout, motion, JavaScript modules and page markup ar
 | What "On this page" lists beside an editor | the `*_OUTLINE` constant in that `sections/*.php` |
 | The Save button, and Discard beside it | the `$save` argument to `admin_head()` — **not** per section |
 | Whether a form posts without navigating | `data-async` on the `<form>`; `public/assets/js/admin-forms.js` |
+| **Where** a form posts | its `action` attribute, and nothing else. Never `form.action` in script — a control named `action` replaces it. [ADR 0022](../90-decisions/0022-form-properties-are-read-off-the-prototype.md) |
 | Whether a link moves screens without reloading | write it as `?s=<section>`; `public/assets/js/admin-swap.js` |
 | What survives a move between screens | anything outside `#admin-body` — the rail, and nothing else |
 | The rich-text toolbar | `public/assets/js/editor.js` |
@@ -103,7 +105,10 @@ The public site's palette, layout, motion, JavaScript modules and page markup ar
 | I want to change | Where |
 |---|---|
 | **Add an editable page to the admin** | `ADMIN_SECTIONS` in `lib/admin.php` + a file in `sections/` + a name in `CONTRACT_DOCUMENTS` **in both repositories** — [adding-an-editor.md](server-side/adding-an-editor.md) |
-| The icon rail | `ADMIN_SECTIONS`; new icons go in `ADMIN_ICONS`, same file |
+| The icon rail's rows, or their order | `ADMIN_RAIL_SECTIONS` in `lib/admin.php`. **Registry order is not rail order**, and `account` is registered but deliberately not in the rail — deleting it from the registry instead would make `?s=account` land on the Overview and put the password screen out of reach |
+| A rail label | `ADMIN_SECTIONS`; new icons go in `ADMIN_ICONS`, same file. It must fit on one line — `check_admin_a11y.py` measures that, and `--rail-wide` in `admin.css` is what to widen |
+| **A page's title, search description, share card, breadcrumb or crawl setting** | `sections/seo.php`. It writes the `meta` band of that page's own document; the page's own editor does not, and must not — [seo.md](../40-reference/seo.md) |
+| The Organization graph, robots rules, the manifest, verification tokens | `sections/seo.php`, writing `content/seo.json` |
 | How long a session lasts | `AUTH_IDLE` (1 hour idle) and `AUTH_ABSOLUTE` (12 hours) in `lib/auth.php` |
 | How many failures before a lockout | `AUTH_ALLOW` in `lib/auth.php`; the backoff is in `lib/throttle.php` |
 | The longest lockout | `THROTTLE_MAX_BLOCK` in `lib/throttle.php` |

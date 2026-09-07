@@ -23,7 +23,9 @@ python3 tools/check_docs.py            # the docs still describe the code
 python3 tools/audit_pages.py           # SEO, accessibility, structure, internal links
 python3 tools/build_deploy_set.py --check   # nothing secret or local is bound for the server
 python3 tools/check_shared_lib.py
+python3 tools/check_shared_facts.py    # the offices, email and phone the policy repeats from the contact page
 python3 tools/check_shared_repos.py      # the four files both halves hold identically
+python3 tools/check_form_dom.py        # no script reads a property a form's own control hides
 ```
 
 > **Half the suite is in the other repository.** The public site's pages, its markup auditors, its
@@ -41,6 +43,11 @@ python3 tools/test_contact_admin.py     # the contact page editor
 python3 tools/test_home_admin.py        # the home page editor — six lists
 python3 tools/test_about_admin.py       # the about page editor
 python3 tools/test_services_admin.py    # the services editor — two screens, one document
+python3 tools/test_certifications_admin.py  # the certifications editor — three lists deep
+python3 tools/test_branding_admin.py    # the branding editor — logos and the files in them
+python3 tools/test_privacy_admin.py     # the privacy editor — three lists deep, and the anchor rule
+python3 tools/test_seo_admin.py         # the SEO editor — and that no other editor blanks a meta band
+python3 tools/test_svg.py               # the SVG sanitiser, which is a security boundary
 python3 tools/test_store.py             # the JSON store itself
 python3 tools/test_qr.py                # the pairing code, against libqrencode
 ```
@@ -76,9 +83,11 @@ never covered these screens — before the split as well as after it. They went 
 `tech4time-website-frontend` with the pages they were written for, and for a while this paragraph
 said the admin had never been checked for focus visibility, tap targets at 320px, or dark mode.
 
-It has now. `check_admin_a11y.py` signs in the way `test_editor.py` does and walks all nine
-screens — the three anyone can reach and the four behind the sign-in — asserting four families of
-thing at 1200px and 320px. It is one file rather than four because there are nine screens here and
+It has now. `check_admin_a11y.py` signs in the way `test_editor.py` does and walks every screen —
+the ones anyone can reach, the ones behind the sign-in, and all five of the SEO editor's — asserting
+four families of thing at 1200px and 320px. It also measures the rail: **every label must render as
+one line box that is not cut off**, at both rail widths and in the 320px chip strip, so renaming a
+section to something too long fails a check instead of being noticed by eye. It is one file rather than four because there are nine screens here and
 four copies of the sign-in would be four things to fix when the login markup moves.
 
 **It was not a formality.** The first run found that five `admin.css` rules wrote
@@ -121,6 +130,10 @@ These start a real PHP server on a spare port and drive it over HTTP.
 | `test_contact_admin.py` | the contact page editor, and the icon rail |
 | `test_home_admin.py` | the home page editor: **six** lists, so add, remove, hide and reorder are exercised across them rather than on one — the mechanics are shared, and a break in the shared part would otherwise surface only in whichever list happened to be tested. Also each terminal line's kind and colour, the light/dark picture pair on a card, and the accent phrase that has to appear in the headline |
 | `test_services_admin.py` | the services editor — the only one split across two screens, and the only one whose save **merges** rather than replaces. Both halves of that are covered: saving one service must not disturb another, saving the index must not write the six pages it never showed, and a service added on the list screen must survive the round trip. Plus add, remove, hide and reorder on the lists — including the **nested** one, a solution inside a group, which nothing else exercises — and that a hand-written solution id is kept rather than re-minted from its name |
+| `test_certifications_admin.py` | the certifications editor — the only one with a list **inside a list**, so add, remove, hide and reorder are exercised at all three levels and, more to the point, a button pressed on one role group is checked to have left the others alone. Also that a new group arrives hidden, that its web address is minted from its first role and then **survives that role being renamed**, and that the counts shown beside the prose are the live ones rather than anything stored |
+| `test_branding_admin.py` | the branding editor: logo variants and the files inside them, so add, remove, hide and reorder are exercised at both levels and a button pressed on one variant is checked to have left the others alone. Also that a new variant arrives hidden, that a card's preview and its download stay two separate records rather than one, and that the size shown beside a download is read off the file rather than typed |
+| `test_privacy_admin.py` | the privacy editor, which is **three** lists deep: sections hold blocks and blocks hold rows, so every verb is exercised at all three levels and checked to have left the other two alone. Also that all six block kinds are present, that changing a kind narrows the block to that kind's fields rather than carrying the old ones invisibly, that a section which has been named keeps its anchor when a section with the same heading is added above it — the case the obvious implementation gets silently wrong — and that a policy disagreeing with the contact page still saves, because that comparison is a notice and never a refusal |
+| `test_svg.py` **shared** | the SVG sanitiser, as the security boundary it is: a real logo survives and still draws, sanitising it twice changes nothing — which is what lets the receiving host prove bytes are clean without editing them — and script, event handlers, entities, embedded rasters, animation, filters and any reference off the file are each refused rather than quietly stripped |
 | `test_store.py` | `lib/store.php`: telling apart missing, unreadable and corrupt; the atomic write; and the rule that a damaged file is never copied over a good `.bak`, because the backup is what damage is recovered from |
 
 **The three that publish do so to a stub, and that is the point.** `tools/publish_stub.py`
@@ -139,7 +152,8 @@ runs against a copy of the real data files, restored afterwards whether the run 
 | Script | Proves |
 |---|---|
 | `test_editor.py` | the rich-text editor driven as a person drives it, including a real sign-in: the toolbar, the selection, and that alignment is a class and never an inline style |
-| `test_admin_forms.py` | that nothing in the admin throws the document away. Every form carries `data-async` and every link is one `admin-swap.js` will answer; adding, moving, removing and saving each leave the page where it was and the focus where it is wanted; following a rail item changes the bar, the tab, the address and `aria-current` while leaving the rail element itself standing; Back and Forward work. Then the same edits **and the same moves** with **JavaScript switched off** — including the one measurement only that browser can make, that the server draws a narrow rail on its own, which is what stopped the rail flashing open and shut on every load |
+| `test_seo_admin.py` | all five screens of the SEO editor: every field round-trips; the index lists every route **and** every service, so a service added in the services editor gets a card with no key registered anywhere; a page screen's save leaves **the rest of that document untouched**, because it writes one band of a file another editor owns; add, remove, reorder and hide on `sameas` and `hours`; an over-long title and a duplicate title are both refused; a page set to `noindex` leaves the sitemap; and the certifications description is measured **after** its `{certifications}` token is filled. **Its most important assertion is about the other nine editors**: saving any of them leaves that document's `meta` band exactly as it was. Those forms stopped rendering those fields, and a `*_from_post()` still naming the band would blank a title on every save — silently, because an empty string is a valid title. Broken on purpose, the check reports four fields emptied on every document |
+| `test_admin_forms.py` | that nothing in the admin throws the document away. Every form carries `data-async` and every link is one `admin-swap.js` will answer; adding, moving, removing and saving each leave the page where it was and the focus where it is wanted; following a rail item changes the bar, the tab, the address and `aria-current` while leaving the rail element itself standing; Back and Forward work. Then the same edits **and the same moves** with **JavaScript switched off** — including the one measurement only that browser can make, that the server draws a narrow rail on its own, which is what stopped the rail flashing open and shut on every load. Then, on every screen, the address each form is **actually handed** by `fetch` — which is not the same question as what the module would answer, and is how a control named `action` took the careers screen down for ten days — and one real press on that screen, asserting the document on disk moved |
 | `check_hover.py` | every interactive element visibly responds to a real pointer |
 | `check_dark_mode.py` | every page in both themes, as painted — catching what a CSS reader cannot, like a token that resolves to the same colour as its background |
 | `check_responsive.py` | every page at 320, 360, 414, 640, 768, 1024 and 1440px: the document does not scroll sideways, no link, button or field is wider than the screen, and no tap target is under 24px. Each width is a frame, not a window — see *0015* (in tech4time-website-frontend), because Firefox silently clamps a window at about 500px and a check written the obvious way reports widths it never tested |

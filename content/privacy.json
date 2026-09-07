@@ -1,0 +1,591 @@
+{
+    "updated": "",
+    "revision": 0,
+    "meta": {
+        "title": "Privacy Policy | Tech4TIME",
+        "description": "What Tech4TIME collects when you use this website, why, and how to ask us to correct or delete it. No cookies, no analytics, no tracking.",
+        "share_title": "Privacy Policy | Tech4TIME",
+        "breadcrumb": "Privacy Policy"
+    },
+    "hero": {
+        "title": "Privacy Policy",
+        "subtitle": "What We Collect, Why, and What You Can Ask Us to Do About It"
+    },
+    "policy": {
+        "label": "Privacy policy",
+        "effective": "Effective 21 August 2026",
+        "callout": {
+            "status": "shown",
+            "items": [
+                {
+                    "text": "This website sets <strong>no cookies</strong>, runs <strong>no analytics</strong> and contains <strong>no tracking of any kind</strong>. You can read every page without telling us anything about yourself.",
+                    "status": "shown",
+                    "id": "this-website-sets-no-cookies-runs"
+                },
+                {
+                    "text": "We only receive personal information if you <strong>send us an enquiry</strong> or <strong>apply for a job</strong>.",
+                    "status": "shown",
+                    "id": "we-only-receive-personal-information-if"
+                },
+                {
+                    "text": "Job applications are collected through an <strong>external form service</strong>, so that provider holds your CV as well as we do. You can see which one as soon as you follow an application link.",
+                    "status": "shown",
+                    "id": "job-applications-are-collected-through-an"
+                },
+                {
+                    "text": "If you apply for a role that involves being placed with one of our clients, <strong>we share your application with that client</strong> as part of their selection. This is how resource placement works, and we would rather you knew before applying than after.",
+                    "status": "shown",
+                    "id": "if-you-apply-for-a-role"
+                },
+                {
+                    "text": "We never sell your data, and we never send marketing to people who did not ask for it.",
+                    "status": "shown",
+                    "id": "we-never-sell-your-data-and"
+                },
+                {
+                    "text": "You can ask us what we hold about you, correct it, or have it deleted — free of charge, at <a href=\"mailto:info@tech4time.bd\">info@tech4time.bd</a>.",
+                    "status": "shown",
+                    "id": "you-can-ask-us-what-we"
+                }
+            ],
+            "note": "The rest of this page says the same things in full.",
+            "title": "The short version"
+        },
+        "sections": [
+            {
+                "id": "who-we-are",
+                "heading": "Who is responsible for your data",
+                "status": "shown",
+                "blocks": [
+                    {
+                        "id": "paragraph",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "Tech4TIME decides why and how personal data is processed on this website. In data protection law that makes us the <em>data controller</em>. You can reach us at:"
+                    },
+                    {
+                        "id": "address",
+                        "kind": "address",
+                        "status": "shown",
+                        "text": "<strong>M/s. Tech4TIME</strong><br> 278/3, Manikdi<br> Dhaka - 1206, Bangladesh<br> <br> Email: <a href=\"mailto:info@tech4time.bd\">info@tech4time.bd</a><br> Telephone: <a href=\"tel:+8801320571562\">+880 1320 571562</a>"
+                    },
+                    {
+                        "id": "paragraph-2",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "We also operate from 68100 Batu Caves, Selangor, Malaysia and 367 Avenue Louise, Brussels, Belgium. Because we have a presence in the European Union, we apply the standards of the EU General Data Protection Regulation (GDPR) to everyone who contacts us, wherever you happen to be."
+                    }
+                ]
+            },
+            {
+                "id": "what-we-collect",
+                "heading": "What we collect, and why",
+                "status": "shown",
+                "blocks": [
+                    {
+                        "id": "paragraph",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "There are only two ways this website collects anything from you, and both require you to act first."
+                    },
+                    {
+                        "id": "subheading",
+                        "kind": "subheading",
+                        "status": "shown",
+                        "text": "When you use the contact form"
+                    },
+                    {
+                        "id": "paragraph-2",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "We receive:"
+                    },
+                    {
+                        "id": "list",
+                        "kind": "list",
+                        "status": "shown",
+                        "rows": [
+                            {
+                                "text": "Your name",
+                                "status": "shown",
+                                "id": "your-name"
+                            },
+                            {
+                                "text": "Your email address",
+                                "status": "shown",
+                                "id": "your-email-address"
+                            },
+                            {
+                                "text": "Your telephone number",
+                                "status": "shown",
+                                "id": "your-telephone-number"
+                            },
+                            {
+                                "text": "The type of service you are asking about",
+                                "status": "shown",
+                                "id": "the-type-of-service-you-are"
+                            },
+                            {
+                                "text": "Your message",
+                                "status": "shown",
+                                "id": "your-message"
+                            },
+                            {
+                                "text": "Your IP address and the time you submitted the form — recorded so that abuse of the form can be traced, not to identify you",
+                                "status": "shown",
+                                "id": "your-ip-address-and-the-time"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "paragraph-3",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "We use this to answer your enquiry and any follow-up to it, and for nothing else. The message is delivered by email to our own mail server and is read by the people at Tech4TIME who deal with enquiries."
+                    },
+                    {
+                        "id": "paragraph-4",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "<strong>Legal basis:</strong> your consent, which you give by ticking the box on the form (GDPR Art. 6(1)(a)). You can withdraw it at any time — see <a href=\"#your-rights\">your rights</a> below."
+                    },
+                    {
+                        "id": "subheading-2",
+                        "kind": "subheading",
+                        "status": "shown",
+                        "text": "When you apply for a job"
+                    },
+                    {
+                        "id": "paragraph-5",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "Applications and speculative CVs are collected through an external online form service rather than on this website. When you follow an &quot;Apply&quot; or &quot;Share your CV&quot; link you leave this site, and what you submit — including your CV and everything in it — is collected and stored by that provider on our behalf."
+                    },
+                    {
+                        "id": "paragraph-6",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "Which provider we use is visible the moment you follow the link, in your browser&#039;s address bar, and that provider&#039;s own privacy policy governs what it does with your data. We change these services from time to time; if you would like to know which one we are using before you apply, or how it handles your information, ask us at <a href=\"mailto:career@tech4time.bd\">career@tech4time.bd</a> and we will tell you."
+                    },
+                    {
+                        "id": "paragraph-7",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "We use your application to assess you for the role you applied for, and to consider you for roles that open later."
+                    },
+                    {
+                        "id": "note",
+                        "kind": "note",
+                        "status": "shown",
+                        "text": "<strong>Where your application may go.</strong> Some of the roles we recruit for are placements with our client companies rather than positions on our own staff. If you apply for one of those, or if we think you suit one, <strong>we share your application — including your CV — with that client</strong> as part of their selection process. Our clients are in Bangladesh and abroad, so this may mean your details travel outside your own country. If you would rather we did not do this, tell us at <a href=\"mailto:career@tech4time.bd\">career@tech4time.bd</a> and we will keep your application to ourselves."
+                    },
+                    {
+                        "id": "paragraph-8",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "<strong>Legal basis:</strong> steps taken at your request before entering a contract of employment (GDPR Art. 6(1)(b)), and our legitimate interest in matching candidates to roles (Art. 6(1)(f))."
+                    },
+                    {
+                        "id": "subheading-3",
+                        "kind": "subheading",
+                        "status": "shown",
+                        "text": "When you simply read the site"
+                    },
+                    {
+                        "id": "paragraph-9",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "Our hosting provider&#039;s web server keeps ordinary access logs, as every web server does. These record:"
+                    },
+                    {
+                        "id": "list-2",
+                        "kind": "list",
+                        "status": "shown",
+                        "rows": [
+                            {
+                                "text": "Your IP address",
+                                "status": "shown",
+                                "id": "your-ip-address"
+                            },
+                            {
+                                "text": "Browser type and version",
+                                "status": "shown",
+                                "id": "browser-type-and-version"
+                            },
+                            {
+                                "text": "Operating system",
+                                "status": "shown",
+                                "id": "operating-system"
+                            },
+                            {
+                                "text": "The page you came from, if any",
+                                "status": "shown",
+                                "id": "the-page-you-came-from-if"
+                            },
+                            {
+                                "text": "The date and time of the request",
+                                "status": "shown",
+                                "id": "the-date-and-time-of-the"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "paragraph-10",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "These are not combined with anything else and are not used to build a picture of you. They exist so faults and attacks can be investigated. Retention is set by our hosting provider rather than by us."
+                    },
+                    {
+                        "id": "paragraph-11",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "<strong>Legal basis:</strong> our legitimate interest in running a secure and working website (GDPR Art. 6(1)(f))."
+                    },
+                    {
+                        "id": "subheading-4",
+                        "kind": "subheading",
+                        "status": "shown",
+                        "text": "Your light or dark mode choice"
+                    },
+                    {
+                        "id": "paragraph-12",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "If you switch between light and dark appearance, your browser remembers that choice in its own local storage. It is a single word, it stays on your device, and it is <strong>never sent to us</strong>. Clearing your browser&#039;s site data for this domain removes it."
+                    }
+                ]
+            },
+            {
+                "id": "what-we-do-not-do",
+                "heading": "What we do not do",
+                "status": "shown",
+                "blocks": [
+                    {
+                        "id": "paragraph",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "This is worth stating plainly, because most websites cannot say it:"
+                    },
+                    {
+                        "id": "list",
+                        "kind": "list",
+                        "status": "shown",
+                        "rows": [
+                            {
+                                "text": "<strong>No cookies.</strong> This site sets none at all.",
+                                "status": "shown",
+                                "id": "no-cookies-this-site-sets-none"
+                            },
+                            {
+                                "text": "<strong>No analytics.</strong> No Google Analytics, no Matomo, no tag manager, no counters. We do not measure your visit.",
+                                "status": "shown",
+                                "id": "no-analytics-no-google-analytics-no"
+                            },
+                            {
+                                "text": "<strong>No tracking or advertising.</strong> No pixels, no fingerprinting, no advertising networks, no profiling.",
+                                "status": "shown",
+                                "id": "no-tracking-or-advertising-no-pixels"
+                            },
+                            {
+                                "text": "<strong>No third-party content.</strong> Every file this site loads — every stylesheet, script, font and image — comes from our own domain. Your browser is not asked to contact anyone else while you read these pages. There are no embedded maps, videos or social media plugins. Our links to LinkedIn and GitHub are ordinary links: those networks learn nothing unless you click.",
+                                "status": "shown",
+                                "id": "no-third-party-content-every-file-this"
+                            },
+                            {
+                                "text": "<strong>We never sell or rent your data</strong>, and we never pass it to anyone for their own marketing.",
+                                "status": "shown",
+                                "id": "we-never-sell-or-rent-your"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "id": "who-sees-it",
+                "heading": "Who else sees your data",
+                "status": "shown",
+                "blocks": [
+                    {
+                        "id": "paragraph",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "We keep the list of people who touch your data as short as we can. It is:"
+                    },
+                    {
+                        "id": "list",
+                        "kind": "list",
+                        "status": "shown",
+                        "rows": [
+                            {
+                                "text": "<strong>Our hosting provider</strong>, whose servers run this website and hold our email. They do not use your data for anything of their own.",
+                                "status": "shown",
+                                "id": "our-hosting-provider-whose-servers-run"
+                            },
+                            {
+                                "text": "<strong>The provider of our application form service</strong>, for job applications only. We will name the current one on request.",
+                                "status": "shown",
+                                "id": "the-provider-of-our-application-form"
+                            },
+                            {
+                                "text": "<strong>Client companies</strong>, for applications only, and only where a role involves placement with that client, as described above.",
+                                "status": "shown",
+                                "id": "client-companies-for-applications-only-and"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "paragraph-2",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "Enquiries sent through the contact form are <strong>not</strong> shared with any of these beyond our hosting provider — they stay on our own mail server."
+                    },
+                    {
+                        "id": "paragraph-3",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "We may also disclose information where the law requires it, for instance in response to a valid order from a court or regulator."
+                    }
+                ]
+            },
+            {
+                "id": "how-long",
+                "heading": "How long we keep things",
+                "status": "shown",
+                "blocks": [
+                    {
+                        "id": "table",
+                        "kind": "table",
+                        "status": "shown",
+                        "rows": [
+                            {
+                                "label": "Contact enquiries",
+                                "value": "Until your question is resolved, and for up to 12 months afterwards in case you come back to us about it. Then deleted.",
+                                "status": "shown",
+                                "id": "contact-enquiries"
+                            },
+                            {
+                                "label": "Job applications and CVs",
+                                "value": "12 months from when you send them, so we can consider you for roles that open in that time. Then deleted.",
+                                "status": "shown",
+                                "id": "job-applications-and-cvs"
+                            },
+                            {
+                                "label": "Server access logs",
+                                "value": "As long as our hosting provider retains them. We do not keep copies.",
+                                "status": "shown",
+                                "id": "server-access-logs"
+                            },
+                            {
+                                "label": "Light or dark mode choice",
+                                "value": "Until you clear your browser's data. We never receive it.",
+                                "status": "shown",
+                                "id": "light-or-dark-mode-choice"
+                            }
+                        ],
+                        "caption": "Retention periods by type of data",
+                        "columns": [
+                            "What",
+                            "How long"
+                        ]
+                    },
+                    {
+                        "id": "paragraph",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "If you become a client, information connected to that relationship is kept for as long as the relationship lasts and for as long afterwards as tax and company law require."
+                    },
+                    {
+                        "id": "paragraph-2",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "You do not have to wait for any of these periods to pass. Ask us to delete something and we will, unless the law requires us to keep it."
+                    }
+                ]
+            },
+            {
+                "id": "where",
+                "heading": "Where your data is held",
+                "status": "shown",
+                "blocks": [
+                    {
+                        "id": "paragraph",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "This website and our email run on servers located in <strong>Singapore</strong>, operated by our hosting provider. That is where your contact form message and our access logs physically sit. Job applications are held by whichever form service we are using at the time, and providers of that kind commonly store data across data centres in several countries."
+                    },
+                    {
+                        "id": "paragraph-2",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "Singapore is outside the European Economic Area, and the European Commission has not issued an adequacy decision for it. So if you write to us from the EEA, your message is transferred out of it. We rely on the contractual safeguards in our agreement with our hosting provider for that transfer, and we will show you the detail if you ask."
+                    },
+                    {
+                        "id": "paragraph-3",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "Where we share an application with a client company, that client may be in a different country from you again. Where personal data leaves the European Economic Area that way, we rely on the safeguards the receiving organisation has in place, and we will tell you which on request."
+                    }
+                ]
+            },
+            {
+                "id": "your-rights",
+                "heading": "Your rights",
+                "status": "shown",
+                "blocks": [
+                    {
+                        "id": "paragraph",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "Whatever country you are in, we will honour all of the following. None of them costs you anything."
+                    },
+                    {
+                        "id": "list",
+                        "kind": "list",
+                        "status": "shown",
+                        "rows": [
+                            {
+                                "text": "<strong>Ask what we hold.</strong> We will tell you what data we have about you, where it came from, who has received it and why we have it.",
+                                "status": "shown",
+                                "id": "ask-what-we-hold-we-will"
+                            },
+                            {
+                                "text": "<strong>Correct it</strong> if it is wrong or incomplete.",
+                                "status": "shown",
+                                "id": "correct-it-if-it-is-wrong"
+                            },
+                            {
+                                "text": "<strong>Have it deleted.</strong> We will erase it unless the law requires us to keep it, in which case we will say so.",
+                                "status": "shown",
+                                "id": "have-it-deleted-we-will-erase"
+                            },
+                            {
+                                "text": "<strong>Restrict or object to what we do with it</strong>, including objecting to anything we do on the basis of legitimate interest.",
+                                "status": "shown",
+                                "id": "restrict-or-object-to-what-we"
+                            },
+                            {
+                                "text": "<strong>Take it with you.</strong> We will provide the data you gave us in a common machine-readable format, or send it directly to someone else where that is technically possible.",
+                                "status": "shown",
+                                "id": "take-it-with-you-we-will"
+                            },
+                            {
+                                "text": "<strong>Withdraw consent</strong> at any time, where we relied on it. This does not undo processing that already happened lawfully.",
+                                "status": "shown",
+                                "id": "withdraw-consent-at-any-time-where"
+                            },
+                            {
+                                "text": "<strong>Complain to a regulator.</strong> You can complain to the data protection authority in your country. If you are in the European Union, that includes the authority where you live, work, or where you believe the problem occurred.",
+                                "status": "shown",
+                                "id": "complain-to-a-regulator-you-can"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "paragraph-2",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "To exercise any of these, email <a href=\"mailto:info@tech4time.bd\">info@tech4time.bd</a> — or <a href=\"mailto:career@tech4time.bd\">career@tech4time.bd</a> if it concerns a job application. An informal message is enough; you do not need a particular form of words. We will respond within one month."
+                    }
+                ]
+            },
+            {
+                "id": "security",
+                "heading": "How we protect your data",
+                "status": "shown",
+                "blocks": [
+                    {
+                        "id": "paragraph",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "The whole site is served over an encrypted HTTPS connection, so what you send through the contact form cannot be read in transit. Access to our mailbox and to job applications is limited to the people who need it, and is protected by passwords and, where available, two-factor authentication."
+                    },
+                    {
+                        "id": "paragraph-2",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "We should be honest about the limits of this. No transmission over the internet is ever completely secure, and email in particular can be intercepted between mail servers. Please do not send us anything highly sensitive — identity documents, financial details, medical information — through the contact form. If you need to share something like that, write to us first and we will arrange a safer route."
+                    }
+                ]
+            },
+            {
+                "id": "marketing",
+                "heading": "Marketing and unsolicited email",
+                "status": "shown",
+                "blocks": [
+                    {
+                        "id": "paragraph",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "We do not run a mailing list and we do not send marketing to people who have not asked for it. Answering your enquiry does not put you on any list."
+                    },
+                    {
+                        "id": "paragraph-2",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "We also expressly refuse permission for the contact details published on this website to be used to send us unsolicited advertising. We reserve the right to take action if such material is sent to us."
+                    }
+                ]
+            },
+            {
+                "id": "children",
+                "heading": "Children",
+                "status": "shown",
+                "blocks": [
+                    {
+                        "id": "paragraph",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "This website and our services are meant for businesses and for adults seeking work. We do not knowingly collect information from children. If you believe a child has sent us personal information, tell us and we will delete it."
+                    }
+                ]
+            },
+            {
+                "id": "changes",
+                "heading": "Changes to this policy",
+                "status": "shown",
+                "blocks": [
+                    {
+                        "id": "paragraph",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "If what we do with your data changes, we will update this page and change the date at the top. Where a change materially affects you, we will do more than quietly edit the page."
+                    }
+                ]
+            },
+            {
+                "id": "contact",
+                "heading": "Questions",
+                "status": "shown",
+                "blocks": [
+                    {
+                        "id": "paragraph",
+                        "kind": "paragraph",
+                        "status": "shown",
+                        "text": "If anything here is unclear, or you think we have got something wrong, please write to <a href=\"mailto:info@tech4time.bd\">info@tech4time.bd</a>. We would much rather hear from you than have you complain to a regulator, but you are entitled to do both."
+                    }
+                ]
+            }
+        ]
+    },
+    "cta": {
+        "status": "shown",
+        "title": "Questions about your data?",
+        "text": "Ask us what we hold, or ask us to delete it. Both are free, and we answer within a month.",
+        "items": [
+            {
+                "label": "Contact Us",
+                "href": "/pages/contact/",
+                "style": "primary",
+                "status": "shown",
+                "id": "contact-us"
+            },
+            {
+                "label": "info@tech4time.bd",
+                "href": "mailto:info@tech4time.bd",
+                "style": "ghost",
+                "status": "shown",
+                "id": "info-tech4time-bd"
+            }
+        ]
+    }
+}

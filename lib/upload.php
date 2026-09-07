@@ -35,6 +35,8 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/publish.php';
+require_once __DIR__ . '/svg.php';
+require_once __DIR__ . '/store.php';
 
 /** Where the canonical copy of every uploaded picture lives. */
 const UPLOAD_DIR = __DIR__ . '/../public/uploads';
@@ -54,6 +56,21 @@ const UPLOAD_MAX_BYTES = 5242880;
  * size the site displays, including on a 2x screen.
  */
 const UPLOAD_MAX_DIMENSION = 1600;
+
+/**
+ * The longest side a picture may have when it is the thing being DOWNLOADED.
+ *
+ * The bound above is about what a page displays. The branding page is the one
+ * place where the file is not decoration — it is the deliverable, and somebody
+ * putting the mark on a banner needs more than a screen's worth of pixels.
+ * The files that page ships today are exactly 1600 wide, so nothing regresses
+ * either way; this is headroom above them rather than a change to them.
+ *
+ * Everything else about the path is unchanged: still decoded, still
+ * re-encoded, still refused if the result is over PUBLISH_ASSET_MAX_BYTES.
+ * A larger ceiling is not a looser one.
+ */
+const UPLOAD_MAX_DOWNLOAD_DIMENSION = 3000;
 
 /** Quality for the two lossy encoders. High enough that a logo stays crisp. */
 const UPLOAD_WEBP_QUALITY = 82;
@@ -105,13 +122,13 @@ function upload_problem(): string
  *
  * @param array $file one entry of $_FILES
  */
-function upload_accept(array $file): array
+function upload_accept(array $file, int $maxSide = UPLOAD_MAX_DIMENSION): array
 {
-    $problem = upload_problem();
-    if ($problem !== '') {
-        return ['error' => $problem];
-    }
-
+    /* NOT upload_problem() here. That asks whether GD is present, and until
+       the bytes have been read nothing knows whether GD is the library this
+       file needs -- a vector one does not touch it. The raster branch of
+       upload_store() asks, where the answer is relevant, so a host missing one
+       library does not refuse the format that works. */
     $code = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
     if ($code !== UPLOAD_ERR_OK) {
         return ['error' => upload_error_reason($code)];
@@ -137,21 +154,32 @@ function upload_accept(array $file): array
                          . (int)(UPLOAD_MAX_BYTES / 1048576) . ' MB.'];
     }
 
-    return upload_store($bytes);
+    return upload_store($bytes, $maxSide);
 }
 
 /**
  * Re-encode bytes and store the pair. Separated from upload_accept() so that
  * the part worth testing does not need a real HTTP upload to reach.
  */
-function upload_store(string $bytes): array
+function upload_store(string $bytes, int $maxSide = UPLOAD_MAX_DIMENSION): array
 {
+    /* A vector file is not decoded, because there is nothing to decode. It
+       goes down its own path, which does the same job a different way: parse,
+       allow-list, re-serialise, store THAT. See lib/svg.php, and the
+       amendment to ADR 0019 for why this stopped being a refusal. */
+    if (svg_looks_like($bytes)) {
+        return upload_store_svg($bytes);
+    }
+
+    $problem = upload_problem();
+    if ($problem !== '') {
+        return ['error' => $problem];
+    }
+
     /* Decided from the header, never from a name or a Content-Type. */
     $kind = publish_asset_type($bytes);
     if ($kind === null) {
-        return ['error' => 'That file is not a JPEG, PNG or WebP picture. '
-                         . 'An SVG cannot be accepted: it is a document, not '
-                         . 'an image, and can carry script.'];
+        return ['error' => 'That file is not a JPEG, PNG, WebP or SVG picture.'];
     }
 
     [$ext] = $kind;
@@ -163,7 +191,7 @@ function upload_store(string $bytes): array
     }
 
     try {
-        $image = upload_fit($image);
+        $image = upload_fit($image, $maxSide);
 
         /* Transparency survives the copy in upload_fit(); these tell the two
            encoders that can carry it to do so. */
@@ -209,23 +237,74 @@ function upload_store(string $bytes): array
 }
 
 /**
- * Scale to fit UPLOAD_MAX_DIMENSION, or return the image untouched.
+ * Store a vector file, having first made it one.
+ *
+ * The raster path's rule, applied to a format that has no pixels to re-encode:
+ * the file is parsed, walked against an allow-list and re-serialised, and what
+ * is written is THAT — never the bytes that arrived. svg_sanitise() carries
+ * the whole argument, including why anything unrecognised is refused outright
+ * rather than quietly dropped.
+ *
+ * ONE FILE, NOT TWO. The raster path writes a WebP beside its fallback because
+ * nearly every visitor is better served by the WebP. A vector file has no
+ * better version of itself, so 'webp' is left empty — which the renderers
+ * already read as "emit a bare <img>, no <picture>", the same as it has always
+ * meant. Nothing on the public page draws it in any case; it is a download.
+ *
+ * NO DIMENSION CEILING, and none is needed. A vector has no resolution to
+ * reduce, and SVG_MAX_BYTES bounds the file itself.
+ */
+function upload_store_svg(string $bytes): array
+{
+    $clean = svg_sanitise($bytes);
+    if (isset($clean['error'])) {
+        return ['error' => $clean['error']];
+    }
+
+    $svg = (string)$clean['svg'];
+
+    /* The public site refuses anything over this after re-encoding, so
+       refusing it here says so to the person who can do something about it,
+       rather than letting the publish fail later with nobody watching. */
+    if (strlen($svg) > PUBLISH_ASSET_MAX_BYTES) {
+        return ['error' => 'That vector file is too large to publish.'];
+    }
+
+    $name = publish_asset_name($svg, 'svg');
+    if (!upload_write($name, $svg)) {
+        return ['error' => 'The picture could not be saved on this server.'];
+    }
+
+    return [
+        'src'    => UPLOAD_URL_ROOT . $name,
+        'webp'   => '',
+        'width'  => (int)$clean['width'],
+        'height' => (int)$clean['height'],
+    ];
+}
+
+/**
+ * Scale to fit $maxSide, or return the image untouched.
+ *
+ * The caller says how big is big enough, because that depends on what the
+ * picture is FOR: UPLOAD_MAX_DIMENSION for something a page displays,
+ * UPLOAD_MAX_DOWNLOAD_DIMENSION for something a visitor takes away.
  *
  * Aspect ratio is preserved, so the stored width and height are always the
  * real ones — which is what lets the page reserve the right box and keeps
  * Cumulative Layout Shift at zero.
  */
-function upload_fit(GdImage $image): GdImage
+function upload_fit(GdImage $image, int $maxSide = UPLOAD_MAX_DIMENSION): GdImage
 {
     $w = imagesx($image);
     $h = imagesy($image);
     $longest = max($w, $h);
 
-    if ($longest <= UPLOAD_MAX_DIMENSION) {
+    if ($longest <= $maxSide) {
         return $image;
     }
 
-    $scale = UPLOAD_MAX_DIMENSION / $longest;
+    $scale = $maxSide / $longest;
     $scaled = imagescale($image, (int)round($w * $scale), (int)round($h * $scale));
 
     if ($scaled === false) {
@@ -316,9 +395,44 @@ function upload_held(): array
 }
 
 /**
+ * Every picture ANY document points at, with one document overridden.
+ *
+ * THE DIRECTORY IS SHARED AND THE DOCUMENTS ARE NOT. public/uploads/ holds the
+ * artwork of every editor together, so "is this file still used" can only be
+ * answered by asking all of them. It used to be asked of one: about.php passed
+ * about_images(), so the home page's uploads came back as unused and its sweep
+ * button offered to delete them. Three editors, each able to delete the other
+ * two's pictures, and nothing said so.
+ *
+ * $document and $data are the screen that is asking, passed in rather than
+ * read off disk, because the edit in front of somebody has not been saved yet
+ * — and a picture attached a moment ago must not count as unused for the
+ * length of one page render.
+ */
+function upload_in_use(string $document, array $data): array
+{
+    $used = contract_images($document, $data);
+
+    foreach (CONTRACT_DOCUMENTS as $name) {
+        if ($name === $document) {
+            continue;
+        }
+        $held = store_read(contract_path($name));
+        if (is_array($held)) {
+            $used = array_merge($used, contract_images($name, contract_normalise($name, $held)));
+        }
+    }
+
+    return array_values(array_unique($used));
+}
+
+/**
  * The stored pictures nothing in $used points at.
  *
- * $used is the list of web paths a document references — company_images().
+ * $used is every web path the SITE references — upload_in_use(). Asking with
+ * one document's worth is how the bug above happened; the parameter is still a
+ * list rather than a document so that a caller has to have thought about it.
+ *
  * Never swept automatically: a reference count taken from a document somebody
  * is halfway through editing is not a fact, and deleting on it would remove a
  * picture whose row is about to be saved.

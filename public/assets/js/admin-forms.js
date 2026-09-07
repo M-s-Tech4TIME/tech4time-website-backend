@@ -65,6 +65,57 @@
     global.Tech4Time.adminSwap.status(text, className);
   }
 
+  /* -------------------------------------------- where the form actually posts
+
+     NOT form.action, and the reason is a line of the HTML specification rather
+     than anything about this project. HTMLFormElement is declared
+     [LegacyOverrideBuiltIns], so a control's name wins over the interface's own
+     property of that name: a form containing <input name="action"> answers
+     form.action with that INPUT, not with a URL. String() then turns it into
+     "[object HTMLInputElement]", fetch() resolves that against the page, and
+     the request goes to /[object%20HTMLInputElement].
+
+     Every job-post form has such a control — sections/careers.php reads
+     $_POST['action'] to tell save from delete from move — so every button on
+     the careers screen posted to an address no server has ever served and got
+     a 404 back, once per press. Nothing else on the site was affected, because
+     careers is the only section with a control named after a form property
+     that anything reads -- id, name and title are shadowed on several screens,
+     and nothing looks at them.
+     Ordinary submission was never affected either: the browser submits from
+     the ATTRIBUTE and never consults the shadowed property, which is why this
+     appeared on the day the forms started posting themselves and not on the
+     day the field was added.
+
+     The getter on the prototype is exactly the property the shadowing hides,
+     and it already carries the whole of the specification's behaviour: the
+     attribute resolved against the document's base URL, and the document's own
+     URL when there is no attribute. So there is nothing to reimplement here
+     and nothing that can drift from what a plain <form> would have done.
+
+     The same shadowing hides id, name, method, target, elements, submit and
+     reset behind a control of that name. Nothing in this file reads any of
+     them, and tools/check_form_dom.py is there to keep that true. */
+  var FORM_ACTION = global.HTMLFormElement && Object.getOwnPropertyDescriptor
+    ? Object.getOwnPropertyDescriptor(global.HTMLFormElement.prototype, "action")
+    : null;
+
+  function postUrl(form) {
+    if (FORM_ACTION && typeof FORM_ACTION.get === "function") {
+      return FORM_ACTION.get.call(form) || global.location.href;
+    }
+
+    /* No descriptor: work the two answers out by hand. A browser this old has
+       no fetch() either, so usable() has already left the forms alone. */
+    var attr = form.getAttribute("action");
+
+    if (attr && typeof global.URL === "function") {
+      return new global.URL(attr, doc.baseURI).href;
+    }
+
+    return global.location.href;
+  }
+
   /* ------------------------------------------------- where to look afterwards
 
      A reorder renumbers the rows it moves between, so the button that was
@@ -156,10 +207,19 @@
       return false;
     }
 
-    /* The last row's first field that somebody can actually type in: the id
-       is a hidden input and would swallow the focus silently. */
+    /* The last row's first field that somebody can actually type in: the id is
+       a hidden input and would swallow the focus silently, and a picture row's
+       file picker is not somewhere anybody types.
+
+       type=file MATTERS ONLY WHERE GD IS INSTALLED, which is every host and
+       not this laptop: without it admin_image_fields() renders a notice
+       instead of the input, so the field after it was picked by accident and
+       the check passed for a reason that had nothing to do with the code.
+       CI has GD, found it, and named it -- focus went to upload[clients][9]
+       rather than the client's name. */
     var last = rows[rows.length - 1].closest(".admin-card");
-    var field = last && last.querySelector("input:not([type=hidden]), textarea, select");
+    var field = last && last.querySelector(
+      "input:not([type=hidden]):not([type=file]), textarea, select");
 
     if (field) {
       field.focus();
@@ -338,8 +398,36 @@
       }
     }
 
+    /* WHAT TO DO NEXT DEPENDS ON WHAT WENT WRONG, and this said "press again"
+       whatever had happened. It was reported from the live editor with four
+       identical 404 toasts stacked in the corner -- one per press, because the
+       message asked for each of them and none of them could ever have worked.
+
+       A 404 or a 405 is the server saying this address is not one it serves.
+       Repeating the request repeats the answer. A 403 here is a rejected CSRF
+       token, which a fresh page fixes and a retry does not. Only a 5xx and a
+       dropped connection are worth pressing again for. */
+    function whatNext(error) {
+      var code = error && error.status;
+
+      if (code === 404 || code === 405) {
+        return "Nothing was lost, and pressing again will not help: the " +
+               "address this form posts to is not one the server answers. " +
+               "Reload the page. If it happens again, the site is misconfigured.";
+      }
+      if (code === 403 || code === 419) {
+        return "Nothing was lost. Reload the page and try once more — the " +
+               "sign-in may have expired while this screen was open.";
+      }
+      if (code >= 400 && code < 500) {
+        return "Nothing was lost, but the server refused the request as it " +
+               "was made. Reload the page.";
+      }
+      return "Nothing was lost; press again.";
+    }
+
     global
-      .fetch(form.action || global.location.href, {
+      .fetch(postUrl(form), {
         method: "POST",
         body: body,
         credentials: "same-origin",
@@ -347,7 +435,7 @@
         headers: { "X-Requested-With": "fetch" }
       })
       .then(function (response) {
-        var url = response.url || form.action;
+        var url = response.url || postUrl(form);
 
         /* A session that has ended redirects to the sign-in page. Swapping
            that into <main> would leave somebody typing into a form that is no
@@ -358,7 +446,9 @@
         }
 
         if (!response.ok) {
-          throw new Error("The server answered " + response.status + ".");
+          var refused = new Error("The server answered " + response.status + ".");
+          refused.status = response.status;
+          throw refused;
         }
 
         return response.text().then(function (html) {
@@ -395,7 +485,7 @@
         idle();
         status(
           "Not sent — " + (error && error.message ? error.message : "the connection failed") +
-            " Nothing was lost; press again.",
+            " " + whatNext(error),
           BAD
         );
       });
@@ -408,8 +498,53 @@
      back into its textarea — has already run by the time this reads the form.
      Binding per form would mean rebinding after each swap and would put this
      first. */
+  /* Put a count token into the field it belongs to.
+
+     An ENHANCEMENT, and only that: the token is printed on the button, so
+     with no JavaScript at all it can be read off the screen and typed. What
+     this removes is the typing, not the possibility.
+
+     It deliberately does NOT re-render the "Reads as" line beside it. Working
+     out what a token comes to is certifications_fill() in lib/contract.php,
+     which both halves of the project share so that the editor's preview and
+     the published page cannot disagree — and a second implementation of it
+     here, in another language, is exactly the disagreement that file exists to
+     prevent. The line refreshes on the next redraw, from the one function that
+     knows the answer. */
+  function insertToken(chip) {
+    var field = doc.querySelector('[name="' + chip.getAttribute("data-token-field") + '"]');
+    var token = chip.getAttribute("data-token-insert");
+
+    if (!field || !token) {
+      return;
+    }
+
+    var start = typeof field.selectionStart === "number" ? field.selectionStart : field.value.length;
+    var end = typeof field.selectionEnd === "number" ? field.selectionEnd : start;
+
+    field.value = field.value.slice(0, start) + token + field.value.slice(end);
+
+    /* Where the cursor was, plus what was just put there — so a second press
+       lands after the first rather than back at the start. */
+    field.focus();
+    if (field.setSelectionRange) {
+      field.setSelectionRange(start + token.length, start + token.length);
+    }
+
+    /* The form is watched for unsaved changes elsewhere; setting .value in
+       script fires nothing on its own. */
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
   function wire() {
     var pressed = null;
+
+    doc.addEventListener("click", function (event) {
+      var chip = event.target.closest && event.target.closest("[data-token-insert]");
+      if (chip) {
+        insertToken(chip);
+      }
+    });
 
     doc.addEventListener("click", function (event) {
       var button = event.target.closest && event.target.closest("button, input[type=submit]");
@@ -434,6 +569,11 @@
   var api = (global.Tech4Time = global.Tech4Time || {});
 
   api.adminForms = {
+    /* Exposed so tools/test_admin_forms.py can assert the address every async
+       form on every screen will actually be posted to, against the real
+       function rather than a copy of its reasoning. A second implementation in
+       the test is a second thing that can be wrong. */
+    postUrl: postUrl,
     init: function () {
       if (!usable() || api.adminForms.wired) {
         return;

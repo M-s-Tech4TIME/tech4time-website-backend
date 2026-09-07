@@ -49,7 +49,7 @@ function about_from_post(array $current): array
 {
     $data = $current;
 
-    foreach (ABOUT_TEXT_FIELDS as $band => $fields) {
+    foreach (contract_page_bands(ABOUT_TEXT_FIELDS) as $band => $fields) {
         foreach ($fields as $field) {
             $data[$band][$field] = trim((string)($_POST[$band][$field] ?? ''));
         }
@@ -181,7 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $data = $posted;
     } elseif ($do === 'sweep-uploads') {
         $gone = 0;
-        foreach (upload_unused(about_images($posted)) as $name) {
+        foreach (upload_unused(upload_in_use('about', $posted)) as $name) {
             $gone += upload_delete($name) ? 1 : 0;
         }
         $data = $posted;
@@ -698,7 +698,7 @@ if (!$errors && $pending !== '') {
   </fieldset>
 
   <!-- ========================== stored pictures ========================== -->
-<?php $unused = upload_problem() === '' ? upload_unused(about_images($data)) : []; ?>
+<?php $unused = upload_problem() === '' ? upload_unused(upload_in_use('about', $data)) : []; ?>
   <fieldset class="admin__block" id="band-uploads">
     <?php admin_band_head('Stored pictures',
         'Every picture uploaded through this page is kept here, named after '
@@ -732,32 +732,7 @@ if (!$errors && $pending !== '') {
   </fieldset>
 
   <!-- ============================ search ============================ -->
-  <fieldset class="admin__block" id="band-meta">
-    <?php admin_band_head('How it appears elsewhere',
-        'What a search engine shows, and what appears when somebody pastes a '
-        . 'link to this page into a chat.'); ?>
-
-    <div class="admin__grid">
-      <label class="admin__field admin__field--wide">
-        <span class="admin__label">Browser tab title</span>
-        <input class="admin__input" type="text" name="meta[title]" required
-               value="<?= h($data['meta']['title']) ?>">
-      </label>
-
-      <label class="admin__field admin__field--wide">
-        <span class="admin__label">Search description</span>
-        <input class="admin__input" type="text" name="meta[description]"
-               value="<?= h($data['meta']['description']) ?>">
-        <span class="admin__hint">Aim for 150–160 characters.</span>
-      </label>
-
-      <label class="admin__field admin__field--wide">
-        <span class="admin__label">Title on a shared link</span>
-        <input class="admin__input" type="text" name="meta[share_title]"
-               value="<?= h($data['meta']['share_title']) ?>">
-      </label>
-    </div>
-  </fieldset>
+  <?php admin_meta_band('about'); ?>
 
 
   <?php /* The last control in the form, and the only reason it exists is that

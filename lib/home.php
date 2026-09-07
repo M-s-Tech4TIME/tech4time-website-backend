@@ -82,17 +82,13 @@ function home_validate(array $data): array
     if (trim((string)$data['hero']['title']) === '') {
         $errors[] = 'The page needs a heading — the hero title cannot be empty.';
     }
-    if (trim((string)$data['meta']['title']) === '') {
-        $errors[] = 'The browser tab title cannot be empty.';
-    }
-
-    /* strlen and not mb_strlen: bytes, as about_validate() counts them. It
-       undercounts the characters allowed in a description with accents, which
-       for a soft search-engine limit is the safe direction to be wrong in. */
-    if (strlen(trim((string)$data['meta']['description'])) > 320) {
-        $errors[] = 'The search description is longer than 320 characters. '
-                  . 'Search engines will cut it off.';
-    }
+    /* NOTHING ABOUT THE meta BAND IS CHECKED HERE ANY MORE. Its title,
+       description, breadcrumb and crawl setting are edited on the SEO screen
+       and validated by seo_validate(), which is the only place that can see
+       all of them at once -- two pages sharing a title is a fault neither page
+       can detect on its own. Leaving the checks here as well would refuse a
+       save on THIS page for a field this page no longer offers, which is a
+       dead end rather than a warning. */
 
     /* A WARNING AND NOT AN ERROR would be wrong here, because there is nowhere
        to put a warning: the accent silently doing nothing is exactly the

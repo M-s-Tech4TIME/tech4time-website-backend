@@ -57,7 +57,7 @@ ROUTER = ROOT / "tools" / "dev-router.php"
 
 
 def registered_sections() -> list[str]:
-    """The rail's contents, read out of lib/admin.php rather than counted here.
+    """Every section lib/admin.php knows about, in registry order.
 
     A number written into this file is a second copy of the registry, and it is
     the copy that goes stale: adding an editor would fail this test in the
@@ -68,6 +68,19 @@ def registered_sections() -> list[str]:
     text = (ROOT / "lib" / "admin.php").read_text()
     m = re.search(r"const ADMIN_SECTIONS\s*=\s*\[(.*?)\n\];", text, re.S)
     return re.findall(r"^\s{4}'([a-z_]+)'\s*=>", m.group(1), re.M) if m else []
+
+
+def rail_sections() -> list[str]:
+    """The rail's ROWS, which are not the same list.
+
+    The account is a section but not a rail row: it is reached from the avatar
+    menu at the foot of the rail. Two lists mean a new way to be wrong -- a
+    rail row naming a section that does not exist -- so that is asserted below
+    rather than left to the day somebody notices a blank row.
+    """
+    text = (ROOT / "lib" / "admin.php").read_text()
+    m = re.search(r"const ADMIN_RAIL_SECTIONS\s*=\s*\[(.*?)\];", text, re.S)
+    return re.findall(r"'([a-z_]+)'", m.group(1)) if m else []
 
 
 class Results:
@@ -198,14 +211,27 @@ def run(client, r, site):
     status, html = client.get(ADMIN)
     r.check("it opens", status == 200, f"status {status}")
     r.check("it names the file it edits", "content/contact.json" in html)
-    # Overview, Careers, Contact, Account. The count is asserted rather than
-    # the names so that adding a section without adding it to the rail — which
-    # would leave it unreachable — shows up here.
+    # The count is asserted rather than the names, so that adding a section
+    # without adding it to the rail — which would leave it unreachable — shows
+    # up here.
     sections = registered_sections()
-    r.check("the rail lists every section",
-            html.count('class="rail__item"') == len(sections),
-            f'{len(sections)} in ADMIN_SECTIONS, '
+    rail = rail_sections()
+    r.check("the rail lists every row ADMIN_RAIL_SECTIONS names",
+            html.count('class="rail__item"') == len(rail),
+            f'{len(rail)} in ADMIN_RAIL_SECTIONS, '
             f'{html.count(chr(34) + "rail__item")} in the rail')
+    r.check("every rail row names a section that exists",
+            set(rail) <= set(sections),
+            f"not in ADMIN_SECTIONS: {sorted(set(rail) - set(sections))}")
+    # The account is deliberately NOT a rail row — it is reached from the
+    # avatar menu at the foot of the rail, which is the one thing on the screen
+    # that is about the person rather than the page. Asserted, because
+    # dropping it from the registry instead would send ?s=account silently to
+    # the Overview and put the password screen out of reach.
+    r.check("the account is a section but not a rail row",
+            "account" in sections and "account" not in rail)
+    r.check("and the avatar menu still reaches it",
+            's=account' in html)
     r.check("and marks the one showing",
             html.count('aria-current="page"') == 1)
 
@@ -250,19 +276,32 @@ def run(client, r, site):
             first["hours"] == "Sat – Wed: 8:00 AM – 4:00 PM", str(first["hours"]))
 
     # ------------------------------------------------------------ the head
-    print("\nwhat a search engine will be given")
-    fields["meta[title]"] = "Reach Tech4TIME"
-    fields["meta[description]"] = "Three offices, one working day."
-    fields["meta[share_title]"] = "Say hello"
+    #
+    # THIS EDITOR NO LONGER WRITES THE meta BAND, and that is what is asserted.
+    # Every page's title, search description and share title are edited on the
+    # SEO screen; the values still live in content/contact.json, beside the
+    # rest of this page, and are still published with it.
+    #
+    # The check is the dangerous direction, not the harmless one. Every
+    # *_from_post() rebuilds each band named in its *_TEXT_FIELDS from $_POST,
+    # so a form that has stopped RENDERING the meta fields while still naming
+    # them in that loop would read them as absent, take '' for each, and blank
+    # the page's title on every save -- silently, because empty is a valid
+    # value and nothing throws. contract_page_bands() is what stops that, and
+    # this is what would notice if it were undone.
+    print("\nthe meta band survives a save that never touched it")
+    before = published(site)["meta"]
+    fields["hero[title]"] = "Contact Us"
     client.post(ADMIN, fields)
-    meta = published(site)["meta"]
-    r.check("the browser tab title follows", meta["title"] == "Reach Tech4TIME", str(meta))
-    r.check("so does the search description",
-            meta["description"] == "Three offices, one working day.", str(meta))
-    r.check("and the title on a shared link", meta["share_title"] == "Say hello", str(meta))
-    # The <title>, the og: tags and the ContactPage graph are built from these
-    # three fields by the frontend. That they are built correctly is proved
-    # there; that they are given the right values is proved here.
+    after = published(site)["meta"]
+    r.check("the browser tab title is not blanked", after["title"] == before["title"],
+            f'{before["title"]!r} -> {after["title"]!r}')
+    r.check("nor the search description", after["description"] == before["description"])
+    r.check("nor anything else in the band", after == before,
+            f"{before} -> {after}")
+    # That the SEO screen can CHANGE them is proved in tools/test_seo_admin.py;
+    # that the frontend renders them is proved in tech4time-website-frontend by
+    # tools/test_publish.py.
 
     # -------------------------------------------------------- hidden office
     print("\nhiding an office")

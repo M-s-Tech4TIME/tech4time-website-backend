@@ -60,6 +60,12 @@ jobs:
       # the guarantee is CONTRACT_VERSION, checked at run time by the endpoint
       # this half posts to.
       - run: python3 tools/check_shared_lib.py
+      # A fact stated in two documents at once -- the offices, the email and the
+      # telephone are authored in BOTH the privacy policy and the contact page,
+      # on purpose. This asks whether they still agree. It can only see the
+      # committed seed: content edited in the admin never passes through git.
+      - run: python3 tools/check_shared_facts.py
+      - run: python3 tools/check_form_dom.py
 
       # And the thing the line above structurally cannot see: whether the OTHER
       # half still holds the same bytes. A per-repo digest passes happily while
@@ -98,20 +104,70 @@ jobs:
           php -r 'exit(extension_loaded("gd") ? 0 : 1);' \
             || { echo "php-gd did not load"; exit 1; }
 
-      - run: python3 tools/test_store.py
-      - run: python3 tools/test_upload.py
-      - run: python3 tools/test_admin_auth.py
-      - run: python3 tools/test_publish_client.py
-      - run: python3 tools/test_careers_admin.py
-      - run: python3 tools/test_contact_admin.py
-      - run: python3 tools/test_company_admin.py
-      # These three were in the repository but not here, so the about, home and
-      # services editors were only ever tested by somebody remembering to run
-      # them. A test that CI does not run is a test that stops being true
-      # quietly.
-      - run: python3 tools/test_about_admin.py
-      - run: python3 tools/test_home_admin.py
-      - run: python3 tools/test_services_admin.py
+      # The hosts have ext-dom; ubuntu-24.04's php-cli does not. lib/svg.php is
+      # the security boundary for every vector file this site publishes — it is
+      # what turns "an SVG is a document that can carry script" into something
+      # that can be served at all — and without a parser it refuses everything,
+      # which would make tools/test_svg.py pass for the wrong reason. Installed
+      # here rather than left to skip in the one place a regression would be
+      # caught. Same bargain as php-gd.
+      - name: php-xml, so the SVG sanitiser is actually tested
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq php-xml
+          php -r 'exit(class_exists("DOMDocument") ? 0 : 1);' \
+            || { echo "php-xml did not load"; exit 1; }
+
+      # tools/test_qr.py proves lib/qr.php by encoding the same string with a
+      # DIFFERENT implementation and comparing the modules -- which is the whole
+      # value of it, because a QR encoder that is wrong in the same way twice
+      # is not caught by testing it against itself. It calls shutil.which and
+      # skips when qrencode is absent, so without this the suite reported
+      # success while proving nothing. Same bargain as php-gd and php-xml above.
+      - name: qrencode, so the QR encoder is checked against another one
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qrencode
+          command -v qrencode || { echo "::error::qrencode is not on PATH — test_qr.py would have skipped"; exit 1; }
+
+      # ALL OF THEM, THEN A VERDICT. A step each stops the job at the first
+      # failure, and everything after it never runs -- so a red build reports
+      # one problem when it may have found five, and each fix costs another
+      # eight-minute round trip to discover the next. The browser job below and
+      # the frontend's whole workflow are already shaped this way; this job was
+      # the last one that was not, and it hid two failures behind one on the
+      # run that added test_branding_admin.py to it.
+      #
+      # test_seo_admin.py makes the one assertion no other suite here can:
+      # saving one of the nine page editors leaves that document's meta band
+      # exactly as it was. Those forms no longer RENDER the meta fields but
+      # their documents still hold them, so a *_from_post() that still named
+      # the band would blank a title on every save -- silently, because an
+      # empty string is a valid title. See ADR 0020.
+      - name: php suites
+        run: |
+          set -uo pipefail
+          failed=""
+          for s in test_svg test_store test_upload test_qr \
+                   test_admin_auth test_publish_client \
+                   test_careers_admin test_contact_admin test_company_admin \
+                   test_about_admin test_home_admin test_services_admin \
+                   test_certifications_admin test_branding_admin \
+                   test_privacy_admin test_seo_admin; do
+            echo "::group::$s"
+            if python3 "tools/$s.py"; then
+              echo "-- $s passed"
+            else
+              echo "-- $s FAILED"
+              failed="$failed $s"
+            fi
+            echo "::endgroup::"
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::failing suites:$failed"
+            exit 1
+          fi
+          echo "all sixteen php suites passed"
 
   browser:
     name: firefox
@@ -162,8 +218,37 @@ jobs:
       # the pages they were written for. Nothing was lost in the move; what is
       # missing is coverage the admin never had, and it is named in
       # docs/10-development/testing.md rather than left to be discovered.
-      - name: browser suite
-        run: python3 tools/test_editor.py
+      # ALL THREE, THEN A VERDICT -- not three steps that stop at the first
+      # failure. The frontend's workflow learned this the hard way: a step per
+      # suite hides everything behind the earliest problem, and the suites
+      # after it had never run in CI at all.
+      #
+      # test_admin_forms.py was in the repository and NOT here, and the cost of
+      # that was measured rather than imagined. It is the suite that owns
+      # posting a form without navigating -- 236 checks -- and while it was
+      # absent, every button on the careers screen posted to
+      # /[object%20HTMLInputElement] and got a 404 back for ten days, on both
+      # hosts. It is also the only suite anywhere that presses one of those
+      # buttons and reads what fetch() was actually handed. See ADR 0022.
+      - name: browser suites
+        run: |
+          set -uo pipefail
+          failed=""
+          for s in test_editor test_admin_forms; do
+            echo "::group::$s"
+            if python3 "tools/$s.py"; then
+              echo "-- $s passed"
+            else
+              echo "-- $s FAILED"
+              failed="$failed $s"
+            fi
+            echo "::endgroup::"
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::failing suites:$failed"
+            exit 1
+          fi
+          echo "both browser suites passed"
 
       # The accessibility crawl over the SIGNED-IN admin. It belongs in this
       # job rather than "checks" because it needs the same Firefox, and it

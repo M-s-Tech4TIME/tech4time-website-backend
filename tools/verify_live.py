@@ -77,7 +77,13 @@ EXPECT = [
     ("/lib/private.php",      (404,),      "likewise the store locator"),
     ("/lib/publish.php",      (404,),      "likewise the publish key's reader"),
     ("/sections/careers.php", (404,),      "sections/ is outside it too"),
+    # Named as well as careers.php, which proves the same fact about the same
+    # directory: this is the screen that can set any page of the public site
+    # to noindex, and one reachable without signing in is the worst reachable
+    # file on this host.
+    ("/sections/seo.php",     (404,),      "including the one that controls indexing"),
     ("/content/careers.json", (404,),      "and the system of record"),
+    ("/content/seo.json",     (404,),      "including the site-wide SEO document"),
     ("/tools/admin-cli.php",  (404,),      "tools/ is not deployed at all"),
 
     ("/t4t-private-admin/secret.key", (403, 404), "a store dropped in the web root is refused"),
@@ -95,7 +101,8 @@ EXPECT = [
     ("/uploads/",             (403, 404),  "uploads/ does not list its contents"),
     ("/uploads/x.php",        (403, 404),  "and a .php there is refused before any handler sees it"),
     ("/uploads/notahexname.webp", (403, 404), "a name this host did not mint is refused"),
-    ("/uploads/0123456789abcdef.svg", (403, 404), "and so is an extension it does not serve"),
+    ("/uploads/0123456789abcdef.gif", (403, 404), "and so is an extension it does not serve"),
+    ("/uploads/0123456789abcdef.svg", (404,), "but a vector file is allowed through to be served"),
 ]
 
 # (path, header, what must be in its value)

@@ -203,7 +203,17 @@ def run(client, r, site):
         ("technology", 'name="technology[title]"'),
         ("principles", 'name="principles[title]"'),
         ("closing band", 'name="cta[label]"'),
-        ("search wording", 'name="meta[description]"'),
+        # NOT a field any more: the meta band is a link to the SEO screen,
+        # which edits every page's title and description in one place. What is
+        # asserted is that the band is still THERE and still points somewhere,
+        # because the outline column still lists it and a person who knows
+        # where that setting used to be should be told where it went.
+        # NOT a field any more. The meta band is a link to the SEO screen,
+        # which edits every page's title and description in one place. What is
+        # asserted is that the band is still THERE and still points somewhere:
+        # the outline column still lists it, and somebody who knows where that
+        # setting used to be should be told where it went.
+        ("search wording", "s=seo&amp;page="),
     ]:
         r.check(f"the {band} band", needle in html, needle)
 

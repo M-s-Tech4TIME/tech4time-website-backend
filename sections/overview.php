@@ -22,6 +22,7 @@ require_once __DIR__ . '/../lib/contact.php';
 require_once __DIR__ . '/../lib/company.php';
 require_once __DIR__ . '/../lib/about.php';
 require_once __DIR__ . '/../lib/home.php';
+require_once __DIR__ . '/../lib/seo.php';
 
 /** "3 minutes ago", or the date once that stops being useful. */
 function admin_when(string $iso): string
@@ -112,6 +113,36 @@ $cards = [
         'file'    => 'content/home.json',
     ],
     [
+        'section' => 'about',
+        'title'   => 'About Us',
+        'lines'   => [
+            $about_rows . ' entr' . ($about_rows === 1 ? 'y' : 'ies') . ' shown across '
+                . count(ABOUT_LISTS) . ' lists — the sections, the specialities '
+                . 'and the why-us cards',
+            $about_hidden === 0
+                ? 'Every section of the page is showing'
+                : $about_hidden . ' section' . ($about_hidden === 1 ? '' : 's')
+                    . ' of the page switched off',
+        ],
+        'saved'   => (string)($about['updated'] ?? ''),
+        'file'    => 'content/about.json',
+    ],
+    [
+        'section' => 'company',
+        'title'   => 'Company profile',
+        'lines'   => [
+            $company_rows . ' entr' . ($company_rows === 1 ? 'y' : 'ies') . ' shown across '
+                . count(COMPANY_LISTS) . ' lists — milestones, statistics, clients, '
+                . 'photographs, technology and principles',
+            $company_hidden === 0
+                ? 'Every section of the page is showing'
+                : $company_hidden . ' section' . ($company_hidden === 1 ? '' : 's')
+                    . ' of the page switched off',
+        ],
+        'saved'   => (string)($company['updated'] ?? ''),
+        'file'    => 'content/company.json',
+    ],
+    [
         'section' => 'careers',
         'title'   => 'Job posts',
         'lines'   => [
@@ -141,36 +172,34 @@ $cards = [
             : 'The site footer is showing older contact details.',
     ],
     [
-        'section' => 'company',
-        'title'   => 'Company profile',
+        'section' => 'seo',
+        'title'   => 'SEO & metadata',
         'lines'   => [
-            $company_rows . ' entr' . ($company_rows === 1 ? 'y' : 'ies') . ' shown across '
-                . count(COMPANY_LISTS) . ' lists — milestones, statistics, clients, '
-                . 'photographs, technology and principles',
-            $company_hidden === 0
-                ? 'Every section of the page is showing'
-                : $company_hidden . ' section' . ($company_hidden === 1 ? '' : 's')
-                    . ' of the page switched off',
+            $seo_pages . ' page' . ($seo_pages === 1 ? '' : 's') . ' with a title, a '
+                . 'search description and a place in the sitemap',
+            $seo_hidden === 0
+                ? 'Every page is listed in search results'
+                : $seo_hidden . ' page' . ($seo_hidden === 1 ? ' is' : 's are')
+                    . ' set to Not indexed',
         ],
-        'saved'   => (string)($company['updated'] ?? ''),
-        'file'    => 'content/company.json',
-    ],
-    [
-        'section' => 'about',
-        'title'   => 'About Us',
-        'lines'   => [
-            $about_rows . ' entr' . ($about_rows === 1 ? 'y' : 'ies') . ' shown across '
-                . count(ABOUT_LISTS) . ' lists — the sections, the specialities '
-                . 'and the why-us cards',
-            $about_hidden === 0
-                ? 'Every section of the page is showing'
-                : $about_hidden . ' section' . ($about_hidden === 1 ? '' : 's')
-                    . ' of the page switched off',
-        ],
-        'saved'   => (string)($about['updated'] ?? ''),
-        'file'    => 'content/about.json',
+        'saved'   => (string)($seo['updated'] ?? ''),
+        'file'    => 'content/seo.json',
     ],
 ];
+
+/* THE SEO SCREEN COVERS EVERY PAGE, including the six services, which are
+   rows rather than files -- so the count comes from seo_pages() rather than
+   from ADMIN_PAGE_SECTIONS. The 404 is in it too: it has a title and a
+   description like any other page, and is the one page whose record lives in
+   content/seo.json rather than beside its own content. */
+$seo       = seo_load();
+$seo_rows  = seo_pages();
+$seo_pages = count($seo_rows);
+$seo_hidden = count(array_filter(
+    $seo_rows,
+    static fn(array $row): bool => ($row['meta']['robots'] ?? 'index') === 'noindex'
+                                   && $row['key'] !== 'notfound'
+));
 
 admin_head('overview', $user,
     'Everything on the site that can be changed without a redeploy.');

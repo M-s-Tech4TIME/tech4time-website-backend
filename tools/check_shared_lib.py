@@ -18,8 +18,17 @@ WHAT IS SHARED, AND WHY EACH ONE IS
                       differently is a field one of them loses on the next save.
 
     lib/publish.php   the wire format. Disagree here and nothing publishes at
-                      all — which is the least bad of the four, because it
+                      all — which is the least bad of the five, because it
                       fails loudly on the first attempt.
+
+    lib/svg.php       what a safe vector file is. The backend sanitises an
+                      uploaded SVG and sends its own output; the frontend
+                      proves the bytes are already that output by sanitising
+                      them again and checking nothing moved. Two sanitisers
+                      that disagree mean the second one is not a check — and,
+                      worse than html.php, mean the receiving host either
+                      rejects a legitimate logo or stores bytes under a name
+                      computed from different ones.
 
     sprite.svg        the icon set. CONTACT_ICONS is in the contract, so the
                       backend offers a fixed list of icons and the frontend
@@ -70,6 +79,7 @@ SHARED = {
     "html.php":     ["lib/html.php"],
     "contract.php": ["lib/contract.php"],
     "publish.php":  ["lib/publish.php"],
+    "svg.php":      ["lib/svg.php"],
     "sprite.svg":   ["assets/icons/sprite.svg", "public/assets/icons/sprite.svg"],
 }
 

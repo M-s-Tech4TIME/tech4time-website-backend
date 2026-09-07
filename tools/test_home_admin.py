@@ -192,11 +192,11 @@ def run(client, r, site):
     print("the editor opens")
     r.check("it opens", status == 200, f"status {status}")
     r.check("it names the file it edits", "content/home.json" in html)
-    r.check("the rail lists it", ">Home Page<" in region(html, "rail"),
+    r.check("the rail lists it", ">Home<" in region(html, "rail"),
             "the editor is unreachable if the rail does not carry it")
     r.check("and marks the one showing",
             'aria-current="page"' in html
-            and "Home Page" in html[html.index('aria-current="page"'):][:300])
+            and "Home" in html[html.index('aria-current="page"'):][:300])
 
     print("\nevery band of the page is in the form")
     for band, needle in [
@@ -211,7 +211,17 @@ def run(client, r, site):
         ("the structured data", 'name="services[schema_name]"'),
         ("get to know us", 'name="destinations[items][0][alt]"'),
         ("closing band", 'name="cta[label]"'),
-        ("search wording", 'name="meta[description]"'),
+        # NOT a field any more: the meta band is a link to the SEO screen,
+        # which edits every page's title and description in one place. What is
+        # asserted is that the band is still THERE and still points somewhere,
+        # because the outline column still lists it and a person who knows
+        # where that setting used to be should be told where it went.
+        # NOT a field any more. The meta band is a link to the SEO screen,
+        # which edits every page's title and description in one place. What is
+        # asserted is that the band is still THERE and still points somewhere:
+        # the outline column still lists it, and somebody who knows where that
+        # setting used to be should be told where it went.
+        ("search wording", "s=seo&amp;page="),
     ]:
         r.check(f"the {band} band", needle in html, needle)
 

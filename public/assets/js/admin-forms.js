@@ -65,6 +65,57 @@
     global.Tech4Time.adminSwap.status(text, className);
   }
 
+  /* -------------------------------------------- where the form actually posts
+
+     NOT form.action, and the reason is a line of the HTML specification rather
+     than anything about this project. HTMLFormElement is declared
+     [LegacyOverrideBuiltIns], so a control's name wins over the interface's own
+     property of that name: a form containing <input name="action"> answers
+     form.action with that INPUT, not with a URL. String() then turns it into
+     "[object HTMLInputElement]", fetch() resolves that against the page, and
+     the request goes to /[object%20HTMLInputElement].
+
+     Every job-post form has such a control — sections/careers.php reads
+     $_POST['action'] to tell save from delete from move — so every button on
+     the careers screen posted to an address no server has ever served and got
+     a 404 back, once per press. Nothing else on the site was affected, because
+     careers is the only section with a control named after a form property
+     that anything reads -- id, name and title are shadowed on several screens,
+     and nothing looks at them.
+     Ordinary submission was never affected either: the browser submits from
+     the ATTRIBUTE and never consults the shadowed property, which is why this
+     appeared on the day the forms started posting themselves and not on the
+     day the field was added.
+
+     The getter on the prototype is exactly the property the shadowing hides,
+     and it already carries the whole of the specification's behaviour: the
+     attribute resolved against the document's base URL, and the document's own
+     URL when there is no attribute. So there is nothing to reimplement here
+     and nothing that can drift from what a plain <form> would have done.
+
+     The same shadowing hides id, name, method, target, elements, submit and
+     reset behind a control of that name. Nothing in this file reads any of
+     them, and tools/check_form_dom.py is there to keep that true. */
+  var FORM_ACTION = global.HTMLFormElement && Object.getOwnPropertyDescriptor
+    ? Object.getOwnPropertyDescriptor(global.HTMLFormElement.prototype, "action")
+    : null;
+
+  function postUrl(form) {
+    if (FORM_ACTION && typeof FORM_ACTION.get === "function") {
+      return FORM_ACTION.get.call(form) || global.location.href;
+    }
+
+    /* No descriptor: work the two answers out by hand. A browser this old has
+       no fetch() either, so usable() has already left the forms alone. */
+    var attr = form.getAttribute("action");
+
+    if (attr && typeof global.URL === "function") {
+      return new global.URL(attr, doc.baseURI).href;
+    }
+
+    return global.location.href;
+  }
+
   /* ------------------------------------------------- where to look afterwards
 
      A reorder renumbers the rows it moves between, so the button that was
@@ -367,7 +418,7 @@
     }
 
     global
-      .fetch(form.action || global.location.href, {
+      .fetch(postUrl(form), {
         method: "POST",
         body: body,
         credentials: "same-origin",
@@ -375,7 +426,7 @@
         headers: { "X-Requested-With": "fetch" }
       })
       .then(function (response) {
-        var url = response.url || form.action;
+        var url = response.url || postUrl(form);
 
         /* A session that has ended redirects to the sign-in page. Swapping
            that into <main> would leave somebody typing into a form that is no
@@ -509,6 +560,11 @@
   var api = (global.Tech4Time = global.Tech4Time || {});
 
   api.adminForms = {
+    /* Exposed so tools/test_admin_forms.py can assert the address every async
+       form on every screen will actually be posted to, against the real
+       function rather than a copy of its reasoning. A second implementation in
+       the test is a second thing that can be wrong. */
+    postUrl: postUrl,
     init: function () {
       if (!usable() || api.adminForms.wired) {
         return;

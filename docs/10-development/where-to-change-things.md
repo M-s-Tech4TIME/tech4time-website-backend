@@ -55,6 +55,7 @@ The public site's palette, layout, motion, JavaScript modules and page markup ar
 | What "On this page" lists beside an editor | the `*_OUTLINE` constant in that `sections/*.php` |
 | The Save button, and Discard beside it | the `$save` argument to `admin_head()` — **not** per section |
 | Whether a form posts without navigating | `data-async` on the `<form>`; `public/assets/js/admin-forms.js` |
+| **Where** a form posts | its `action` attribute, and nothing else. Never `form.action` in script — a control named `action` replaces it. [ADR 0022](../90-decisions/0022-form-properties-are-read-off-the-prototype.md) |
 | Whether a link moves screens without reloading | write it as `?s=<section>`; `public/assets/js/admin-swap.js` |
 | What survives a move between screens | anything outside `#admin-body` — the rail, and nothing else |
 | The rich-text toolbar | `public/assets/js/editor.js` |

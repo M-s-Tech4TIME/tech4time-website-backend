@@ -39,3 +39,4 @@ new record superseding the old one rather than quietly doing the opposite.
 | [0019](0019-uploaded-images-travel-their-own-channel.md) | Uploaded images travel their own signed channel | accepted |
 | [0020](0020-page-metadata-is-content.md) | A page's metadata is that page's content, and one screen edits all of it | accepted |
 | [0021](0021-analytics-is-off-until-somebody-turns-it-on.md) | Google Analytics is a field, and the policy opens only while it holds one | accepted |
+| [0022](0022-form-properties-are-read-off-the-prototype.md) | A form's properties are read off the prototype, never off the form | accepted |

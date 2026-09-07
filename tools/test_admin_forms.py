@@ -64,6 +64,11 @@ DOCROOT = ROOT / "public"
 ROUTER = ROOT / "tools" / "dev-router.php"
 DATA = ROOT / "content" / "company.json"
 CONTACT = ROOT / "content" / "contact.json"
+# Pressing a careers button for real writes this one, so it is restored with
+# the other two. Every document the suite saves has to be, or a run leaves the
+# repository holding a revision bump and an "updated" stamp no operator made --
+# and that stamp is what the live sitemap publishes as the page's lastmod.
+CAREERS = ROOT / "content" / "careers.json"
 
 
 class Results:
@@ -409,6 +414,74 @@ def run(b: Browser, base: str, r: Results) -> None:
                 "Tech4Time.adminForms is not wired on this screen — the page's "
                 "scripts did not load. Does the section call admin_foot()?")
 
+        # AND THAT IT ACTUALLY POSTS TO AN ADDRESS THIS SERVER ANSWERS.
+        #
+        # This is the check that was missing, and the gap it left was not
+        # small: every button on the careers screen posted to
+        # /[object%20HTMLInputElement] for ten days, both hosts answered 404 to
+        # all of them, and nothing here noticed — because the two loops above
+        # ask the markup whether it WANTS to be posted asynchronously, and
+        # neither asks where it would go.
+        #
+        # A form's named controls hide the form's own properties
+        # (HTMLFormElement is [LegacyOverrideBuiltIns]), and every form in
+        # sections/careers.php carries <input name="action"> because the
+        # section reads $_POST['action'] to tell save from delete. So
+        # form.action was that input, String() made it
+        # "[object HTMLInputElement]", and fetch() resolved it against the page.
+        #
+        # IT SUBMITS EACH FORM AND READS WHAT fetch() WAS HANDED, rather than
+        # asking the module what it would answer. Those are not the same
+        # question, and the difference is exactly the bug: a helper that
+        # returns the right URL proves nothing about a call site that does not
+        # use it. Nothing is sent — the stub resolves to a page the swap
+        # declines — so no document is written and no publish is attempted.
+        #
+        # A form guarded by data-confirm is left alone: it would open the
+        # dialog rather than post, and what the dialog does is checked
+        # elsewhere in this file.
+        posts = b.js("""
+        var out = [];
+        var real = window.fetch;
+        var seen = [];
+
+        window.fetch = function (url) {
+          seen.push(String(url));
+          return Promise.resolve({
+            ok: true, status: 200, url: String(url),
+            text: function () { return Promise.resolve(''); }
+          });
+        };
+
+        var forms = document.querySelectorAll(
+          '#admin-main form[data-async]:not([data-confirm])');
+
+        Array.prototype.forEach.call(forms, function (form) {
+          form.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
+        });
+
+        window.fetch = real;
+
+        if (seen.length !== forms.length) {
+          return [{sent: seen.length, of: forms.length}];
+        }
+
+        seen.forEach(function (url) {
+          var ok = false;
+          try {
+            var parsed = new URL(url, location.href);
+            ok = parsed.origin === location.origin &&
+                 parsed.pathname === location.pathname;
+          } catch (e) { ok = false; }
+          if (!ok) { out.push(url); }
+        });
+        return out;""")
+        r.check(f"{screen}: and every form posts to an address on this page",
+                posts == [],
+                f"{posts} — this is what fetch() was handed. admin-swap.js only "
+                f"swaps a response whose path matches, and a path the server "
+                f"does not serve is a 404 toast for every press")
+
     r.section("every form in the shell asks to be sent this way")
     for screen in ("/?s=careers", "/?s=contact", "/?s=company", "/?s=about",
                    "/?s=home", "/?s=services",
@@ -453,6 +526,53 @@ def run(b: Browser, base: str, r: Results) -> None:
             index["rows"] > 0 and index["linked"] == index["rows"],
             f"{index['linked']} of {index['rows']} rows carry a link — a row "
             f"nobody can open is a page nobody can edit")
+
+    # PRESSING ONE FOR REAL, ON THE SCREEN THAT BROKE.
+    #
+    # Everything above is about what the page would do. This does it. The CV
+    # form link is the safe button on that screen — it posts action=settings
+    # and writes back the value already in the field, so the only thing it
+    # changes is the revision and the stamp, and the finally block puts those
+    # back — and it goes through exactly the path that answered 404 to saving,
+    # publishing, unpublishing, reordering and deleting alike.
+    r.section("a careers button, pressed")
+    b.go(base + "/?s=careers")
+    b.js(MARK)
+    before_press = CAREERS.read_bytes()
+    b.click('form.admin__settings button[type="submit"]')
+
+    # .toast--bad, not .admin__status--bad. The BAD class admin-forms.js passes
+    # to adminSwap.status() never reaches the DOM: status() hands it to
+    # admin-toast.js, which turns it into kind "bad" and renders class
+    # "toast toast--bad". Looking for the class the caller uses finds nothing
+    # whatever happened, and a check that cannot fail is worse than no check --
+    # this one passed through the whole of the sabotage run that proved the
+    # other two work.
+    settled = b.js("""
+    var bad = document.querySelector('.toast--bad');
+    return {
+      bad:    bad ? bad.textContent.trim() : '',
+      marked: window.__stillHere === true,
+      link:   !!document.querySelector('input[name="cv_form_url"]')
+    };""")
+
+    r.check("saving the CV link is not refused",
+            settled["bad"] == "",
+            f"the status line reads {settled['bad']!r} — this is the toast a "
+            f"person saw four times over, once per press")
+    r.check("and the page was not navigated", settled["marked"] is True,
+            "window.__stillHere was lost, so the document was replaced")
+    r.check("and the form came back", settled["link"] is True,
+            "the swap did not put a careers screen back")
+
+    # AND THE DOCUMENT ON DISK MOVED. Without this the three checks above pass
+    # on a press that never happened: no toast, no navigation and the form
+    # still there is exactly what a button nobody managed to click looks like.
+    # The file is restored in the finally block with the other two.
+    r.check("and content/careers.json was written",
+            CAREERS.read_bytes() != before_press,
+            "the document is byte-identical, so nothing reached the server — "
+            "a vacuous pass is what the three checks above would give you")
 
     b.go(base + "/?s=company")
     b.js(MARK)
@@ -1259,6 +1379,7 @@ def main() -> None:
 
     backup = DATA.read_bytes()
     contact_backup = CONTACT.read_bytes()
+    careers_backup = CAREERS.read_bytes()
     web_port, drv_port = free_port(), free_port()
     work = Path(tempfile.mkdtemp(prefix="t4t-admin-forms-"))
     private = work / "private"
@@ -1318,9 +1439,11 @@ def main() -> None:
         shutil.rmtree(work, ignore_errors=True)
         DATA.write_bytes(backup)
         CONTACT.write_bytes(contact_backup)
-        for stray in (DATA.with_suffix(".json.bak"),):
+        CAREERS.write_bytes(careers_backup)
+        for stray in (DATA.with_suffix(".json.bak"),
+                      CAREERS.with_suffix(".json.bak")):
             stray.unlink(missing_ok=True)
-        print(f"\n{DATA.relative_to(ROOT)} restored")
+        print(f"\n{DATA.relative_to(ROOT)} and {CAREERS.relative_to(ROOT)} restored")
 
     total = r.passed + len(r.failed)
     if r.failed:

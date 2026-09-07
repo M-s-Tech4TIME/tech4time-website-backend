@@ -126,6 +126,7 @@ python3 tools/check_secrets.py         python3 tools/check_docs.py
 python3 tools/build_deploy_set.py --check
 python3 tools/check_shared_lib.py
 python3 tools/check_shared_repos.py
+python3 tools/check_form_dom.py
 ```
 
 Touched the admin, auth or an editor? Also `test_admin_auth.py`, `test_careers_admin.py`,

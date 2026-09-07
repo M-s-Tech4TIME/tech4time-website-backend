@@ -262,8 +262,23 @@ def run(client, r, site):
     r.check("it carries a CSRF token", "csrf" in fields)
     r.check("the whole page carries a standing legal warning",
             "Every word on this page is a legal statement" in page)
+    # THE CLASS LIST, NOT A LITERAL ATTRIBUTE. This read
+    # 'class="admin__notice"' in page, and stopped being true the day
+    # admin_standing_notice() gained admin__notice-line to put its icon on the
+    # text's centre line -- a purely visual change that broke a check about
+    # whether a legal warning is styled as a refusal. What it means to assert
+    # is that the paragraph is a notice and is NOT dressed as an error, so
+    # that is what it asks now, and another modifier can be added without
+    # coming back here.
+    warning = re.search(
+        r'<p class="([^"]*admin__notice[^"]*)"[^>]*>(?:(?!</p>).)*'
+        r'Every word on this page is a legal statement',
+        page, re.S)
     r.check("and the warning is a notice, not an error",
-            'class="admin__notice"' in page)
+            warning is not None
+            and "admin__notice--error" not in warning.group(1),
+            f"classes are {warning.group(1)!r}" if warning else
+            "no <p class=...admin__notice...> carries the standing warning")
     r.check("the scripts that stop a button reloading the page are loaded",
             "admin-forms.js" in page,
             "admin_foot() did not run — every button would be a full reload")

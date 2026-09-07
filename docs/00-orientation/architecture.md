@@ -319,6 +319,18 @@ like it worked everywhere: it did, except on the one button somebody presses fir
 `admin-forms.js` now runs on every path out, and `test_admin_forms.py` presses Save twice without
 reloading.
 
+**And where it posts is read off the prototype, which has bitten harder.** A form's named controls
+hide the form's own DOM properties — `HTMLFormElement` is `[LegacyOverrideBuiltIns]` — so on the
+careers screen, whose every form carries `<input name="action">` because the section reads
+`$_POST['action']`, `form.action` was that input rather than a URL. `fetch()` posted to
+`/[object%20HTMLInputElement]` and both hosts answered 404 to saving, publishing, unpublishing,
+reordering and deleting alike, for ten days, while every suite stayed green: the markup was correct
+throughout, and nothing but this file ever read a property off a form. It reads through
+`HTMLFormElement.prototype` now, `tools/check_form_dom.py` refuses the pattern in both halves, and
+`test_admin_forms.py` asks the module for the address it would post each form to on every screen —
+then presses a careers button for real.
+[ADR 0022](../90-decisions/0022-form-properties-are-read-off-the-prototype.md)
+
 Neither touches the rail. It is the same markup on every screen bar one attribute, so `admin-swap.js`
 brings `aria-current` across and leaves the element standing — which is what keeps the account
 menu's open state, the rail's own scroll position, and the width somebody chose. The rail being

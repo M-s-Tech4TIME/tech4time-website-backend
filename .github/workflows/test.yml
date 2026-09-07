@@ -130,33 +130,44 @@ jobs:
           sudo apt-get install -y -qq qrencode
           command -v qrencode || { echo "::error::qrencode is not on PATH — test_qr.py would have skipped"; exit 1; }
 
-      - run: python3 tools/test_svg.py
-      - run: python3 tools/test_store.py
-      - run: python3 tools/test_upload.py
-      # The second factor's enrolment. It was in the repository and not here.
-      - run: python3 tools/test_qr.py
-      - run: python3 tools/test_admin_auth.py
-      - run: python3 tools/test_publish_client.py
-      - run: python3 tools/test_careers_admin.py
-      - run: python3 tools/test_contact_admin.py
-      - run: python3 tools/test_company_admin.py
-      # These three were in the repository but not here, so the about, home and
-      # services editors were only ever tested by somebody remembering to run
-      # them. A test that CI does not run is a test that stops being true
-      # quietly.
-      - run: python3 tools/test_about_admin.py
-      - run: python3 tools/test_home_admin.py
-      - run: python3 tools/test_services_admin.py
-      - run: python3 tools/test_certifications_admin.py
-      - run: python3 tools/test_branding_admin.py
-      - run: python3 tools/test_privacy_admin.py
-      # The SEO screen, and the one assertion in this repository that no other
-      # suite can make: saving one of the nine page editors leaves that
-      # document's meta band exactly as it was. Those forms no longer RENDER
-      # the meta fields but their documents still hold them, so a *_from_post()
-      # that still names the band would blank a title on every save — silently,
-      # because an empty string is a valid title. See ADR 0020.
-      - run: python3 tools/test_seo_admin.py
+      # ALL OF THEM, THEN A VERDICT. A step each stops the job at the first
+      # failure, and everything after it never runs -- so a red build reports
+      # one problem when it may have found five, and each fix costs another
+      # eight-minute round trip to discover the next. The browser job below and
+      # the frontend's whole workflow are already shaped this way; this job was
+      # the last one that was not, and it hid two failures behind one on the
+      # run that added test_branding_admin.py to it.
+      #
+      # test_seo_admin.py makes the one assertion no other suite here can:
+      # saving one of the nine page editors leaves that document's meta band
+      # exactly as it was. Those forms no longer RENDER the meta fields but
+      # their documents still hold them, so a *_from_post() that still named
+      # the band would blank a title on every save -- silently, because an
+      # empty string is a valid title. See ADR 0020.
+      - name: php suites
+        run: |
+          set -uo pipefail
+          failed=""
+          for s in test_svg test_store test_upload test_qr \
+                   test_admin_auth test_publish_client \
+                   test_careers_admin test_contact_admin test_company_admin \
+                   test_about_admin test_home_admin test_services_admin \
+                   test_certifications_admin test_branding_admin \
+                   test_privacy_admin test_seo_admin; do
+            echo "::group::$s"
+            if python3 "tools/$s.py"; then
+              echo "-- $s passed"
+            else
+              echo "-- $s FAILED"
+              failed="$failed $s"
+            fi
+            echo "::endgroup::"
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::failing suites:$failed"
+            exit 1
+          fi
+          echo "all sixteen php suites passed"
 
   browser:
     name: firefox

@@ -207,10 +207,19 @@
       return false;
     }
 
-    /* The last row's first field that somebody can actually type in: the id
-       is a hidden input and would swallow the focus silently. */
+    /* The last row's first field that somebody can actually type in: the id is
+       a hidden input and would swallow the focus silently, and a picture row's
+       file picker is not somewhere anybody types.
+
+       type=file MATTERS ONLY WHERE GD IS INSTALLED, which is every host and
+       not this laptop: without it admin_image_fields() renders a notice
+       instead of the input, so the field after it was picked by accident and
+       the check passed for a reason that had nothing to do with the code.
+       CI has GD, found it, and named it -- focus went to upload[clients][9]
+       rather than the client's name. */
     var last = rows[rows.length - 1].closest(".admin-card");
-    var field = last && last.querySelector("input:not([type=hidden]), textarea, select");
+    var field = last && last.querySelector(
+      "input:not([type=hidden]):not([type=file]), textarea, select");
 
     if (field) {
       field.focus();

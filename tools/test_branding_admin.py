@@ -446,8 +446,15 @@ def run(client, r, site):
       r.check("the preview slot does not",
               'accept="image/jpeg,image/png,image/webp">' in page,
               "the preview input offers SVG, which the page never draws")
+      # WHITESPACE-NORMALISED. The sentence is one line in the browser and two
+      # in lib/admin.php, so the page carries a newline and twelve spaces where
+      # this reads a single space. Asserted against the prose rather than
+      # against its indentation, or the next reflow breaks a check about what
+      # the editor TELLS somebody -- which is the same way
+      # test_privacy_admin.py's notice assertion broke.
       r.check("and it says what happens to one",
-              "read, checked against a list of what a drawing may contain" in page)
+              "read, checked against a list of what a drawing may contain"
+              in " ".join(page.split()))
 
     print("\nhiding is not deleting")
 

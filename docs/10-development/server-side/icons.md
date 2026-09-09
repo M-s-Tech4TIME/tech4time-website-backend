@@ -85,6 +85,23 @@ file.
 inlines the whole list on every admin page, because the contact editor renders a live preview of
 every icon it offers and cannot know in advance which will be used.
 
+### The allow-lists an editor offers
+
+Which icons a document may offer is part of the shared model, in `lib/contract.php`:
+`CONTACT_ICONS`, `COMPANY_ICONS`, `ABOUT_ICONS`, `HOME_ICONS`, `SERVICES_ICONS`, and
+`CHROME_BAR_ICONS` with the fixed marks beside it (`CHROME_CONTACT_ICONS`, `CHROME_SOCIAL_ICONS`).
+They are in the contract rather than here because this side offers the choice and the public site
+has to be able to draw whatever was chosen — a row carrying an icon the frontend has never heard of
+renders there as an empty box.
+
+`python3 tools/check_content_model.py` asserts every name in all of them is in the master sprite
+**and** in `ADMIN_ICONS`. That second half only runs here, where the editor lives; an icon the model
+offers that `ADMIN_ICONS` does not inline draws an empty box in the picker, and nothing else would
+notice.
+
+How the public site inlines the ones chosen at run time is its own problem and is written up in
+`tech4time-website-frontend/docs/10-development/frontend/icons.md`.
+
 ---
 
 ## Accessibility

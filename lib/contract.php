@@ -5204,7 +5204,114 @@ function seo_images(array $data): array
 }
 
 /* ==========================================================================
-   11. Revisions
+   11. Chrome — the shape of the header, footer and dock
+   ========================================================================== */
+
+/*
+   THE CHROME'S ICONS ARE INLINED AT RENDER TIME, NOT SCANNED FOR.
+
+   tools/inject_icons.py finds the symbols a page needs by scanning its source
+   for a literal href="#name". Once lib/body.php emits the header, footer and
+   dock there is no such literal in any page's source, and the block that tool
+   writes would come back empty on eleven of the seventeen pages -- every icon
+   they carry comes from those three blocks.
+
+   The answer is the one lib/services.php and lib/certifications.php already
+   use for content icons: the renderer works out its own set and writes a
+   SECOND sprite, marked content-sprite rather than icon-sprite so the tool's
+   non-greedy match is left alone. Two <symbol> elements sharing an id overlap
+   harmlessly -- tools/audit_pages.py exempts symbol ids from its duplicate-id
+   check for exactly this reason -- and it audits RENDERED output, so "every
+   <use> resolves to an inlined <symbol>" is already proved on the only text a
+   visitor receives.
+
+   THE ALTERNATIVE WAS MEASURED AND REJECTED, in lib/services.php, on a model
+   offering seventy-six icons: naming them all up front cost +7 to +10 KB
+   gzipped per page. The chrome is smaller, but the argument is the same and
+   the conclusion is stronger here, because this list is inlined on ALL
+   seventeen pages rather than seven. A page carries the icons it draws.
+
+   So what follows is the model's business only -- which icons may be CHOSEN,
+   and which mark stands for what. Nothing here decides what gets inlined.
+*/
+
+/**
+ * The icons the dock bar's four slots may choose from.
+ *
+ * A fixed list rather than the whole sprite, for the reason CONTACT_ICONS is:
+ * the backend offers the choice and the frontend has to be able to draw
+ * whatever was chosen. A slot carrying an icon the frontend has never heard of
+ * renders as an empty box.
+ *
+ * Deliberately short. The bar is four buttons wide at the bottom of a phone
+ * screen, and the list only has to cover the kinds of place a slot can point
+ * at -- the site's own pages and its services. One mark per kind, not one per
+ * taste.
+ *
+ * Every name here must also be in ADMIN_ICONS in the backend's lib/admin.php,
+ * or the editor's live preview draws an empty box for it;
+ * tools/check_content_model.py says so when one is missing.
+ *
+ * Order is picker order, and it runs the way somebody choosing one thinks:
+ * home, then the sections, then the ways to get in touch.
+ */
+const CHROME_BAR_ICONS = [
+    'home'        => 'Home',
+    'cogs'        => 'Cogs',
+    'building'    => 'Building',
+    'users'       => 'People',
+    'briefcase'   => 'Briefcase',
+    'certificate' => 'Certificate',
+    'shield-alt'  => 'Shield',
+    'cloud'       => 'Cloud',
+    'code'        => 'Code',
+    'server'      => 'Server',
+    'chart-line'  => 'Chart',
+    'comment-alt' => 'Speech bubble',
+    'envelope'    => 'Envelope',
+    'phone'       => 'Phone',
+    'globe'       => 'Globe',
+];
+
+/**
+ * The mark a footer contact row draws, by what kind of thing it holds.
+ *
+ * Not a picker, and deliberately not one. The kind already decides how the row
+ * links -- tel:, mailto:, or no link at all -- so letting it decide the icon
+ * too is one fewer field to fill in and one fewer way for a phone number to
+ * end up beside a clock. These are the four marks the footer's <address>
+ * block has carried since it was written by hand.
+ */
+const CHROME_CONTACT_ICONS = [
+    'phone'   => 'phone',
+    'email'   => 'envelope',
+    'address' => 'map-marker-alt',
+    'hours'   => 'clock',
+];
+
+/**
+ * The mark a footer social link draws, by the host its URL points at.
+ *
+ * The footer's social links are derived from the SEO document's `sameas` rows,
+ * which hold a URL and a label and nothing about how to draw one -- so the
+ * host is what there is to go on. Matched as a suffix of the hostname, so
+ * www.linkedin.com and linkedin.com are the same site, which is how anybody
+ * pasting a profile URL would expect it to behave.
+ *
+ * Two entries, because assets/icons/sprite.svg holds exactly two brand marks.
+ * Anything else gets CHROME_SOCIAL_FALLBACK, which is why a Facebook row added
+ * tomorrow renders as a globe rather than as nothing at all.
+ */
+const CHROME_SOCIAL_ICONS = [
+    'linkedin.com' => 'linkedin',
+    'github.com'   => 'github',
+];
+
+/** What a social link draws when CHROME_SOCIAL_ICONS does not know its host. */
+const CHROME_SOCIAL_FALLBACK = 'globe';
+
+/* ==========================================================================
+   12. Revisions
    ========================================================================== */
 
 /**
@@ -5227,7 +5334,7 @@ function contract_next_revision(array $data): int
 }
 
 /* ==========================================================================
-   12. Normalising and re-sanitising on receipt
+   13. Normalising and re-sanitising on receipt
    ========================================================================== */
 
 /**

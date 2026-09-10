@@ -142,6 +142,15 @@ only the top rung is also the `src` — so a caller reading `src` and `webp` alo
 The seven `*_images()` collectors all ask it rather than each carrying its own walk, which is what
 makes adding a field to a picture record one edit instead of seven.
 
+`contract_picture_ladder()` answers what a renderer should put in `srcset` and `sizes` for one
+picture in one slot — **and returns nothing at all when the slot declares no `sizes=`.** That is not
+caution. A `srcset` of widths with no `sizes=` beside it does not mean "choose freely": the browser
+is required to assume the picture fills the viewport, so it takes the *widest* rung on every screen
+— a phone downloading the 3× file for a flag drawn at 56 px, which is worse than the single file it
+would otherwise get. The rule has to be the same on five pages that each write their own markup, so
+it lives here once and what comes back is three strings and no markup, which is what keeps this file
+shareable with a repository that renders nothing.
+
 
 `contract_sanitise()` runs every rich field back through `html.php`, driven off
 `CAREERS_RICH_FIELDS` / `CONTACT_RICH_FIELDS` rather than a list of its own — so a rich field added

@@ -1104,6 +1104,44 @@ function contract_slot_sizes(string $slot): string
 }
 
 /**
+ * What a picture's candidate lists and sizes= attribute should be, here.
+ *
+ * NO sizes=, NO LADDER, AND THAT IS NOT CAUTION. It is the difference between
+ * an improvement and a regression. A srcset of widths with no sizes= beside it
+ * does not mean "pick whichever you like": the browser is required to assume
+ * the picture fills the whole viewport, so it takes the WIDEST rung every
+ * time. A phone would end up downloading the 3x file for a flag drawn at 56
+ * pixels -- worse than the single file it gets today. So a slot that declares
+ * no sizes= gets no candidate list, whatever the document happens to hold.
+ *
+ * The renderers ask this rather than reading the two fields themselves,
+ * because that rule has to be the same on all five pages and there are five
+ * copies of the markup it applies to. What comes back is three strings and no
+ * markup: each page still writes its own tags, which is how this file stays
+ * shared with a repository that renders nothing.
+ *
+ * An empty 'srcset' means the picture was stored at one width -- most of them,
+ * and everything stored before ladders existed -- and the caller emits src
+ * alone, exactly as it always did.
+ */
+function contract_picture_ladder(mixed $image, string $slot): array
+{
+    $sizes = contract_slot_sizes($slot);
+
+    if ($sizes === '') {
+        return ['srcset' => '', 'webp_srcset' => '', 'sizes' => ''];
+    }
+
+    $image = is_array($image) ? $image : [];
+
+    return [
+        'srcset'      => trim((string)($image['srcset'] ?? '')),
+        'webp_srcset' => trim((string)($image['webp_srcset'] ?? '')),
+        'sizes'       => $sizes,
+    ];
+}
+
+/**
  * The widths a slot's ladder should hold, given the picture that arrived.
  *
  * Never upscales, and never stores a rung nothing can use. Each density is

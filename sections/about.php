@@ -223,7 +223,7 @@ function about_take_uploads(array $data, array &$errors): array
         $where = 'Section ' . ($index + 1)
                . ($band === 'story_dark' ? ' (dark mode)' : '');
 
-        $stored = upload_accept($file);
+        $stored = upload_accept($file, 'about.story');
 
         if (isset($stored['error'])) {
             $errors[] = $where . ': ' . $stored['error'];

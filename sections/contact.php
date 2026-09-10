@@ -269,7 +269,7 @@ function contact_take_uploads(array $data, array &$errors): array
             continue;
         }
 
-        $stored = upload_accept($file);
+        $stored = upload_accept($file, 'contact.offices');
 
         if (isset($stored['error'])) {
             $errors[] = 'Office ' . ($index + 1) . ': ' . $stored['error'];

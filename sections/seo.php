@@ -322,7 +322,13 @@ function seo_take_uploads(array $data, array &$errors): array
         }
 
         $where  = $band === 'share' ? 'The share card' : 'The logo';
-        $stored = upload_accept($file, UPLOAD_MAX_DIMENSION);
+
+        /* Neither of these ladders, and CONTRACT_IMAGE_SLOTS says why: a share
+           card is read by scrapers that do not implement srcset and want
+           exactly 1200x630, and Organization.logo is one image named once by a
+           consumer that picks nothing. Naming the slot anyway is what makes
+           that a recorded decision rather than an omission. */
+        $stored = upload_accept($file, $band === 'share' ? 'seo.share' : 'seo.logo');
 
         if (isset($stored['error'])) {
             $errors[] = $where . ': ' . $stored['error'];

@@ -448,8 +448,9 @@ says so plainly and the byte-level refusals still hold without it; CI installs `
 
 **Backend only.** The frontend has no upload form and must never gain one.
 
-`upload_problem()` · `upload_accept()` · `upload_store()` · `upload_held()` ·
-`upload_in_use()` · `upload_unused()` · `upload_delete()`
+`upload_problem()` · `upload_accept()` · `upload_store()` · `upload_scale()` ·
+`upload_keep_alpha()` · `upload_srcset()` · `upload_held()` · `upload_in_use()` ·
+`upload_unused()` · `upload_delete()`
 
 The only code in either repository that takes a file from somebody's computer and puts it on a web
 server. **The rule it works to is that nothing the browser sent is ever written.** An upload is
@@ -471,6 +472,32 @@ instead, which is the same rule by a different route. Full reasoning in
 for something a visitor takes away, which today is only the branding page's downloads. The caller
 says which.
 
+**A picture is stored at the widths its slot is drawn at, not at the width that arrived.** Every
+`upload_accept()` call site names a key of `CONTRACT_IMAGE_SLOTS`, and `contract_slot_widths()`
+turns that into a ladder at 1×, 2× and 3× — never upscaling, never past the ceiling.
+`upload_store()` writes a WebP and a fallback for each rung and returns `srcset` / `webp_srcset`
+naming them, with `src` pointing at the top one.
+
+That second half is a fix, not an addition. The ceiling used to be the only number, so a flag
+arrived at 1600 px and *stayed* 1600 px however small it is drawn — **the site got worse the first
+time somebody used the editor as intended**, because `tech4time-website-frontend/tools/build_images.py` had deliberately built
+the committed pictures at 160–1200 per kind and an upload replaced one with a file ten times the
+size. A 1600 px flag now stores 56/112/168 and `src` names the 168.
+
+**A slot that does not ladder stores exactly what it stored before** — one width, the same two
+content-addressed names, byte for byte. `upload_scale()` hands the image back untouched when it is
+already that wide, so nothing is re-encoded and the files already on both hosts stay the files that
+are wanted. `test_upload.py` compares the names against the copy at `HEAD` rather than assuming it.
+
+`upload_keep_alpha()` exists because `imagescale()` returns an image with alpha saving **off**: a
+mark uploaded on transparency would come back on a black rectangle on every screen but the one
+taking the top rung. Every rung goes through it, and the test reads the corner pixel of each.
+
+**A misspelt slot is not an error anywhere at run time.** `contract_slot_widths()` answers with no
+ladder, the upload succeeds, and the picture is quietly stored at one width forever. So
+`test_upload.py` compares the two lists in both directions instead: every slot the contract declares
+is named by a screen, and every slot a screen names is one the contract declares.
+
 **`upload_in_use()` asks every document, not the one on screen — and that is a fix, not a
 nicety.** `public/uploads/` is one directory shared by every editor, but each editor used to pass
 only its own document's pictures to `upload_unused()`. So the about screen counted the home page's
@@ -488,6 +515,14 @@ photograph as unused and offered to delete a picture that was on the contact pag
 section describes, a second time, from listing a document in the wrong arm rather than from not
 listing it at all. `contact_images()` exists now, and `test_upload.py` asks **every** name in
 `CONTRACT_DOCUMENTS` for an answer rather than trusting that each was placed correctly.
+
+**All of a picture goes to the live site, or the caller must not save.**
+`admin_send_picture()` reads every file `contract_image_paths()` names off disk *before* any of them
+leaves, so a file that is not where it had just been written is found while nothing has travelled.
+The network half cannot be made atomic — a refusal on the fifth of six has already sent four — but
+those four are content-addressed and unreferenced, which is what the unused sweep is for. What
+matters is that the caller gets a sentence and leaves the document alone: **no document ever names a
+file that did not arrive.**
 
 **A laddered picture is mostly files that only `srcset` names.** Six files for one photograph, of
 which the sweep's old walk — `src` and `webp` — could see two. The other four would have come back

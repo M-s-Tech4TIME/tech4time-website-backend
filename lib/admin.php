@@ -744,27 +744,47 @@ function admin_uploaded_files(): array
 }
 
 /**
- * Send a stored picture and its WebP sibling to the live site.
+ * Send every file a stored picture is made of to the live site.
  *
- * Returns '' or a sentence. Both files go, because the page names both and a
+ * Returns '' or a sentence. ALL OF THEM GO, OR THE CALLER MUST NOT SAVE. A
  * <source> pointing at a picture the other host does not have is a broken
- * image for everybody whose browser prefers WebP — which is nearly everybody.
+ * image for everybody whose browser prefers WebP — which is nearly everybody —
+ * and a ladder makes that six chances instead of two: a laddered picture keeps
+ * most of its files inside srcset, where only the browser will ever look.
+ *
+ * contract_image_paths() is what "every file" means, so this cannot fall
+ * behind the shape: a field added to a picture record is sent by having been
+ * added. It is also already deduplicated, so the top rung — which is both the
+ * src and the last srcset entry — travels once.
+ *
+ * READ FIRST, THEN SEND. Every file is loaded off disk before any of them
+ * leaves, so "the picture was not where it had just been written" is found
+ * while nothing has travelled. It cannot make the network half atomic — a
+ * refusal on the fifth of six has already sent four — but the four are
+ * content-addressed and unreferenced, which is what the unused sweep is for.
+ * What matters is that the caller gets a sentence and leaves the document
+ * alone, so no document ever names a file that did not arrive.
  */
 function admin_send_picture(array $stored): string
 {
-    foreach (['src', 'webp'] as $which) {
-        $name = basename((string)($stored[$which] ?? ''));
+    $files = [];
+
+    foreach (contract_image_paths($stored) as $path) {
+        $name = basename((string)$path);
         if ($name === '') {
             continue;
         }
 
-        $path = UPLOAD_DIR . '/' . $name;
-        $bytes = @file_get_contents($path);
+        $bytes = @file_get_contents(UPLOAD_DIR . '/' . $name);
 
         if ($bytes === false) {
             return 'The picture was not where it had just been written.';
         }
 
+        $files[] = $bytes;
+    }
+
+    foreach ($files as $bytes) {
         $kind = publish_asset_type($bytes);
         $result = publish_asset($bytes, $kind[1] ?? 'application/octet-stream');
 

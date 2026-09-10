@@ -266,7 +266,7 @@ function home_take_uploads(array $data, array &$errors): array
         $where = 'Card ' . ($index + 1)
                . ($band === 'destinations_dark' ? ' (dark mode)' : '');
 
-        $stored = upload_accept($file);
+        $stored = upload_accept($file, 'home.destinations');
 
         if (isset($stored['error'])) {
             $errors[] = $where . ': ' . $stored['error'];

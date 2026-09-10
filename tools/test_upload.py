@@ -28,6 +28,7 @@ runs there — .github/workflows/test.yml.
 
 import base64
 import json
+import re
 import shutil
 import struct
 import subprocess
@@ -92,6 +93,26 @@ def png(width: int, height: int) -> bytes:
     return (b"\x89PNG\r\n\x1a\n"
             + png_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
             + png_chunk(b"IDAT", zlib.compress(raw))
+            + png_chunk(b"IEND", b""))
+
+
+def png_rgba(width: int, height: int) -> bytes:
+    """A real PNG with an alpha channel: opaque left half, transparent right.
+
+    A logo is the picture most likely to be uploaded with transparency and the
+    one where losing it is most visible — a mark on a black rectangle. Every
+    rung is a separate imagescale(), and imagescale() hands back an image with
+    saving OFF, so this is the thing a ladder is most likely to break.
+    """
+    rows = []
+    for _ in range(height):
+        row = b""
+        for x in range(width):
+            row += bytes([200, 60, 60, 255 if x < width // 2 else 0])
+        rows.append(b"\x00" + row)
+    return (b"\x89PNG\r\n\x1a\n"
+            + png_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
+            + png_chunk(b"IDAT", zlib.compress(b"".join(rows)))
             + png_chunk(b"IEND", b""))
 
 
@@ -237,6 +258,24 @@ def run(r: Results, gd: bool) -> None:
         r.check(f"contract_images() answers for '{name}'", "fatal" not in got,
                 str(got)[:200])
 
+    print("\nwhere a picture comes from says which width it is stored at")
+    # A slot is a string, and a string can be misspelt. A misspelt one is not
+    # an error anywhere at run time — contract_slot_widths() answers with no
+    # ladder, the upload succeeds, and the picture is quietly stored at one
+    # width forever. So the two lists are compared instead, in both directions:
+    # every slot the contract declares is named by a screen, and every slot a
+    # screen names is one the contract declares.
+    declared = set(php("echo json_encode(array_keys(CONTRACT_IMAGE_SLOTS));") or [])
+    named = {}
+    for f in sorted((ROOT / "sections").glob("*.php")):
+        for lit in re.findall(r"'([a-z][a-z_]*\.[a-z][a-z_]*)'", f.read_text()):
+            named.setdefault(lit, f.name)
+
+    r.check("every slot a screen names is one the contract declares",
+            not (set(named) - declared), f"unknown: {sorted(set(named) - declared)}")
+    r.check("and every slot the contract declares is named by a screen",
+            not (declared - set(named)), f"never used: {sorted(declared - set(named))}")
+
     print("\na ladder's rungs count as pictures in use")
     # A laddered picture keeps most of its files inside srcset and nowhere
     # else: only the top rung is also the src. A collector reading src and webp
@@ -362,6 +401,94 @@ def run(r: Results, gd: bool) -> None:
               % base64.b64encode(wide).decode())
     r.check("an oversized picture is reduced", got.get("width") == 1600, str(got))
     r.check("and keeps its shape", got.get("height") == 8, str(got))
+
+    print("\nhow many widths get stored, and how wide the file itself is")
+    # THE OTHER HALF OF THE CHANGE, and the one that was a live defect: a flag
+    # arrived at 1600 and STAYED 1600 however small it is drawn, so the site
+    # got worse the first time somebody used the editor as intended. src now
+    # names the top rung — the width the slot is drawn at — and never the width
+    # that happened to arrive.
+    #
+    # Every expectation here was measured off the rendered pages, not guessed:
+    # see the docblock on CONTRACT_IMAGE_SLOTS.
+    for slot, w, h, ceiling, src_w, rungs in [
+            ("contact.offices",    1600, 1600, "",   168, [56, 112, 168]),
+            ("contact.offices",      40,   40, "",    40, []),
+            ("about.story",        2000, 1000, "",  1600, [700, 1400, 1600]),
+            ("about.story",         900,  600, "",   900, [700, 900]),
+            ("about.story",         500,  400, "",   500, []),
+            ("company.technology", 1200,  400, "",   360, [120, 240, 360]),
+            ("company.clients",     300,  300, "",   300, [250, 300]),
+            # Portrait, and the point of it: the ladder is cut from the WIDTH,
+            # which is what a sizes= attribute is about. Fitting is the longest
+            # side; these are not the same number and this is where that shows.
+            ("home.destinations",   600, 1400, "",   600, [400, 600]),
+            # The three that do not ladder, each for a reason recorded in the
+            # contract, plus a slot nobody declared and no slot at all.
+            ("branding.file",      2000, 1000, ", UPLOAD_MAX_DOWNLOAD_DIMENSION",
+                                                2000, []),
+            ("seo.share",          1200,  630, "",  1200, []),
+            ("seo.logo",           1200,  630, "",  1200, []),
+            ("",                   2000,   10, "",  1600, []),
+            ("not.a.slot",         1200,  800, "",  1200, [])]:
+        got = php("echo json_encode(upload_store(base64_decode('%s'), '%s'%s));"
+                  % (base64.b64encode(png(w, h)).decode(), slot, ceiling))
+        where = f"{slot or '(no slot)'} at {w}x{h}"
+
+        r.check(f"{where}: src is stored {src_w}px wide",
+                got.get("width") == src_w, str(got)[:220])
+
+        stored = [int(e.strip().split(" ")[1][:-1])
+                  for e in got.get("srcset", "").split(",") if e.strip()]
+        r.check(f"{where}: {'stores ' + '/'.join(map(str, rungs)) if rungs else 'stores one width, no ladder'}",
+                stored == rungs, f"got {stored} from {str(got.get('srcset'))[:160]}")
+
+        webp_stored = [int(e.strip().split(" ")[1][:-1])
+                       for e in got.get("webp_srcset", "").split(",") if e.strip()]
+        r.check(f"{where}: the WebP ladder matches the fallback's",
+                webp_stored == stored, f"{webp_stored} vs {stored}")
+
+        # A rung named and not written is a broken picture for everybody whose
+        # browser prefers WebP, which is nearly everybody.
+        paths = php("echo json_encode(contract_image_paths(%s));"
+                    % json.dumps(got).replace("\\/", "/")
+                          .replace('"', "'").replace("{", "[").replace("}", "]")
+                          .replace("':", "' =>"))
+        missing = [p for p in (paths if isinstance(paths, list) else [])
+                   if not (UPLOADS / Path(p).name).is_file()]
+        r.check(f"{where}: every file it names is on disk",
+                isinstance(paths, list) and not missing, f"missing {missing}")
+
+    print("\nwhat a rescale must not lose")
+    # imagescale() hands back an image with alpha saving OFF. A ladder is three
+    # of them, so a mark uploaded on transparency would come back on a black
+    # rectangle on every screen but the one that takes the top rung.
+    got = php("echo json_encode(upload_store(base64_decode('%s'), 'company.technology'));"
+              % base64.b64encode(png_rgba(600, 200)).decode())
+    r.check("a transparent logo ladders", len(got.get("srcset", "").split(",")) == 3,
+            str(got)[:220])
+    for entry in [e.strip() for e in got.get("srcset", "").split(",") if e.strip()]:
+        name = Path(entry.split(" ")[0]).name
+        alpha = php("$im = imagecreatefrompng(UPLOAD_DIR . '/%s');"
+                    "echo json_encode(['a' => (imagecolorat($im, imagesx($im) - 1, 0)"
+                    " >> 24) & 0x7F, 'w' => imagesx($im)]);" % name)
+        r.check(f"and its {alpha.get('w')}px rung is still transparent",
+                (alpha.get("a") or 0) > 120, str(alpha))
+
+    print("\nsending a picture to the live site")
+    # All of it goes or the caller must not save: a document naming a rung that
+    # never arrived is a broken image. The record below names a rung that is
+    # not on disk, so this must stop before anything travels rather than send
+    # the two files it can find and report success.
+    ghost = php(
+        "define('T4T_ADMIN', true); require 'lib/admin.php';"
+        "echo json_encode(['e' => admin_send_picture(["
+        "  'src' => '%s', 'webp' => '%s',"
+        "  'srcset' => '/uploads/deadbeefdeadbeef.png 56w, %s 112w'])]);"
+        % (got.get("src", ""), got.get("webp", ""), got.get("src", "")))
+    r.check("a set with a file missing from it is not sent at all",
+            "not where it had just been written" in (ghost.get("e") or ""),
+            str(ghost)[:220])
 
     print("\nwhen the directory is not there yet")
     # It is in neither repository -- it holds nothing that is committed -- so on

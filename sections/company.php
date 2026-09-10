@@ -228,12 +228,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
  */
 function company_take_uploads(array $data, array &$errors): array
 {
+    /* Which CONTRACT_IMAGE_SLOTS row each band's pictures fill. Three of the
+       six bands are missing on purpose: a milestone, a statistic and a
+       principle carry no picture. One arriving anyway stores a single file,
+       which is what every band did before slots existed. */
+    $slots = [
+        'journey'    => 'company.journey',
+        'clients'    => 'company.clients',
+        'technology' => 'company.technology',
+    ];
+
     foreach (admin_uploaded_files() as [$band, $index, $file]) {
         if (!isset(COMPANY_LISTS[$band]) || !isset($data[$band]['items'][$index])) {
             continue;
         }
 
-        $stored = upload_accept($file);
+        $stored = upload_accept($file, $slots[$band] ?? '');
 
         if (isset($stored['error'])) {
             $errors[] = 'Row ' . ($index + 1) . ' of '

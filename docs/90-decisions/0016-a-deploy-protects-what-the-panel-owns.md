@@ -8,15 +8,24 @@
 gate reads the dry run and fails the job if it proposes deleting anything on that list.
 
 ```
-P /content/            live job posts and contact details
-P /admin/.htaccess     cPanel writes it; ours must never replace it
+P /content/            THE SYSTEM OF RECORD -- every job post and contact detail
+P /public/uploads/     pictures the editor stored, which are not in the repository
 P /.well-known/        AutoSSL's ACME challenges
+P /public/.well-known/ and here too: which one AutoSSL writes to depends on when
+                       it last read the subdomain's configuration
 P /cgi-bin/            created by cPanel
-P /error_log           written by the server
+P error_log            written by the server -- AT ANY DEPTH, see below
 P /.user.ini           MultiPHP INI Editor
 P /php.ini             MultiPHP INI Editor
-P /.htpasswd           Directory Privacy
 ```
+
+`public/.htaccess` is deliberately **not** here: this repository ships it.
+
+**`error_log` is the one rule with no leading slash, and that is deliberate.** A pattern
+containing no `/` is matched by rsync against the final component of a name at any depth, and PHP
+writes its log beside whichever script raised the error. This half serves from `public/`, so its
+log is `public/error_log` -- which `P /error_log` did not match at all, and every deploy deleted
+it. Seen happening in the 2026-09-10 deploy log, in the run that shipped ADR 0023.
 
 The filters prevent the deletions. **The gate is a separate check that they did**, and it is not
 redundant.

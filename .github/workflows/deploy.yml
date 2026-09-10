@@ -108,7 +108,7 @@ jobs:
           P /.well-known/
           P /public/.well-known/
           P /cgi-bin/
-          P /error_log
+          P error_log
           P /.user.ini
           P /php.ini
           RULES
@@ -139,7 +139,7 @@ jobs:
           # spaces, and a pattern expecting one silently matches nothing —
           # a gate that always passes, which is worse than no gate at all.
           # Caught by running this against a deliberately unprotected plan.
-          if grep -E '^\*deleting[[:space:]]+(content/|\.well-known/|public/\.well-known/|cgi-bin/|error_log|\.user\.ini|php\.ini)' /tmp/plan.txt; then
+          if grep -E '^\*deleting[[:space:]]+(content/|\.well-known/|public/\.well-known/|cgi-bin/|([^[:space:]]*/)?error_log|\.user\.ini|php\.ini)' /tmp/plan.txt; then
             echo "::error::The deploy proposed deleting something the host owns. Refusing."
             echo "content/ here is the SYSTEM OF RECORD — every job post and contact"
             echo "detail the client has written. The public site holds a replica of it."

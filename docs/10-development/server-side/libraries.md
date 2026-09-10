@@ -28,6 +28,7 @@ store they read from is outside the document root entirely.
 | [`services.php`](#servicesphp) | what this side does with the services document | `contract`, `store`, `publish_client` |
 | [`seo.php`](#seophp) | what every page says about itself in its `<head>` — read from ten documents, written to whichever one owns the field | `contract`, `store`, `services`, `publish_client` |
 | [`chrome.php`](#chromephp) | the header, footer and dock every page of the public site carries | `contract`, `store`, `services`, `contact`, `publish_client` |
+| [`settings.php`](#settingsphp) | the site's identity: the mark, the icons, the colours, the address | `contract`, `store` |
 | [`upload.php`](#uploadphp) *(backend)* | a file somebody chose, turned into a picture this site will show | `publish` |
 | [`publish.php`](#publishphp) **shared** | how a document is signed and checked on the wire | `private`, `contract` |
 | [`publish_client.php`](#publish_clientphp) *(backend)* | sending one | `publish` |
@@ -570,6 +571,30 @@ The key is `publish.key` in the private store: 32 random bytes, **the same bytes
 never derived from `secret.key` (the two stores have different master keys, so anything derived
 would differ by construction). It is never created on demand — see
 [`make_publish_key.py`](../../40-reference/tools.md).
+
+### `settings.php`
+
+**Backend only** — the writing half. The renderer's half is
+`tech4time-website-frontend/lib/settings.php`.
+
+`settings_load()` · `settings_edit()` · `settings_logo_is_shared()` ·
+`settings_logo_is_uploaded()` · `settings_icon_is_stale()`
+
+One document, `content/settings.json`, holding the four things every page depends on and no page
+owns: the logo, the square mark the favicons are made from, the colour tokens the site is drawn
+from, and the address the contact form sends to.
+
+`settings_edit()` is `chrome_edit()` line for line, and it locks for the same reason: each screen
+holds one **part** of this document — the colour screen never sees the logo — so a save merges the
+rest back from the file. A read-modify-write without a lock loses one of two concurrent edits to
+different parts, which here is the normal case rather than an edge one.
+
+The three questions at the end exist so the screens can **say** something rather than refuse it.
+An empty dark logo half is a legitimate answer for a single-colour mark and indistinguishable, in
+the document, from somebody having meant to upload one; a replaced logo with the shipped tab icon
+still under it is exactly what happens, because the favicon is generated from its own square master
+and not from a wordmark that would be an illegible smear at sixteen pixels. Both are standing
+notices. Neither ever blocks a save.
 
 ### `chrome.php`
 

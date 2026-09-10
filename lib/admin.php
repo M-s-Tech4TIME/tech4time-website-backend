@@ -132,6 +132,16 @@ const ADMIN_SECTIONS = [
         /* No single page: this screen edits all of them. */
         'view'  => '',
     ],
+    'settings' => [
+        'label' => 'Settings',
+        /* A cog, which is what a settings screen has been drawn with for forty
+           years. Nothing else in the rail is close: this is the one row that
+           is not a page or a part of one. */
+        'icon'  => 'cog',
+        'desc'  => 'The logo, the tab icon, the brand colours and where enquiries go',
+        /* No single page: every page of the site draws from it. */
+        'view'  => '',
+    ],
     'account' => [
         'label' => 'Account',
         'icon'  => 'user-shield',
@@ -160,7 +170,7 @@ const ADMIN_SECTIONS = [
  */
 const ADMIN_RAIL_SECTIONS = ['overview', 'home', 'about', 'services', 'company',
                              'careers', 'contact', 'certifications', 'branding',
-                             'privacy', 'chrome', 'seo'];
+                             'privacy', 'chrome', 'seo', 'settings'];
 
 /**
  * Sections that edit a page of the website, in rail order.
@@ -171,6 +181,14 @@ const ADMIN_RAIL_SECTIONS = ['overview', 'home', 'about', 'services', 'company',
  */
 const ADMIN_PAGE_SECTIONS = ['home', 'about', 'services', 'company', 'careers',
                              'contact', 'certifications', 'branding', 'privacy'];
+
+/* THREE RAIL ROWS ARE NOT IN THAT LIST, and none of them is an omission. The
+   chrome is on every page, the SEO screen edits every page's metadata, and the
+   settings hold the mark, the icons and the colours every page draws from.
+   None of them IS a page, so none has a "view the page" link and none is
+   counted where "the pages you can edit" is counted. tools/check_content_model.py
+   asks this list for the editors it must check, which is right for the same
+   reason: those three are proved by their own round-trip tests instead. */
 
 /* The marker admin_form_tail() writes and admin_form_truncated() looks for. */
 const ADMIN_TAIL_FIELD = '__tail';

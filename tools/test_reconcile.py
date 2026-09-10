@@ -171,7 +171,11 @@ def the_table(r: Results) -> None:
             not missing, f"no model for {missing}")
     r.check("and every model is a name in CONTRACT_DOCUMENTS",
             not extra, f"models nothing: {extra}")
-    r.check("which is eleven of them, not five", len(modelled) == len(known),
+    # A count, not a number written here: this said "eleven, not five" and was
+    # wrong within a day of being written, which is the whole failure it exists
+    # to catch, one level up.
+    r.check(f"which is all {len(known)} of them, and not the five it knew",
+            len(modelled) == len(known),
             f"{len(modelled)} models, {len(known)} documents")
 
 

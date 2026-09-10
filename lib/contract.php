@@ -54,7 +54,8 @@ const CONTRACT_VERSION = 1;
 
 /** Every document that is published, by name. The endpoint refuses any other. */
 const CONTRACT_DOCUMENTS = ['careers', 'contact', 'company', 'about', 'home', 'services',
-                            'certifications', 'branding', 'privacy', 'seo', 'chrome'];
+                            'certifications', 'branding', 'privacy', 'seo', 'chrome',
+                            'settings'];
 
 /**
  * Where a document's record lives, on either host.
@@ -6334,7 +6335,284 @@ function chrome_drift_key(string $kind, string $value): string
 }
 
 /* ==========================================================================
-   12. Revisions
+   12. Settings — the identity: the mark, the icons, the colours, the address
+   ========================================================================== */
+
+/*
+   WHAT THIS DOCUMENT IS FOR, AND WHY IT IS NOT PART OF ANY OTHER.
+
+   The editor owns almost every word on the site. It owned none of the
+   IDENTITY: the logo, the favicon, the colours and where the contact form's
+   mail goes were files in a repository, changeable only by a developer running
+   a script and shipping a deploy.
+
+   None of it belongs to a page. The logo is in the header, the footer, the
+   About page, the admin's own rail, Organization.logo, JobPosting's hiring
+   organisation, the favicon set, the branding kit and the share card -- nine
+   places across five documents and two repositories. Putting it in any one of
+   them would make the other eight read from a document about something else.
+   So it is its own document, and everything that draws a mark reads it.
+
+   IT IS NOT A PAGE, so it has no meta band. Chrome is the same and for the
+   same reason: a document with no <head> of its own has nothing to put in one.
+
+   THE DEFAULTS ARE WHAT SHIPS, NOT WHAT SOMEBODY TYPED. Every value below was
+   read off the files it replaces -- the logo record out of content/chrome.json,
+   the colours out of assets/css/theme.css, the address out of the contact
+   handler's own constant. A fresh install therefore renders byte for byte what
+   the site renders today, and tools/test_settings.py asserts exactly that.
+*/
+
+/**
+ * The colour tokens the editor may change.
+ *
+ * EXACTLY THE ONES tools/check_contrast.py CAN JUDGE, which is what makes the
+ * refusal in settings_validate() possible at all. That check knows the WCAG AA
+ * pairs for these fourteen: which is text on which surface, which is a control
+ * boundary, which is the ink on a filled button. A token it has no pair for is
+ * a token nothing could say is safe -- so exposing one would mean offering a
+ * picker whose only honest answer is "I do not know".
+ *
+ * Three tokens in theme.css are deliberately NOT here, and the same rule
+ * explains all three. --artwork-plate and --artwork-plate-dark are the ground
+ * another company's logo is drawn on, and their docblocks record that NOT
+ * flipping them with the theme is the bug they exist to prevent.
+ * --contrast-max is the forced-colours fallback. None is a pair check_contrast
+ * knows, and none is a brand decision.
+ *
+ * Read out of theme.css rather than typed: the two agreed on all twenty-eight
+ * values when this was written, and the way to keep that true is to have taken
+ * them from there.
+ */
+const SETTINGS_COLOURS = [
+    'light' => [
+        'bg-base'             => '#fafafa',
+        'bg-surface'          => '#f1f1f2',
+        'bg-elevated'         => '#ffffff',
+        'text-primary'        => '#111113',
+        'text-secondary'      => '#4a4a4e',
+        'text-muted'          => '#6a6a6e',
+        'border-subtle'       => '#e1e1e3',
+        'border-strong'       => '#8a8a8e',
+        'silver-accent-start' => '#c7c9cc',
+        'silver-accent-mid'   => '#9ea1a6',
+        'silver-accent-end'   => '#6e7075',
+        'accent-text'         => '#6a6c71',
+        'focus-ring'          => '#6a6c71',
+        'on-accent'           => '#111113',
+    ],
+    'dark' => [
+        'bg-base'             => '#0b0b0c',
+        'bg-surface'          => '#151517',
+        'bg-elevated'         => '#1d1d20',
+        'text-primary'        => '#f5f5f6',
+        'text-secondary'      => '#b4b4b8',
+        'text-muted'          => '#8a8a8e',
+        'border-subtle'       => '#2a2a2d',
+        'border-strong'       => '#6a6a6e',
+        'silver-accent-start' => '#e8e9eb',
+        'silver-accent-mid'   => '#b8babe',
+        'silver-accent-end'   => '#7c7e83',
+        'accent-text'         => '#b8babe',
+        'focus-ring'          => '#b8babe',
+        'on-accent'           => '#111113',
+    ],
+];
+
+/** Which icons the square master is rendered into, and at what size. */
+const SETTINGS_ICON_SIZES = ['png16' => 16, 'png32' => 32, 'png48' => 48,
+                             'png96' => 96, 'png192' => 192, 'png512' => 512,
+                             'apple' => 180];
+
+/**
+ * The site as it ships, and the fallback for anything missing from the file.
+ *
+ * EVERY VALUE HERE IS ALREADY TRUE OF THE SITE. The logo record is
+ * content/chrome.json's header lockup in the shape contract_image_defaults()
+ * fills -- the same six files, the same three widths, the same 360px fallback
+ * -- so a host with no settings document renders what it renders now.
+ */
+function settings_defaults(): array
+{
+    return [
+        'updated'  => '',
+        'revision' => 0,
+
+        /* The wordmark. Two halves because a mark drawn for a light ground can
+           be invisible on a dark one; the dark half is optional everywhere it
+           is read, and falls back to the light one. */
+        'logo' => [
+            'light' => contract_image_defaults([
+                'src'         => '/assets/images/logo/logo-light-360.png',
+                'webp'        => '/assets/images/logo/logo-light-360.webp',
+                'width'       => 360,
+                'height'      => 128,
+                'srcset'      => '/assets/images/logo/logo-light-180.png 180w, '
+                               . '/assets/images/logo/logo-light-360.png 360w, '
+                               . '/assets/images/logo/logo-light-540.png 540w',
+                'webp_srcset' => '/assets/images/logo/logo-light-180.webp 180w, '
+                               . '/assets/images/logo/logo-light-360.webp 360w, '
+                               . '/assets/images/logo/logo-light-540.webp 540w',
+            ]),
+            'dark' => contract_image_defaults([
+                'src'         => '/assets/images/logo/logo-dark-360.png',
+                'webp'        => '/assets/images/logo/logo-dark-360.webp',
+                'width'       => 360,
+                'height'      => 128,
+                'srcset'      => '/assets/images/logo/logo-dark-180.png 180w, '
+                               . '/assets/images/logo/logo-dark-360.png 360w, '
+                               . '/assets/images/logo/logo-dark-540.png 540w',
+                'webp_srcset' => '/assets/images/logo/logo-dark-180.webp 180w, '
+                               . '/assets/images/logo/logo-dark-360.webp 360w, '
+                               . '/assets/images/logo/logo-dark-540.webp 540w',
+            ]),
+        ],
+
+        /* The favicon. A DIFFERENT PICTURE FROM THE LOGO, and that is not an
+           oversight: the logo is a wordmark about three times as wide as it is
+           tall, and a favicon is a 16px square. Squeezing one into the other
+           gives an illegible smear, which is why the site ships a separate
+           square mark and why this is a separate upload.
+
+           'master' is what somebody uploads; 'generated' is what the server
+           makes of it. Empty here because nothing that ships came from an
+           upload -- the files below are committed, and HEAD_ICONS names them
+           directly until something replaces them. */
+        'icon' => [
+            'master'    => contract_image_defaults([]),
+            'generated' => ['ico' => ''] + array_map(
+                static fn(int $_size): string => '',
+                SETTINGS_ICON_SIZES),
+        ],
+
+        'colours' => [
+            'light' => SETTINGS_COLOURS['light'],
+            'dark'  => SETTINGS_COLOURS['dark'],
+        ],
+
+        /* Where the enquiry form's mail goes. MAIL_FROM is deliberately NOT
+           here: it is what the site sends AS, and the domain's SPF record says
+           which server may do that -- a field somebody could change would let
+           the site start sending as an address it is not allowed to send as,
+           and every message would go to spam with nothing here to say why. */
+        'contact' => [
+            'mail_to'      => 'info@tech4time.bd',
+            'mail_subject' => 'Website enquiry',
+        ],
+    ];
+}
+
+/**
+ * Bring the settings to the current shape, whatever they arrived as.
+ *
+ * Explicit rather than a recursive merge, for the reason chrome_normalise()
+ * gives: filling entry by entry from the defaults would put back a value
+ * somebody deliberately cleared.
+ *
+ * AN EMPTY LOGO HALF IS MEANINGFUL AND IS KEPT. 'dark' cleared means "this
+ * mark reads on both grounds, use the light one" -- a real answer, and the
+ * common one for a single-colour mark. Filling it back in from the defaults
+ * would put the shipped Tech4TIME lockup underneath somebody else's logo.
+ */
+function settings_normalise(array $data): array
+{
+    $defaults = settings_defaults();
+
+    $out = [
+        'updated'  => trim((string)($data['updated'] ?? $defaults['updated'])),
+        'revision' => max(0, (int)($data['revision'] ?? 0)),
+    ];
+
+    /* A logo half that ARRIVED is kept as it arrived, empty or not; one that
+       did not arrive at all -- a document from before this field, or one
+       damaged in transit -- falls back to what ships. */
+    $logo = is_array($data['logo'] ?? null) ? $data['logo'] : [];
+
+    foreach (['light', 'dark'] as $mode) {
+        $out['logo'][$mode] = contract_image_defaults(
+            array_key_exists($mode, $logo) ? $logo[$mode] : $defaults['logo'][$mode]
+        );
+    }
+
+    $icon = is_array($data['icon'] ?? null) ? $data['icon'] : [];
+    $held = is_array($icon['generated'] ?? null) ? $icon['generated'] : [];
+
+    $out['icon'] = [
+        'master'    => contract_image_defaults($icon['master'] ?? []),
+        'generated' => [],
+    ];
+
+    foreach ($defaults['icon']['generated'] as $name => $_empty) {
+        $out['icon']['generated'][$name] =
+            contract_safe_image_path((string)($held[$name] ?? ''));
+    }
+
+    /* A colour is six hex digits or it is the shipped one. Nothing else is
+       let through: this string ends up inside a generated stylesheet, and
+       'red; } body { display: none' is a valid CSS value right up until it
+       is not. */
+    foreach (['light', 'dark'] as $mode) {
+        $held = is_array($data['colours'][$mode] ?? null) ? $data['colours'][$mode] : [];
+
+        foreach (SETTINGS_COLOURS[$mode] as $token => $shipped) {
+            $value = strtolower(trim((string)($held[$token] ?? '')));
+            $out['colours'][$mode][$token] =
+                preg_match('/^#[0-9a-f]{6}$/', $value) ? $value : $shipped;
+        }
+    }
+
+    $contact = is_array($data['contact'] ?? null) ? $data['contact'] : [];
+
+    /* An address that is not one is the shipped address, not an empty string:
+       a contact form that posts into nowhere loses enquiries silently, which
+       is the worst way for this field to be wrong. */
+    $to = trim((string)($contact['mail_to'] ?? ''));
+
+    $out['contact'] = [
+        'mail_to'      => filter_var($to, FILTER_VALIDATE_EMAIL)
+                            ? $to : $defaults['contact']['mail_to'],
+        /* Trimmed and nothing more, the way every other text field in this
+           file is. What a subject line may be LIKE -- how long, whether it is
+           empty -- is a validation question, and validation is the editing
+           side's: this half has to accept whatever a published document holds
+           or the two hosts would disagree about the same bytes. */
+        'mail_subject' => trim((string)($contact['mail_subject'] ?? ''))
+                            ?: $defaults['contact']['mail_subject'],
+    ];
+
+    return $out;
+}
+
+/** Every picture this document points at, as web paths, without duplicates. */
+function settings_images(array $data): array
+{
+    $seen = [];
+
+    foreach (['light', 'dark'] as $mode) {
+        foreach (contract_image_paths($data['logo'][$mode] ?? []) as $path) {
+            $seen[$path] = true;
+        }
+    }
+
+    foreach (contract_image_paths($data['icon']['master'] ?? []) as $path) {
+        $seen[$path] = true;
+    }
+
+    /* The generated icons too. They are files on both hosts like any other,
+       they are named nowhere else, and a sweep that missed them would offer
+       to delete the site's favicon. */
+    foreach ($data['icon']['generated'] ?? [] as $path) {
+        $path = trim((string)$path);
+        if ($path !== '') {
+            $seen[$path] = true;
+        }
+    }
+
+    return array_keys($seen);
+}
+
+/* ==========================================================================
+   13. Revisions
    ========================================================================== */
 
 /**
@@ -6357,7 +6635,7 @@ function contract_next_revision(array $data): int
 }
 
 /* ==========================================================================
-   13. Normalising and re-sanitising on receipt
+   14. Normalising and re-sanitising on receipt
    ========================================================================== */
 
 /**
@@ -6389,6 +6667,7 @@ function contract_normalise(string $document, array $data): array
         'privacy'  => privacy_normalise($data),
         'seo'      => seo_normalise($data),
         'chrome'   => chrome_normalise($data),
+        'settings' => settings_normalise($data),
         default    => throw new RuntimeException('Unknown document: ' . $document),
     };
 }
@@ -6431,6 +6710,10 @@ function contract_images(string $document, array $data): array
         /* No meta band: the chrome is not a page and has no <head> of its own.
            Its pictures are the two logo lockups, srcsets included. */
         'chrome'   => chrome_images($data),
+        /* No meta band either, and the same reason: the settings are not a
+           page. Their pictures are the two logo halves, the icon master and
+           every icon generated from it. */
+        'settings' => settings_images($data),
         default    => throw new RuntimeException('Unknown document: ' . $document),
     };
 }
@@ -6580,6 +6863,15 @@ function contract_sanitise(string $document, array $data): array
        seo's is: "nothing to sanitise" must not arrive at the same line as
        "document I do not know". */
     if ($document === 'chrome') {
+        return $data;
+    }
+
+    /* The settings hold no text a person writes at all -- a mail address, a
+       subject line, six hex digits and a set of picture paths, every one of
+       them already validated to a fixed shape by settings_normalise(). The
+       branch is explicit for the reason seo's and chrome's are: "nothing to
+       sanitise" must not arrive at the same line as "document I do not know". */
+    if ($document === 'settings') {
         return $data;
     }
 

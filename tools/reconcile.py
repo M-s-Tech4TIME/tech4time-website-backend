@@ -142,6 +142,7 @@ require_once 'lib/branding.php';
 require_once 'lib/privacy.php';
 require_once 'lib/seo.php';
 require_once 'lib/chrome.php';
+require_once 'lib/settings.php';
 
 /* A TABLE, AND NOT A TERNARY, for the reason contract_normalise() gives at
    length. What stood here was
@@ -182,6 +183,8 @@ $models = [
                  static fn(array $_d): bool => seo_edit(static fn(array $h): array => $h)],
     'chrome' => ['chrome_load',
                  static fn(array $_d): bool => chrome_edit(static fn(array $h): array => $h)],
+    'settings' => ['settings_load',
+                   static fn(array $_d): bool => settings_edit(static fn(array $h): array => $h)],
 ];
 
 $document = $argv[1];

@@ -1,0 +1,80 @@
+{
+    "updated": "",
+    "revision": 0,
+    "logo": {
+        "light": {
+            "src": "/assets/images/logo/logo-light-360.png",
+            "webp": "/assets/images/logo/logo-light-360.webp",
+            "width": 360,
+            "height": 128,
+            "srcset": "/assets/images/logo/logo-light-180.png 180w, /assets/images/logo/logo-light-360.png 360w, /assets/images/logo/logo-light-540.png 540w",
+            "webp_srcset": "/assets/images/logo/logo-light-180.webp 180w, /assets/images/logo/logo-light-360.webp 360w, /assets/images/logo/logo-light-540.webp 540w"
+        },
+        "dark": {
+            "src": "/assets/images/logo/logo-dark-360.png",
+            "webp": "/assets/images/logo/logo-dark-360.webp",
+            "width": 360,
+            "height": 128,
+            "srcset": "/assets/images/logo/logo-dark-180.png 180w, /assets/images/logo/logo-dark-360.png 360w, /assets/images/logo/logo-dark-540.png 540w",
+            "webp_srcset": "/assets/images/logo/logo-dark-180.webp 180w, /assets/images/logo/logo-dark-360.webp 360w, /assets/images/logo/logo-dark-540.webp 540w"
+        }
+    },
+    "icon": {
+        "master": {
+            "src": "",
+            "webp": "",
+            "width": 0,
+            "height": 0,
+            "srcset": "",
+            "webp_srcset": ""
+        },
+        "generated": {
+            "ico": "",
+            "png16": "",
+            "png32": "",
+            "png48": "",
+            "png96": "",
+            "png192": "",
+            "png512": "",
+            "apple": ""
+        }
+    },
+    "colours": {
+        "light": {
+            "bg-base": "#fafafa",
+            "bg-surface": "#f1f1f2",
+            "bg-elevated": "#ffffff",
+            "text-primary": "#111113",
+            "text-secondary": "#4a4a4e",
+            "text-muted": "#6a6a6e",
+            "border-subtle": "#e1e1e3",
+            "border-strong": "#8a8a8e",
+            "silver-accent-start": "#c7c9cc",
+            "silver-accent-mid": "#9ea1a6",
+            "silver-accent-end": "#6e7075",
+            "accent-text": "#6a6c71",
+            "focus-ring": "#6a6c71",
+            "on-accent": "#111113"
+        },
+        "dark": {
+            "bg-base": "#0b0b0c",
+            "bg-surface": "#151517",
+            "bg-elevated": "#1d1d20",
+            "text-primary": "#f5f5f6",
+            "text-secondary": "#b4b4b8",
+            "text-muted": "#8a8a8e",
+            "border-subtle": "#2a2a2d",
+            "border-strong": "#6a6a6e",
+            "silver-accent-start": "#e8e9eb",
+            "silver-accent-mid": "#b8babe",
+            "silver-accent-end": "#7c7e83",
+            "accent-text": "#b8babe",
+            "focus-ring": "#b8babe",
+            "on-accent": "#111113"
+        }
+    },
+    "contact": {
+        "mail_to": "info@tech4time.bd",
+        "mail_subject": "Website enquiry"
+    }
+}

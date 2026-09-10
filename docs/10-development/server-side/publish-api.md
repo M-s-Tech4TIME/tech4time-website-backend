@@ -224,7 +224,7 @@ guards have been watched to fail: removing the revision check breaks five of the
 re-sanitise breaks two.
 
 ```bash
-python3 tools/check_shared_lib.py      # the three shared files are as recorded
+python3 tools/check_shared_lib.py      # the five shared files are as recorded
 python3 tools/verify_live.py <url>     # /api/publish.php answers 405 to GET
 ```
 

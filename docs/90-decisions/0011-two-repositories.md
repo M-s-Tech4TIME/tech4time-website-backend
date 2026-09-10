@@ -34,6 +34,13 @@ only three shared files — `lib/html.php` (the sanitiser, as defence in depth),
 (the shape of a document) and `lib/publish.php` (the wire format). All three are byte-identical
 across the repositories, with a CI step in each comparing a SHA-256 against a committed value.
 
+> **Amended since.** It is **five** now, and the count is the thing to watch rather than the names.
+> `lib/svg.php` joined when vector logos became uploadable — the sanitiser is the boundary, so the
+> receiving host must run the same one — and `public/assets/icons/sprite.svg` joined because both halves
+> draw from it and a symbol present in one and not the other is an icon that silently does not
+> render. `tools/check_shared_lib.py` reports the count on every run; if this paragraph and that
+> number ever disagree, the number is right.
+
 > **Amended when built — and this is the important one.** *"A mismatch fails both builds"* is not
 > true, and believing it would be worse than not having the check at all.
 >

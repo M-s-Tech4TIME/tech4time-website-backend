@@ -150,8 +150,8 @@ screens, and then repeats every edit and every move **with JavaScript off**, whi
 proves all of it is still only an enhancement. Same browser requirements.
 
 Touched CSS, an admin screen or anything a keyboard reaches? Also
-`python3 tools/check_admin_a11y.py` — the focus ring, 320px, dark mode and hover across all nine
-screens, signed in. Same Firefox and geckodriver, same clean-up.
+`python3 tools/check_admin_a11y.py` — the focus ring, 320px, dark mode and hover across all
+twenty-one screens, signed in. Same Firefox and geckodriver, same clean-up.
 
 Touched `lib/contract.php`, `lib/publish.php`, `lib/html.php` or the sprite? Also
 **`check_shared_lib.py --update`, and copy the changed file and the manifest to the frontend.**

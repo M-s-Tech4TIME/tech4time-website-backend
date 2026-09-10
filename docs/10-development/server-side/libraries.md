@@ -99,8 +99,8 @@ damage is recovered from. `tools/test_store.py` covers both.
 **Shared — byte-identical in `tech4time-website-frontend` and `tech4time-website-backend`.**
 
 `CONTRACT_VERSION` · `CONTRACT_DOCUMENTS` · `CONTRACT_BOOKKEEPING` · `careers_normalise()` ·
-`contact_normalise()` · `contact_defaults()` · `contact_fingerprint()` · `contract_sanitise()` ·
-`contract_next_revision()` · …
+`contact_normalise()` · `contact_defaults()` · `chrome_defaults()` · `chrome_normalise()` ·
+`chrome_targets()` · `chrome_contact_drift()` · `contract_sanitise()` · `contract_next_revision()` · …
 
 **The shape of a document, and nothing else.** Field lists, the defaults a missing key falls back
 to, the normalising that turns whatever arrived into that shape, and the queries that read it. Both

@@ -27,10 +27,12 @@ The shell needs to know nothing else. The rail draws itself from the registry.
 
 ---
 
-**The example below is a page that does not exist**, deliberately: the four editors that do —
-careers, contact, company profile and about — are the ones to copy from, and an example that named
-one of them would drift out of step with it. `sections/about.php` is the most recent and the
-closest to this recipe.
+**The example below is a page that does not exist**, deliberately: the editors that do — every
+row of `ADMIN_RAIL_SECTIONS` bar the overview — are the ones to copy from, and an example that
+named one of them would drift out of step with it. `sections/about.php` is the closest to this
+recipe. `sections/chrome.php` is the most recent and by some way the largest, so it is the better
+read for the harder parts — four screens over one document, a standing notice that never blocks a
+save, and a row action that fills the form without writing anything.
 
 ## 1. The model — `lib/<name>.php`
 
@@ -69,26 +71,39 @@ Seed it with the page's current content, so the first render is identical to wha
 
 ## 3. The renderer — `pages/<name>/index.php`
 
-Rename `tech4time-website-frontend/index.html` to `index.php` and replace the editable copy with values from the model.
+**The page is the other repository's, and it owns this step.** The full recipe is
+*adding-a-page.md* (in tech4time-website-frontend); what matters here is that the page is a
+`<main>` and a handful of calls, not a file to paste chrome into.
 
 ```php
 <?php
+require_once __DIR__ . '/../../lib/head.php';
+require_once __DIR__ . '/../../lib/body.php';
 require_once __DIR__ . '/../../lib/partners.php';
 $data = partners_load();
 ?>
 …
-<h1><?= h($data['hero']['title']) ?></h1>
+<?php body_header('/pages/partners/'); ?>
+<main class="page__main" id="main">
+  <h1><?= h($data['hero']['title']) ?></h1>
+</main>
+<?php body_footer(); ?>
+<?php body_dock('/pages/partners/'); ?>
 ```
 
 **Everything through `h()`.** Rich text is emitted already sanitised by `rt_sanitise_html()` on save.
 
-Keep the markup otherwise identical — `check_shared_markup.py` still applies, and the head, header
-and footer must stay byte-identical to the templates.
+There is no header or footer markup to keep in step: the `<head>` is
+`tech4time-website-frontend/lib/head.php` and the header, footer and dock are
+`tech4time-website-frontend/lib/body.php`, both rendering from documents
+([ADR 0023](../../90-decisions/0023-the-header-and-footer-are-emitted-once.md)).
+`check_shared_markup.py` still applies, but what it now compares is the hero circuit and the script
+tags.
 
 ## 4. The form — `sections/<name>.php`
 
-Start by copying `sections/contact.php`. It is the fuller of the two and demonstrates
-repeatable rows, reordering, validation display and the save cycle.
+Start by copying `sections/contact.php`. It demonstrates repeatable rows, reordering, validation
+display and the save cycle without being large enough to get lost in.
 
 The obligations:
 

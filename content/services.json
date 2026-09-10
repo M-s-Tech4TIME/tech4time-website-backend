@@ -1,10 +1,22 @@
 {
-    "updated": "",
-    "revision": 0,
+    "updated": "2026-09-10T02:47:15+00:00",
+    "revision": 2,
     "meta": {
         "title": "Services — Cybersecurity, Software, Cloud & HRaaS | Tech4TIME",
         "description": "Software development, cybersecurity and SOC build-out, private cloud on OpenStack, HRaaS, IT equipment supply, consultancy and training — Tech4TIME's six practices.",
-        "share_title": "Our Comprehensive Technological Solutions"
+        "share_title": "Our Comprehensive Technological Solutions",
+        "breadcrumb": "Services",
+        "keywords": "IT services, cybersecurity services, software development, cloud infrastructure, HRaaS, IT consultancy and training, IT equipment supply",
+        "robots": "index",
+        "changefreq": "weekly",
+        "priority": "0.9",
+        "share": {
+            "src": "",
+            "webp": "",
+            "width": 0,
+            "height": 0
+        },
+        "share_alt": ""
     },
     "hero": {
         "title": "Services",
@@ -44,7 +56,7 @@
                 "id": "hraas",
                 "block": "hraas",
                 "icon": "users",
-                "title": "HRaaS",
+                "title": "Human Resource as a Service",
                 "text": "Human Resource as a Service",
                 "status": "shown"
             },
@@ -277,7 +289,7 @@
                 "id": "hraas",
                 "service": "hr-solutions",
                 "icon": "users",
-                "title": "HRaaS",
+                "title": "Human Resource as a Service",
                 "intro": "Human Resource as a Service. Certified engineers across cybersecurity, development and infrastructure, engaged on whichever model fits the work — a named individual embedded in your team, a shared pool, a project squad, or a retainer you draw on when you need it.",
                 "groups": [
                     {
@@ -296,7 +308,7 @@
                 "buttons": [
                     {
                         "id": "explore-hraas",
-                        "label": "Explore HRaaS",
+                        "label": "Explore Human Resource as a Service",
                         "href": "/pages/services/hr-solutions/",
                         "icon": "arrow-right",
                         "style": "secondary",
@@ -569,7 +581,19 @@
                 "meta": {
                     "title": "Cybersecurity Services — SOC, CIRT & SIM3 Audits | Tech4TIME",
                     "description": "Tech4TIME builds full SOC and CIRT capability and audits it against SIM3, backed by 24 proactive and reactive security solutions across prevention and response.",
-                    "share_title": "Complete Security Defense System"
+                    "share_title": "Complete Security Defense System",
+                    "breadcrumb": "Cybersecurity",
+                    "keywords": "Cybersecurity",
+                    "robots": "index",
+                    "changefreq": "monthly",
+                    "priority": "0.9",
+                    "share": {
+                        "src": "",
+                        "webp": "",
+                        "width": 0,
+                        "height": 0
+                    },
+                    "share_alt": ""
                 },
                 "hero": {
                     "title": "Cybersecurity",
@@ -1042,7 +1066,19 @@
                 "meta": {
                     "title": "Software Development — Web, Mobile & DevSecOps | Tech4TIME",
                     "description": "Custom web, mobile and enterprise application development from Tech4TIME, with DevOps and DevSecOps pipelines, database engineering, QA and source code auditing.",
-                    "share_title": "Software Development Service Catalogue"
+                    "share_title": "Software Development Service Catalogue",
+                    "breadcrumb": "Software Development",
+                    "keywords": "Software Development",
+                    "robots": "index",
+                    "changefreq": "monthly",
+                    "priority": "0.9",
+                    "share": {
+                        "src": "",
+                        "webp": "",
+                        "width": 0,
+                        "height": 0
+                    },
+                    "share_alt": ""
                 },
                 "hero": {
                     "title": "Software Development",
@@ -1434,7 +1470,19 @@
                 "meta": {
                     "title": "Cloud Infrastructure — OpenStack Private Cloud | Tech4TIME",
                     "description": "Private and hybrid cloud on OpenStack from Tech4TIME: architecture, migration, container platforms, SDN, monitoring, disaster recovery and managed operations.",
-                    "share_title": "Cloud and Infrastructure Services Catalogue"
+                    "share_title": "Cloud and Infrastructure Services Catalogue",
+                    "breadcrumb": "Cloud Infrastructure",
+                    "keywords": "Cloud Infrastructure",
+                    "robots": "index",
+                    "changefreq": "monthly",
+                    "priority": "0.9",
+                    "share": {
+                        "src": "",
+                        "webp": "",
+                        "width": 0,
+                        "height": 0
+                    },
+                    "share_alt": ""
                 },
                 "hero": {
                     "title": "Cloud Infrastructure",
@@ -1952,17 +2000,29 @@
             {
                 "id": "hr-solutions",
                 "slug": "hr-solutions",
-                "name": "HRaaS",
+                "name": "Human Resource as a Service",
                 "status": "shown",
                 "schema_type": "IT Staffing",
                 "schema_description": "Certified technical resources engaged as dedicated staff, a shared pool, project-based teams or retainer-based access.",
                 "meta": {
                     "title": "HRaaS — Human Resource as a Service | Tech4TIME",
                     "description": "Certified cybersecurity, development and infrastructure engineers from Tech4TIME, engaged as dedicated staff, shared resource, project teams or on retainer.",
-                    "share_title": "Human Resource as a Service"
+                    "share_title": "Human Resource as a Service",
+                    "breadcrumb": "Human Resource as a Service",
+                    "keywords": "HRaaS",
+                    "robots": "index",
+                    "changefreq": "monthly",
+                    "priority": "0.9",
+                    "share": {
+                        "src": "",
+                        "webp": "",
+                        "width": 0,
+                        "height": 0
+                    },
+                    "share_alt": ""
                 },
                 "hero": {
-                    "title": "HRaaS",
+                    "title": "Human Resource as a Service",
                     "subtitle": "Human Resource as a Service"
                 },
                 "core": {
@@ -2760,7 +2820,19 @@
                 "meta": {
                     "title": "IT Equipment Supply — Sourcing, Deployment & Disposal | Tech4TIME",
                     "description": "Multi-vendor hardware sourcing, configure-to-order builds, on-site deployment, lifecycle support, secure data erasure and responsible disposal from Tech4TIME.",
-                    "share_title": "Sourced, Configured, Deployed and Retired"
+                    "share_title": "Sourced, Configured, Deployed and Retired",
+                    "breadcrumb": "IT Equipment Supply",
+                    "keywords": "IT Equipment Supply",
+                    "robots": "index",
+                    "changefreq": "monthly",
+                    "priority": "0.9",
+                    "share": {
+                        "src": "",
+                        "webp": "",
+                        "width": 0,
+                        "height": 0
+                    },
+                    "share_alt": ""
                 },
                 "hero": {
                     "title": "IT Equipment Supply",
@@ -3219,7 +3291,19 @@
                 "meta": {
                     "title": "IT Consultancy & Training — Advisory and Skills | Tech4TIME",
                     "description": "IT strategy, enterprise architecture and virtual CIO advisory from Tech4TIME, plus technical, user and certification training delivered how it suits you.",
-                    "share_title": "Advisory, Skills and Enablement"
+                    "share_title": "Advisory, Skills and Enablement",
+                    "breadcrumb": "IT Consultancy & Training",
+                    "keywords": "IT Consultancy & Training",
+                    "robots": "index",
+                    "changefreq": "monthly",
+                    "priority": "0.9",
+                    "share": {
+                        "src": "",
+                        "webp": "",
+                        "width": 0,
+                        "height": 0
+                    },
+                    "share_alt": ""
                 },
                 "hero": {
                     "title": "IT Consultancy & Training",

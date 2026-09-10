@@ -67,39 +67,42 @@ function seo_pages(): array
 {
     $out = [];
 
-    foreach (SEO_ROUTES as $key => [$route, $name, $document]) {
+    /* THE ENUMERATION ITSELF IS chrome_targets(), in the contract, which is
+       also the list the Header & Footer screen offers as link destinations.
+       It was written twice -- here and there -- and two answers to "what pages
+       are there" is two things to keep true. It walks SEO_ROUTES and slots
+       every service in under the services index, which is where they sit on
+       the site, in the sitemap and on this screen. */
+    foreach (chrome_targets(services_load()) as $key => $target) {
         $out[$key] = [
             'key'      => $key,
-            'name'     => $name,
-            'route'    => $route,
-            'document' => $document,
+            'name'     => $target['name'],
+            'route'    => $target['route'],
+            'document' => $target['service'] ? 'services' : SEO_ROUTES[$key][2],
             'meta'     => seo_page_meta($key),
-            'service'  => false,
+            'service'  => $target['service'],
         ];
 
-        /* The services sit directly under their index, which is where they
-           sit on the site and in the sitemap. */
-        if ($key !== 'services') {
-            continue;
-        }
-
-        foreach (services_all(services_load()) as $service) {
-            $id = trim((string)($service['id'] ?? ''));
-            if ($id === '') {
-                continue;
-            }
-            $slug = trim((string)($service['slug'] ?? ''));
-            $out['service:' . $id] = [
-                'key'      => 'service:' . $id,
-                'name'     => trim((string)$service['name']) ?: $slug ?: $id,
-                'route'    => $slug === '' ? '' : '/pages/services/' . $slug . '/',
-                'document' => 'services',
-                'meta'     => $service['meta'],
-                'service'  => true,
-                'hidden'   => ($service['status'] ?? 'shown') === 'hidden',
-            ];
+        if ($target['service']) {
+            $out[$key]['hidden'] = $target['hidden'];
         }
     }
+
+    /* AND THE 404, WHICH chrome_targets() OMITS ON PURPOSE. It has no address
+       of its own -- it is served at every address that does not exist -- so a
+       nav link must not be able to point at it. This screen must still list
+       it: it has a title and a search description like every other page, and
+       is the one page whose record lives in content/seo.json rather than in a
+       document of its own. */
+    [$route, $name, $document] = SEO_ROUTES['notfound'];
+    $out['notfound'] = [
+        'key'      => 'notfound',
+        'name'     => $name,
+        'route'    => $route,
+        'document' => $document,
+        'meta'     => seo_page_meta('notfound'),
+        'service'  => false,
+    ];
 
     return $out;
 }

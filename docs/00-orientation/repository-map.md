@@ -91,6 +91,8 @@ sections/
 ├── privacy.php         the privacy policy       → content/privacy.json
 ├── services.php        the services editor, and each service page beneath it
 │                                                → content/services.json
+├── chrome.php          the header, footer and mobile dock every page carries
+│                                                → content/chrome.json
 ├── seo.php             every page's search and share metadata, and the
 │                       site-wide graph          → content/seo.json AND the
 │                                                  meta band of nine others
@@ -102,7 +104,7 @@ and description from `ADMIN_SECTIONS` — both in `lib/admin.php`:
 
 | URL | Section | Edits |
 |---|---|---|
-| `/` | `overview` | nothing — it says what can and cannot be changed |
+| `/` | `overview` | nothing — one tile per rail row, derived from `ADMIN_RAIL_SECTIONS`, and a plain list of what a redeploy still owns |
 | `/?s=careers` | `careers` | `content/careers.json`, then publishes |
 | `/?s=contact` | `contact` | `content/contact.json`, then publishes |
 | `/?s=company` | `company` | `content/company.json`, then publishes |
@@ -113,6 +115,10 @@ and description from `ADMIN_SECTIONS` — both in `lib/admin.php`:
 | `/?s=certifications` | `certifications` | `content/certifications.json`, then publishes |
 | `/?s=branding` | `branding` | `content/branding.json`, then publishes |
 | `/?s=privacy` | `privacy` | `content/privacy.json`, then publishes |
+| `/?s=chrome` | `chrome` | nothing — it lists the three parts and links to each |
+| `/?s=chrome&part=header` | `chrome` | the `header` band of `content/chrome.json`, then publishes |
+| `/?s=chrome&part=footer` | `chrome` | the `footer` band, likewise |
+| `/?s=chrome&part=dock` | `chrome` | the `dock` band, likewise |
 | `/?s=seo` | `seo` | nothing — it lists every page and links to its screen |
 | `/?s=seo&page=<key>` | `seo` | the `meta` band of that page's own document |
 | `/?s=seo&page=service:<id>` | `seo` | the `meta` band of one service row |
@@ -121,11 +127,13 @@ and description from `ADMIN_SECTIONS` — both in `lib/admin.php`:
 | `/?s=account` | `account` | your own password, second factor and recovery codes |
 
 `ADMIN_PAGE_SECTIONS` names the subset that edits a page of the public website
-— everything but `overview`, `seo` and `account` — so anything counting "the
-pages you can edit" asks there rather than filtering the registry by hand.
+— everything but `overview`, `chrome`, `seo` and `account` — so anything counting
+"the pages you can edit" asks there rather than filtering the registry by hand.
+`chrome` is not one of them for the same reason `seo` is not: it does not edit a
+page, it edits something on **every** page.
 
 **`account` is in the registry and not in the rail.** `ADMIN_RAIL_SECTIONS`
-holds the rail's eleven rows and their order; `ADMIN_SECTIONS` holds every
+holds the rail's twelve rows and their order; `ADMIN_SECTIONS` holds every
 section there is. They differ by exactly one entry, because the account is
 about the person rather than about a page — it is reached from the avatar menu
 at the foot of the rail. Deleting it from the registry instead would not hide
@@ -168,11 +176,18 @@ Never reachable over HTTP: it is outside the document root.
 | `html.php` **shared** | escaping, and the rich-text sanitiser |
 | `contract.php` **shared** | the shape of every editable document, and `CONTRACT_VERSION` |
 | `publish.php` **shared** | how a document is signed, and how a signature is checked |
+| `svg.php` **shared** | the SVG sanitiser, which is a security boundary |
 | `publish_client.php` | sending one, and where the public site is |
 | `store.php` | reading and writing a JSON file atomically, with a lock |
 | `careers.php` | validation, and the save that publishes |
 | `contact.php` | the same, plus the flag picker |
 | `company.php` | the same again, for six repeatable lists and their artwork |
+| `about.php` `home.php` `services.php` | likewise, one editable page each — services holds the index and every detail page |
+| `certifications.php` `branding.php` `privacy.php` | likewise |
+| `chrome.php` | the header, footer and dock: what may be edited, and what the footer's rows are compared against |
+| `seo.php` | every page's metadata, the Organization graph, robots and the manifest |
+| `upload.php` | a picture arriving: what is accepted, re-encoded and named |
+| `qr.php` | the enrolment code an authenticator app scans |
 | `private.php` | where the secrets are, and the keys derived from them |
 | `auth.php` | accounts, hashing, sessions, the audit log |
 | `totp.php` | RFC 6238, hand-written, checked against its published vectors |
@@ -194,12 +209,21 @@ Detail on each: [libraries.md](../10-development/server-side/libraries.md).
 
 ```
 content/
-├── careers.json     job posts and the CV form link
-└── contact.json     offices, phone numbers, the enquiry form's copy
+├── about.json           the about page
+├── branding.json        the branding & advertisement page
+├── careers.json         job posts and the CV form link
+├── certifications.json  the resource certifications page
+├── chrome.json          the header, footer and dock every page carries
+├── company.json         the company profile page
+├── contact.json         offices, phone numbers, the enquiry form's copy
+├── home.json            the home page
+├── privacy.json         the privacy policy
+├── seo.json             every page's <head>, the sitemap, robots and the manifest
+└── services.json        the services index and all seven detail pages
 ```
 
 **This is the real data, and the public site holds a replica of it.** Every
-save here writes this file first, then pushes a signed copy to
+save here writes the file first, then pushes a signed copy to
 `tech4time.bd/api/publish.php`. A deploy that overwrote this directory would
 destroy live job posts — so it is never synced, seeded once with
 `--ignore-existing`, and named in the deploy's protect list.

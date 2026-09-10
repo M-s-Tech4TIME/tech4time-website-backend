@@ -60,7 +60,7 @@ server this moves to, and is the single file most likely to arrive damaged or no
 ### What comes back
 
 ```json
-{"ok": true,  "document": "careers", "revision": 12, "footer_synced": "4d3f…"}
+{"ok": true,  "document": "careers", "revision": 12}
 {"ok": false, "code": "not-newer", "error": "The live site already holds…", "revision": 12}
 ```
 
@@ -185,23 +185,34 @@ was restored from an older backup, and a person has to decide which copy is righ
 
 ---
 
-## The footer fingerprint, which travels back the other way
+## Nothing travels back the other way
 
-The only thing the frontend tells the backend. The site-wide footers repeat the contact details as
-literal markup in all sixteen pages, so they go stale the moment an address is edited and stay stale
-until the pages are rebuilt and deployed.
+The answer to a publish is `{"ok": true, "document": "about", "revision": 12}` and nothing else.
 
-`tech4time-website-frontend/tools/sync_site_contact.py` rebuilds them and records the fingerprint in
-`tech4time-website-frontend/lib/footer-fingerprint.php`; `tech4time-website-frontend/api/publish.php` returns it in every response; `contact_save()`
-records what it was told; the editor compares. **The side that knows what its own footers say is the
-side that answers** — which is why it is not simply a field in `contact.json` any more.
+**There used to be a fingerprint in it.** The public site's footers repeated the contact details as
+literal markup in all sixteen pages, so they went stale the moment an address was edited here and
+stayed stale until those pages were rebuilt and deployed. Only the frontend knew what its own
+footers said, so it reported a digest of them in every publish response, `contact_save()` recorded
+what it was told with a second `store_write()`, and the editor drew a banner when the two parted.
+
+The `<head>` shed the same problem first — `seo_graph()` builds the Organization graph from
+`content/contact.json` on the request, so the structured data is right the moment the publish lands
+([ADR 0020](../../90-decisions/0020-page-metadata-is-content.md)). The footer shed it next: it
+renders from `tech4time-website-frontend/content/chrome.json`, its contact rows are the footer's own
+and are edited on the **Header & Footer** screen, and what keeps them honest is a notice drawn from
+two documents this side holds rather than a digest carried over the wire
+([ADR 0023](../../90-decisions/0023-the-header-and-footer-are-emitted-once.md)).
+
+So `footer-fingerprint.php`, `contact_fingerprint()`, `contact_footer_in_step()`, the
+`footer_synced` bookkeeping field and the second write that recorded it are all deleted. The wire
+is one-way again.
 
 ---
 
 ## Proving it
 
 ```bash
-python3 tools/test_publish.py          # 36 checks, over real HTTP with real signatures
+python3 tools/test_publish.py          # 400+ checks, over real HTTP with real signatures
 ```
 
 It drives the real endpoint and then tries every way past it that does not involve holding the key:
@@ -213,7 +224,7 @@ guards have been watched to fail: removing the revision check breaks five of the
 re-sanitise breaks two.
 
 ```bash
-python3 tools/check_shared_lib.py      # the three shared files are as recorded
+python3 tools/check_shared_lib.py      # the five shared files are as recorded
 python3 tools/verify_live.py <url>     # /api/publish.php answers 405 to GET
 ```
 

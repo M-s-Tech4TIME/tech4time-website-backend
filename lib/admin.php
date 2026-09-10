@@ -113,6 +113,18 @@ const ADMIN_SECTIONS = [
         'desc'  => 'What the site collects, why, and what people can ask for',
         'view'  => '/pages/privacy-policy/',
     ],
+    'chrome' => [
+        'label' => 'Header & Footer',
+        /* Bands stacked down a page, which is what this screen edits: the
+           bar across the top, the bar across the bottom, and the card that
+           rises over the bottom one on a phone. Every more obvious glyph is
+           already a rail row -- 'th-large' is the Overview, 'layer-group' is
+           Services, 'building' is the Company Profile. */
+        'icon'  => 'stream',
+        'desc'  => 'The navigation, the footer and the mobile dock',
+        /* No single page: this screen is on all of them. */
+        'view'  => '',
+    ],
     'seo' => [
         'label' => 'SEO Management',
         'icon'  => 'globe',
@@ -148,7 +160,7 @@ const ADMIN_SECTIONS = [
  */
 const ADMIN_RAIL_SECTIONS = ['overview', 'home', 'about', 'services', 'company',
                              'careers', 'contact', 'certifications', 'branding',
-                             'privacy', 'seo'];
+                             'privacy', 'chrome', 'seo'];
 
 /**
  * Sections that edit a page of the website, in rail order.
@@ -182,6 +194,12 @@ const ADMIN_ICONS = [
        enrolment and recovery panels on the account page. */
     'user-shield', 'user-lock', 'shield-alt', 'check-circle',
     'exclamation-circle', 'question-circle', 'angle-right',
+    /* The header, footer and dock: the rail's own row, and every mark the
+       chrome can be told to draw. Kept in step with CHROME_BAR_ICONS,
+       CHROME_CONTACT_ICONS, CHROME_SOCIAL_ICONS and CHROME_SOCIAL_FALLBACK --
+       tools/check_content_model.py asserts it, because the dock-key picker
+       draws a live preview of whichever icon is chosen. */
+    'stream',
     /* The company profile: the icons a principle card may carry, plus the one
        its picture rows use for "upload". Kept in step with COMPANY_ICONS —
        every name there must be inlined here, or the editor's live preview
@@ -869,6 +887,15 @@ function admin_status_field(string $name, string $status, string $noun): void
  *   icon    a sprite id to show before the label, or ''.
  *   status  'shown' or 'hidden' for the pill; '' for rows that have no such
  *           setting, which is why it is not simply a boolean.
+ *   controls which of ['up', 'down', 'remove'] to draw. All three by default.
+ *
+ * WHY 'controls' EXISTS. The dock bar is exactly CHROME_BAR_SLOTS keys, and
+ * that number is code: the grid is written for four, tools/test_nav.py asserts
+ * four, and a fifth would break a layout nobody has measured. So those rows
+ * reorder but do not add or remove -- and the alternative to saying so here
+ * was a second head laid out by hand in one section, which is the exact
+ * failure this function was extracted to stop. A caller that says nothing gets
+ * what every caller got before.
  *
  * The button VALUES are the contract with each section's POST handler --
  * "<band>-up:<index>" -- and are the reason $band and $index are separate
@@ -876,7 +903,8 @@ function admin_status_field(string $name, string $status, string $noun): void
  */
 function admin_card_head(string $band, int $index, int $total, array $card): void
 {
-    $card += ['label' => '', 'noun' => 'row', 'detail' => '', 'icon' => '', 'status' => ''];
+    $card += ['label' => '', 'noun' => 'row', 'detail' => '', 'icon' => '',
+              'status' => '', 'controls' => ['up', 'down', 'remove']];
 
     $label = (string)$card['label'];
     $noun  = (string)$card['noun'];
@@ -908,13 +936,19 @@ function admin_card_head(string $band, int $index, int $total, array $card): voi
                  end of the line. That only works because they are inside the
                  flex row above -- see the note at the top of this function. */ ?>
         <div class="admin-card__controls">
+<?php if (in_array('up', $card['controls'], true)): ?>
           <button class="btn btn--ghost" type="submit" name="do" value="<?= h($band) ?>-up:<?= $index ?>"
                   aria-label="Move <?= h($named) ?> up"<?= $index === 0 ? ' disabled' : '' ?>>&uarr;</button>
+<?php endif; ?>
+<?php if (in_array('down', $card['controls'], true)): ?>
           <button class="btn btn--ghost" type="submit" name="do" value="<?= h($band) ?>-down:<?= $index ?>"
                   aria-label="Move <?= h($named) ?> down"<?= $index === $total - 1 ? ' disabled' : '' ?>>&darr;</button>
+<?php endif; ?>
+<?php if (in_array('remove', $card['controls'], true)): ?>
           <button class="btn btn--ghost admin-row__delete" type="submit"
                   name="do" value="<?= h($band) ?>-remove:<?= $index ?>"
                   aria-label="Remove <?= h($named) ?>">Remove</button>
+<?php endif; ?>
         </div>
       </div>
 <?php

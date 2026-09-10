@@ -15,8 +15,6 @@
  *   {
  *     "updated":        set on every save
  *     "revision":       monotonic; see contract.php
- *     "footer_synced":  fingerprint of the details as last written into the
- *                       site-wide footer — see contact_fingerprint()
  *     "meta":    { title, description, share_title }
  *     "hero":    { title, subtitle }
  *     "form":    { title, lead, subject_hint, note, service_types[] }
@@ -70,19 +68,20 @@ function contact_load(): array
  * Write the record, then publish it. Returns whether the WRITE succeeded.
  *
  * Same shape as careers_save(), and the same reasons — see the long note
- * there. What is different is the second write.
+ * there.
  *
- * THE SECOND WRITE, AND WHY IT IS NOT WASTE.
- * The site-wide footers repeat these details as literal markup on sixteen
- * pages, so they go stale the moment an address changes here and stay stale
- * until the frontend is rebuilt and deployed. Only the frontend knows what its
- * own footers currently say, so it reports that fingerprint in every publish
- * response — and it can only do so AFTER the publish. Recording it means
- * writing again.
+ * THERE USED TO BE A SECOND WRITE HERE. The site-wide footers repeated these
+ * details as literal markup on sixteen pages, so they went stale the moment an
+ * address changed here and stayed stale until the frontend was rebuilt and
+ * deployed. Only the frontend knew what its own footers said, so it reported a
+ * fingerprint in every publish response and this recorded it — a second
+ * store_write, after the publish, so the editor could show a banner.
  *
- * It happens only when the value actually changed, which is after a footer
- * rebuild and not on an ordinary save. contact_footer_in_step() then compares
- * it against the details now held, and the editor shows the banner.
+ * None of that exists now. The frontend's footer is rendered from
+ * content/chrome.json on the request, its contact rows are the footer's own
+ * and are edited on the Header & Footer screen, and what keeps them honest is
+ * a notice drawn from the two documents rather than a digest carried over the
+ * wire. ADR 0023.
  */
 function contact_save(array $data): bool
 {
@@ -93,16 +92,7 @@ function contact_save(array $data): bool
         return false;
     }
 
-    $result = publish_push('contact', $data);
-    publish_note($result);
-
-    $told = (string)($result['footer_synced'] ?? '');
-
-    if (($result['ok'] ?? false) === true && $told !== ''
-            && $told !== (string)($data['footer_synced'] ?? '')) {
-        $data['footer_synced'] = $told;
-        store_write(CONTACT_FILE, $data);
-    }
+    publish_note(publish_push('contact', $data));
 
     return true;
 }

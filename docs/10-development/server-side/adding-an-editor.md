@@ -27,10 +27,12 @@ The shell needs to know nothing else. The rail draws itself from the registry.
 
 ---
 
-**The example below is a page that does not exist**, deliberately: the four editors that do —
-careers, contact, company profile and about — are the ones to copy from, and an example that named
-one of them would drift out of step with it. `sections/about.php` is the most recent and the
-closest to this recipe.
+**The example below is a page that does not exist**, deliberately: the editors that do — every
+row of `ADMIN_RAIL_SECTIONS` bar the overview — are the ones to copy from, and an example that
+named one of them would drift out of step with it. `sections/about.php` is the closest to this
+recipe. `sections/chrome.php` is the most recent and by some way the largest, so it is the better
+read for the harder parts — four screens over one document, a standing notice that never blocks a
+save, and a row action that fills the form without writing anything.
 
 ## 1. The model — `lib/<name>.php`
 
@@ -69,26 +71,39 @@ Seed it with the page's current content, so the first render is identical to wha
 
 ## 3. The renderer — `pages/<name>/index.php`
 
-Rename `tech4time-website-frontend/index.html` to `index.php` and replace the editable copy with values from the model.
+**The page is the other repository's, and it owns this step.** The full recipe is
+*adding-a-page.md* (in tech4time-website-frontend); what matters here is that the page is a
+`<main>` and a handful of calls, not a file to paste chrome into.
 
 ```php
 <?php
+require_once __DIR__ . '/../../lib/head.php';
+require_once __DIR__ . '/../../lib/body.php';
 require_once __DIR__ . '/../../lib/partners.php';
 $data = partners_load();
 ?>
 …
-<h1><?= h($data['hero']['title']) ?></h1>
+<?php body_header('/pages/partners/'); ?>
+<main class="page__main" id="main">
+  <h1><?= h($data['hero']['title']) ?></h1>
+</main>
+<?php body_footer(); ?>
+<?php body_dock('/pages/partners/'); ?>
 ```
 
 **Everything through `h()`.** Rich text is emitted already sanitised by `rt_sanitise_html()` on save.
 
-Keep the markup otherwise identical — `check_shared_markup.py` still applies, and the head, header
-and footer must stay byte-identical to the templates.
+There is no header or footer markup to keep in step: the `<head>` is
+`tech4time-website-frontend/lib/head.php` and the header, footer and dock are
+`tech4time-website-frontend/lib/body.php`, both rendering from documents
+([ADR 0023](../../90-decisions/0023-the-header-and-footer-are-emitted-once.md)).
+`check_shared_markup.py` still applies, but what it now compares is the hero circuit and the script
+tags.
 
 ## 4. The form — `sections/<name>.php`
 
-Start by copying `sections/contact.php`. It is the fuller of the two and demonstrates
-repeatable rows, reordering, validation display and the save cycle.
+Start by copying `sections/contact.php`. It demonstrates repeatable rows, reordering, validation
+display and the save cycle without being large enough to get lost in.
 
 The obligations:
 
@@ -242,8 +257,8 @@ every page.
 | `ADMIN_PAGE_SECTIONS` | the subset that edits a page of the website; what anything counting "the pages you can edit" asks |
 
 Registry order is **not** rail order any more. `ADMIN_RAIL_SECTIONS` decides that, and it holds
-eleven of the twelve sections: `account` is registered and deliberately absent, because it is about
-the person rather than a page and is reached from the avatar menu at the foot of the rail.
+twelve of the thirteen sections: `account` is registered and deliberately absent, because it is
+about the person rather than a page and is reached from the avatar menu at the foot of the rail.
 
 **Do not "simplify" that by deleting the entry from the registry.** `admin_section()` returns
 `'overview'` for any name `ADMIN_SECTIONS` does not list, so `?s=account` would land silently on the
@@ -315,7 +330,7 @@ the reason beside it. `test_careers_admin.py` is the worked example.
 - [ ] an `id` on every `<fieldset>` the outline names
 - [ ] `ADMIN_SECTIONS`, `ADMIN_RAIL_SECTIONS` and `ADMIN_PAGE_SECTIONS` updated; icon in `ADMIN_ICONS`
 - [ ] the rail label fits on one line — `check_admin_a11y.py` measures it
-- [ ] a card in `sections/overview.php`'s `$cards`, in the same order. **Nothing checks this** — the Overview would simply not mention the new editor
+- [ ] an entry in `sections/overview.php`'s `$facts`, keyed by section. The **tile** appears by itself — `$cards` walks `ADMIN_RAIL_SECTIONS` — and a section with no entry draws a tile saying it has no summary, which `test_contact_admin.py` fails on. It was a hand-written list and it had drifted to six tiles against nine editors
 - [ ] **no `meta` fieldset in the form.** A new page's title and description are edited on the SEO screen; the editor renders `admin_meta_band()` in that place instead, and its `*_from_post()` iterates `contract_page_bands()` so a save cannot blank them
 - [ ] `check_content_model.py`: a `SUBJECTS` entry, or a `COVERED_ELSEWHERE` one naming the test
 - [ ] `test_<name>_admin.py`
@@ -349,7 +364,9 @@ if the id is a fragment somebody linked to, that link now lands in the wrong pla
 `content/*.json` on the host is live data written by other people. Add it to the exclude list —
 [routine-deploys.md](../../20-deployment/routine-deploys.md).
 
-**The footer problem, if the page carries contact details.** Anything repeated in every page's
-footer is markup, not content, and the editor cannot reach it. That is what
-`tech4time-website-frontend/tools/sync_site_contact.py` exists for, and it needs a deploy to take effect.
+**The footer is a document too, and a separate one.** Anything repeated in every page's footer used
+to be markup the editor could not reach. It is `tech4time-website-frontend/content/chrome.json` now,
+edited on the **Header & Footer** screen — so if your new page carries contact details, the footer's
+are still not yours to write, and are deliberately not kept in step with them.
+[ADR 0023](../../90-decisions/0023-the-header-and-footer-are-emitted-once.md) ·
 *shared-markup.md* (in tech4time-website-frontend)

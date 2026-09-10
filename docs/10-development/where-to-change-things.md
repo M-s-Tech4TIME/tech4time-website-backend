@@ -28,16 +28,20 @@ breath**.
 | The home page's hero, badges, tags, terminal and cards | `/?s=home` |
 | What the enquiry form says | `/?s=contact` |
 | Anything the privacy policy says — a clause, the retention table, the effective date | `/?s=privacy` |
+| A navigation link, on the site or in the footer or the mobile dock | `/?s=chrome` |
+| The footer's tagline, its contact rows, the copyright line | `/?s=chrome` |
+| The logo lockup at the top or the bottom of every page | `/?s=chrome` |
 
 Saving writes `content/careers.json` or `content/contact.json` here — **the system of record** —
 and then pushes a signed copy to the public site, which verifies it, re-sanitises it and writes its
 replica. If that push fails the editor says so, in words, with a **Publish again** control.
 [publish-api.md](server-side/publish-api.md)
 
-> **The footer is the exception.** The contact details repeated in every page's footer are *markup*
-> on the public site, not content, so this editor cannot reach them. After changing an address here,
-> run `python3 tools/sync_site_contact.py` **in tech4time-website-frontend** and deploy it. The banner in
-> this editor clears on the next save, when the public site reports its new fingerprint back.
+> **The footer's contact details are separate, deliberately.** They are the footer's own rows, on
+> the **Header & Footer** screen — `/?s=chrome` — and not a copy of this page's. The contact page
+> holds everything in full; the footer holds the part worth putting in a footer, in whatever order
+> and wording suits it. A standing notice reports when the two differ, and never blocks a save.
+> [ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md)
 
 ---
 

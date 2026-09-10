@@ -1,0 +1,328 @@
+{
+    "updated": "",
+    "revision": 0,
+    "header": {
+        "brand_label": "Tech4TIME — home",
+        "logo": {
+            "alt": "Tech4TIME",
+            "sizes": "(max-width: 48em) 140px, 180px",
+            "width": 360,
+            "height": 128,
+            "light": {
+                "src": "/assets/images/logo/logo-light-360.png",
+                "srcset": "/assets/images/logo/logo-light-180.png 180w, /assets/images/logo/logo-light-360.png 360w, /assets/images/logo/logo-light-540.png 540w",
+                "webp": "/assets/images/logo/logo-light-180.webp 180w, /assets/images/logo/logo-light-360.webp 360w, /assets/images/logo/logo-light-540.webp 540w"
+            },
+            "dark": {
+                "src": "/assets/images/logo/logo-dark-360.png",
+                "srcset": "/assets/images/logo/logo-dark-180.png 180w, /assets/images/logo/logo-dark-360.png 360w, /assets/images/logo/logo-dark-540.png 540w",
+                "webp": "/assets/images/logo/logo-dark-180.webp 180w, /assets/images/logo/logo-dark-360.webp 360w, /assets/images/logo/logo-dark-540.webp 540w"
+            }
+        },
+        "nav": {
+            "items": [
+                {
+                    "id": "home",
+                    "target": "home",
+                    "label": "",
+                    "status": "shown"
+                },
+                {
+                    "id": "about",
+                    "target": "about",
+                    "label": "",
+                    "status": "shown"
+                },
+                {
+                    "id": "services",
+                    "target": "services",
+                    "label": "",
+                    "status": "shown"
+                },
+                {
+                    "id": "company",
+                    "target": "company",
+                    "label": "",
+                    "status": "shown"
+                },
+                {
+                    "id": "careers",
+                    "target": "careers",
+                    "label": "",
+                    "status": "shown"
+                },
+                {
+                    "id": "contact",
+                    "target": "contact",
+                    "label": "",
+                    "status": "shown"
+                }
+            ]
+        }
+    },
+    "footer": {
+        "brand_label": "Tech4TIME — home",
+        "logo": {
+            "alt": "Tech4TIME",
+            "sizes": "",
+            "width": 360,
+            "height": 128,
+            "light": {
+                "src": "/assets/images/logo/logo-light-360.png",
+                "srcset": "",
+                "webp": "/assets/images/logo/logo-light-360.webp"
+            },
+            "dark": {
+                "src": "/assets/images/logo/logo-dark-360.png",
+                "srcset": "",
+                "webp": "/assets/images/logo/logo-dark-360.webp"
+            }
+        },
+        "tagline": "Orchestrating Technology with Time",
+        "description": "Open-Source & Enterprise-grade cybersecurity, software development, and IT solutions. Orchestrate, build, maintain and protect your business with our profound solutions.",
+        "links": {
+            "heading": "Quick Links",
+            "items": [
+                {
+                    "id": "home",
+                    "target": "home",
+                    "label": "",
+                    "status": "shown"
+                },
+                {
+                    "id": "about",
+                    "target": "about",
+                    "label": "",
+                    "status": "shown"
+                },
+                {
+                    "id": "company",
+                    "target": "company",
+                    "label": "",
+                    "status": "shown"
+                },
+                {
+                    "id": "careers",
+                    "target": "careers",
+                    "label": "",
+                    "status": "shown"
+                },
+                {
+                    "id": "certifications",
+                    "target": "certifications",
+                    "label": "",
+                    "status": "shown"
+                },
+                {
+                    "id": "branding",
+                    "target": "branding",
+                    "label": "",
+                    "status": "shown"
+                },
+                {
+                    "id": "contact",
+                    "target": "contact",
+                    "label": "",
+                    "status": "shown"
+                }
+            ]
+        },
+        "services": {
+            "heading": "Our Services",
+            "index_label": "All Services"
+        },
+        "contact": {
+            "heading": "Contact Info",
+            "items": [
+                {
+                    "id": "phone-bangladesh",
+                    "kind": "phone",
+                    "label": "Bangladesh",
+                    "lines": [
+                        "+880 1320571562",
+                        "+880 1881873463",
+                        "+880 1847313835"
+                    ],
+                    "note": "Sunday – Thursday",
+                    "status": "shown"
+                },
+                {
+                    "id": "phone-malaysia",
+                    "kind": "phone",
+                    "label": "Malaysia",
+                    "lines": [
+                        "+60 198527096"
+                    ],
+                    "note": "Monday – Friday",
+                    "status": "shown"
+                },
+                {
+                    "id": "phone-belgium",
+                    "kind": "phone",
+                    "label": "Belgium",
+                    "lines": [
+                        "+32 2 555 75 25",
+                        "+32 2 999 55 75"
+                    ],
+                    "note": "",
+                    "status": "shown"
+                },
+                {
+                    "id": "email",
+                    "kind": "email",
+                    "label": "",
+                    "lines": [
+                        "info@tech4time.bd"
+                    ],
+                    "note": "",
+                    "status": "shown"
+                },
+                {
+                    "id": "address-bangladesh",
+                    "kind": "address",
+                    "label": "Bangladesh",
+                    "lines": [
+                        "278/3, Manikdi, Dhaka - 1206"
+                    ],
+                    "note": "",
+                    "status": "shown"
+                },
+                {
+                    "id": "address-malaysia",
+                    "kind": "address",
+                    "label": "Malaysia",
+                    "lines": [
+                        "68100 Batu Caves, Selangor, Malaysia"
+                    ],
+                    "note": "",
+                    "status": "shown"
+                },
+                {
+                    "id": "address-belgium",
+                    "kind": "address",
+                    "label": "Belgium",
+                    "lines": [
+                        "367, Avenue Louise, Brussels, Belgium"
+                    ],
+                    "note": "",
+                    "status": "shown"
+                },
+                {
+                    "id": "hours-bangladesh-office",
+                    "kind": "hours",
+                    "label": "Bangladesh Office",
+                    "lines": [
+                        "Sun – Thu: 9:00 AM – 6:00 PM"
+                    ],
+                    "note": "",
+                    "status": "shown"
+                },
+                {
+                    "id": "hours-malaysia-office",
+                    "kind": "hours",
+                    "label": "Malaysia Office",
+                    "lines": [
+                        "Mon – Fri: 9:00 AM – 6:00 PM"
+                    ],
+                    "note": "",
+                    "status": "shown"
+                }
+            ]
+        },
+        "legal": {
+            "items": [
+                {
+                    "id": "privacy",
+                    "target": "privacy",
+                    "label": "",
+                    "status": "shown"
+                }
+            ]
+        },
+        "copyright": {
+            "name": "Tech4TIME",
+            "rights": "All rights reserved."
+        }
+    },
+    "dock": {
+        "panel": {
+            "items": [
+                {
+                    "id": "home",
+                    "target": "home",
+                    "label": "",
+                    "description": "Start here",
+                    "status": "shown"
+                },
+                {
+                    "id": "about",
+                    "target": "about",
+                    "label": "",
+                    "description": "Who we are and how we work",
+                    "status": "shown"
+                },
+                {
+                    "id": "services",
+                    "target": "services",
+                    "label": "",
+                    "description": "Security, development, cloud and people",
+                    "status": "shown"
+                },
+                {
+                    "id": "company",
+                    "target": "company",
+                    "label": "",
+                    "description": "Milestones, clients and the technology we use",
+                    "status": "shown"
+                },
+                {
+                    "id": "careers",
+                    "target": "careers",
+                    "label": "",
+                    "description": "Open roles, and speculative applications",
+                    "status": "shown"
+                },
+                {
+                    "id": "contact",
+                    "target": "contact",
+                    "label": "",
+                    "description": "Reach us any way you prefer",
+                    "status": "shown"
+                }
+            ]
+        },
+        "bar": {
+            "items": [
+                {
+                    "id": "home",
+                    "target": "home",
+                    "label": "Home",
+                    "icon": "home",
+                    "emphasis": "plain"
+                },
+                {
+                    "id": "services",
+                    "target": "services",
+                    "label": "Services",
+                    "icon": "cogs",
+                    "emphasis": "plain"
+                },
+                {
+                    "id": "contact",
+                    "target": "contact",
+                    "label": "Contact",
+                    "icon": "comment-alt",
+                    "emphasis": "disc"
+                },
+                {
+                    "id": "company",
+                    "target": "company",
+                    "label": "Profile",
+                    "icon": "building",
+                    "emphasis": "plain"
+                }
+            ]
+        },
+        "menu_label": "Menu"
+    }
+}

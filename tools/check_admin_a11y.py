@@ -21,10 +21,11 @@ the sign-in, which is the half nobody has ever looked at.
 
 WHY ONE FILE AND NOT FOUR
 Over there, four files is right: sixteen public pages, and each tool carries a
-lot of crawl machinery for its own question. Here there are nine screens. Four
-copies of "start PHP, start geckodriver, sign in, walk the screens" would be
-four copies of the sign-in -- and the sign-in is the part most likely to need
-changing, because it is the part that depends on the login page's markup.
+lot of crawl machinery for its own question. Here it is a dozen screens, which
+SIGNED_IN_SCREENS lists. Four copies of "start PHP, start geckodriver, sign in,
+walk the screens" would be four copies of the sign-in -- and the sign-in is the
+part most likely to need changing, because it is the part that depends on the
+login page's markup.
 
 So: one crawl, four families of assertion. The families are kept visibly
 separate below, and each names the success criterion it is about, so a failure
@@ -114,6 +115,13 @@ SIGNED_IN_SCREENS = ["/", "/?s=home", "/?s=careers", "/?s=contact", "/?s=company
                      # two file inputs.
                      "/?s=seo", "/?s=seo&page=about", "/?s=seo&page=notfound",
                      "/?s=seo&site=identity", "/?s=seo&site=crawl",
+                     # All four shapes the Header & Footer editor takes, for
+                     # the same reason. The index is cards and links; the
+                     # footer screen is the longest form on this site after
+                     # the SEO identity one, and the only one that draws a
+                     # standing notice with a list inside it.
+                     "/?s=chrome", "/?s=chrome&part=header",
+                     "/?s=chrome&part=footer", "/?s=chrome&part=dock",
                      "/?s=account"]
 
 MIN_TARGET = 24          # SC 2.5.8, CSS pixels

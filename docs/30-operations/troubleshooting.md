@@ -194,22 +194,21 @@ ls -la ~/t4t-private-admin/sessions/
 `mail()` — as above. Check the spam folder, confirm the mailbox on the account is one you can open,
 and confirm SPF/DKIM/DMARC. A recovery code will sign you in meanwhile.
 
-### A banner says the footer is out of step
+### A notice says the footer's contact details differ from the contact page's
 
-The contact details here and the ones baked into the public site's page footers disagree. Expected
-after editing an address — the footer is markup on that side, not content, and this editor cannot
-reach it.
+**Nothing is broken and nothing needs doing unless you want it to.** The footer's contact rows are
+its own — added, worded, ordered, shown and hidden on the **Header & Footer** screen — and are
+deliberately not a copy of the contact page's. The contact page holds every detail in full; a footer
+holds the part worth putting in a footer.
 
-```bash
-# in tech4time-website-frontend, with content/contact.json as the live site now holds it
-python3 tools/sync_site_contact.py     # rewrites the footers and lib/footer-fingerprint.php
-python3 tools/check_shared_markup.py   # proves the sixteen still agree
-git commit && git push                 # the deploy carries it
-```
+The notice exists so the difference is never *invisible*, not to say it is wrong. It never blocks a
+save. If the difference is an oversight rather than a choice, edit the footer's rows at `/?s=chrome`,
+or press **Copy from the Contact page** to reseed them, and save.
+[ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md)
 
-**The banner clears on the next save here**, which is when the public site reports its new
-fingerprint back in the publish response. It is not stored in that side's `content/contact.json`
-any more: that file is a replica, and the next publish would overwrite it.
+There used to be a different banner here saying the footer was *out of step*, which meant something
+else entirely: the footer was markup in sixteen of the public site's pages, a build script had to
+push the details into them, and closing the gap was a deploy of that repository. That is gone.
 
 ---
 

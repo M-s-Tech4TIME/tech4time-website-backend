@@ -40,3 +40,4 @@ new record superseding the old one rather than quietly doing the opposite.
 | [0020](0020-page-metadata-is-content.md) | A page's metadata is that page's content, and one screen edits all of it | accepted |
 | [0021](0021-analytics-is-off-until-somebody-turns-it-on.md) | Google Analytics is a field, and the policy opens only while it holds one | accepted |
 | [0022](0022-form-properties-are-read-off-the-prototype.md) | A form's properties are read off the prototype, never off the form | accepted |
+| [0023](0023-the-header-and-footer-are-emitted-once.md) | The header, footer and dock are emitted once, from a document anybody can edit | accepted, **built** |

@@ -64,6 +64,9 @@ DOCROOT = ROOT / "public"
 ROUTER = ROOT / "tools" / "dev-router.php"
 DATA = ROOT / "content" / "company.json"
 CONTACT = ROOT / "content" / "contact.json"
+# The Header & Footer screen is written to below, to raise its standing
+# notice. Restored with the other three.
+CHROME = ROOT / "content" / "chrome.json"
 # Pressing a careers button for real writes this one, so it is restored with
 # the other two. Every document the suite saves has to be, or a run leaves the
 # repository holding a revision bump and an "updated" stamp no operator made --
@@ -1027,17 +1030,27 @@ def improvements(b: Browser, base: str, r: Results) -> None:
                 f"{b.js(SHELL)['marked'] is not True}")
 
     r.section("a standing warning does not steal the page")
-    # THE BUG BEHIND "the async never landed". The contact editor carries a
-    # warning whenever the site's footers have drifted from the record, and the
-    # swap used to scroll to the first error OR warning it found afterwards —
-    # so every press on that screen jumped to the top and looked like a reload.
-    # It could not be reproduced here because the development copy is in step.
+    # THE BUG THIS GUARDS. A screen that carries a standing advisory — one that
+    # is true of the record rather than an answer to what was just pressed —
+    # used to have every row action scroll to it, so every press looked like a
+    # reload. admin-forms.js scrolls to PROBLEM = ".admin__notice--error,
+    # .admin__notice--warn", and the fix was to scroll only to one the press
+    # itself raised.
+    #
+    # IT WAS ASSERTED ON ?s=contact until 2026-09-10, whose banner said the
+    # site's footers had drifted from that record. That banner is gone with the
+    # thing it was about — the footer renders from content/chrome.json now and
+    # holds no copy of those details to go stale (ADR 0023). Its replacement is
+    # the same shape of advisory in the same shape of place: the Header &
+    # Footer screen reports what the footer's own contact rows say that the
+    # contact page does not, over a band of reorderable rows, and never blocks
+    # a save.
     import json as _json
-    record = _json.loads(CONTACT.read_text())
-    record["footer_synced"] = "deliberately-out-of-step"
-    CONTACT.write_text(_json.dumps(record, indent=4))
+    record = _json.loads(CHROME.read_text())
+    record["footer"]["contact"]["items"][0]["lines"] = ["+880 1000000000"]
+    CHROME.write_text(_json.dumps(record, indent=4))
 
-    b.go(base + "/?s=contact")
+    b.go(base + "/?s=chrome&part=footer")
     r.check("the standing warning is on the page",
             b.js("return document.querySelectorAll('.admin__notice--warn').length;") >= 1,
             "the state this group is about could not be set up, so the check "
@@ -1052,7 +1065,7 @@ def improvements(b: Browser, base: str, r: Results) -> None:
     b.js("window.scrollTo({top: 2500, behavior: 'instant'});")
     time.sleep(0.4)
     was = b.js("return Math.round(window.scrollY);")
-    b.click('button[name="do"][value="reach-down:0"]')
+    b.click('button[name="do"][value="contact-down:0"]')
     now = b.js("return Math.round(window.scrollY);")
 
     # NOT "the scroll is identical": a move deliberately follows the row it
@@ -1082,9 +1095,6 @@ def improvements(b: Browser, base: str, r: Results) -> None:
             b.js("return Math.round(window.scrollY);") < 600,
             "a publish that failed is news, and it was not on the page before "
             "the button was pressed")
-
-    CONTACT.write_text(_json.dumps(record, indent=4).replace(
-        '"deliberately-out-of-step"', '""'))
 
     r.section("what the server said, said in the corner")
     b.go(base + "/?s=company")
@@ -1379,6 +1389,7 @@ def main() -> None:
 
     backup = DATA.read_bytes()
     contact_backup = CONTACT.read_bytes()
+    chrome_backup = CHROME.read_bytes()
     careers_backup = CAREERS.read_bytes()
     web_port, drv_port = free_port(), free_port()
     work = Path(tempfile.mkdtemp(prefix="t4t-admin-forms-"))
@@ -1439,8 +1450,10 @@ def main() -> None:
         shutil.rmtree(work, ignore_errors=True)
         DATA.write_bytes(backup)
         CONTACT.write_bytes(contact_backup)
+        CHROME.write_bytes(chrome_backup)
         CAREERS.write_bytes(careers_backup)
         for stray in (DATA.with_suffix(".json.bak"),
+                      CHROME.with_suffix(".json.bak"),
                       CAREERS.with_suffix(".json.bak")):
             stray.unlink(missing_ok=True)
         print(f"\n{DATA.relative_to(ROOT)} and {CAREERS.relative_to(ROOT)} restored")

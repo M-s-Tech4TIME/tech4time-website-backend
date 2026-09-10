@@ -120,12 +120,13 @@ confused person months later.
 ### The exemptions, and why they exist
 
 ```python
-"page_indirect": {"updated", "footer_synced"},
-"form_exempt":   {"updated", "footer_synced", "offices.items.id"},
+"page_indirect": {"updated"},
+"form_exempt":   {"updated", "offices.items.id"},
 ```
 
-- `updated` and `footer_synced` are the store's own bookkeeping. Nothing renders them and nothing
-  should; the admin prints them as status rather than content.
+- `updated` is the store's own bookkeeping. Nothing renders it and nothing should; the admin prints
+  it as status rather than content. `footer_synced` was here beside it until the footer stopped
+  being markup — [ADR 0023](../../90-decisions/0023-the-header-and-footer-are-emitted-once.md).
 - `offices.items.id` is generated when an office is created, not typed.
 
 Add an exemption only when the field genuinely should not appear in that layer — never to quiet a

@@ -54,7 +54,7 @@ const CONTRACT_VERSION = 1;
 
 /** Every document that is published, by name. The endpoint refuses any other. */
 const CONTRACT_DOCUMENTS = ['careers', 'contact', 'company', 'about', 'home', 'services',
-                            'certifications', 'branding', 'privacy', 'seo'];
+                            'certifications', 'branding', 'privacy', 'seo', 'chrome'];
 
 /**
  * Where a document's record lives, on either host.
@@ -95,7 +95,7 @@ function contract_path(string $document): string
  * entry reports it as "a field nobody edits" — which is true, and not the
  * point. That is exactly how 'revision' announced itself.
  */
-const CONTRACT_BOOKKEEPING = ['updated', 'revision', 'footer_synced'];
+const CONTRACT_BOOKKEEPING = ['updated', 'revision'];
 
 /* ---------------------------------------------------- page metadata
 
@@ -373,9 +373,8 @@ const CONTACT_RICH_FIELDS = [
 function contact_defaults(): array
 {
     return [
-        'updated'       => '',
-        'revision'      => 0,
-        'footer_synced' => '',
+        'updated'  => '',
+        'revision' => 0,
         'meta' => [
             'title'       => 'Contact Us | Tech4TIME',
             'description' => 'Get in touch with Tech4TIME.',
@@ -655,60 +654,6 @@ function contact_tel(string $number): string
 {
     $digits = preg_replace('/[^0-9]/', '', $number) ?? '';
     return (str_starts_with(trim($number), '+') ? '+' : '') . $digits;
-}
-
-/* ------------------------------------------------------------ footer drift
-
-   The same email, phone numbers, addresses and opening hours appear in the
-   site footer, which is pasted into every page as literal markup — the project
-   forbids runtime partials, so there is no include to point at contact.json.
-
-   The contact page updates the moment it is saved; the footer does not, and
-   cannot, until the frontend's pages are rebuilt and deployed. Rather than let
-   that difference go unnoticed, the details that appear in both places are
-   fingerprinted here.
-
-   AFTER THE SPLIT the two halves of that comparison live on different hosts.
-   The frontend's tools/sync_site_contact.py rebuilds the footers and writes
-   the fingerprint into lib/footer.php, which deploys with the site; the
-   frontend reports it back in every publish response; the backend records what
-   it was told and the editor compares. So the warning is still answered by the
-   side that actually knows, rather than by the side that would like to.
-   -------------------------------------------------------------------------- */
-
-/**
- * A stable digest of exactly the facts the site-wide footer repeats.
- *
- * Deliberately a delimited string rather than json_encode(): the same digest
- * has to be computed by the frontend's tools/sync_site_contact.py in Python,
- * and the two languages do not agree on how a JSON document is spelled — PHP
- * escapes the slash in "278/3" by default and Python does not. A string with
- * fixed separators is the same bytes in both.
- */
-function contact_fingerprint(array $data): string
-{
-    $parts = ['email=' . contact_email($data)];
-
-    foreach (contact_shown_offices($data) as $office) {
-        $parts[] = implode('|', [
-            trim((string)$office['name']),
-            trim((string)$office['address']),
-            implode(';', $office['phones']),
-            trim((string)$office['hours']),
-            trim((string)$office['schema']['street']),
-            trim((string)$office['schema']['locality']),
-            trim((string)$office['schema']['region']),
-            trim((string)$office['schema']['postal_code']),
-            strtoupper(trim((string)$office['schema']['country'])),
-        ]);
-    }
-
-    return hash('sha256', implode("\n", $parts));
-}
-
-function contact_footer_in_step(array $data): bool
-{
-    return trim((string)($data['footer_synced'] ?? '')) === contact_fingerprint($data);
 }
 
 /* ==========================================================================
@@ -5204,7 +5149,959 @@ function seo_images(array $data): array
 }
 
 /* ==========================================================================
-   11. Revisions
+   11. Chrome — the shape of the header, footer and dock
+   ========================================================================== */
+
+/*
+   THE CHROME'S ICONS ARE INLINED AT RENDER TIME, NOT SCANNED FOR.
+
+   tools/inject_icons.py finds the symbols a page needs by scanning its source
+   for a literal href="#name". Once lib/body.php emits the header, footer and
+   dock there is no such literal in any page's source, and the block that tool
+   writes would come back empty on eleven of the seventeen pages -- every icon
+   they carry comes from those three blocks.
+
+   The answer is the one lib/services.php and lib/certifications.php already
+   use for content icons: the renderer works out its own set and writes a
+   SECOND sprite, marked content-sprite rather than icon-sprite so the tool's
+   non-greedy match is left alone. Two <symbol> elements sharing an id overlap
+   harmlessly -- tools/audit_pages.py exempts symbol ids from its duplicate-id
+   check for exactly this reason -- and it audits RENDERED output, so "every
+   <use> resolves to an inlined <symbol>" is already proved on the only text a
+   visitor receives.
+
+   THE ALTERNATIVE WAS MEASURED AND REJECTED, in lib/services.php, on a model
+   offering seventy-six icons: naming them all up front cost +7 to +10 KB
+   gzipped per page. The chrome is smaller, but the argument is the same and
+   the conclusion is stronger here, because this list is inlined on ALL
+   seventeen pages rather than seven. A page carries the icons it draws.
+
+   So what follows is the model's business only -- which icons may be CHOSEN,
+   and which mark stands for what. Nothing here decides what gets inlined.
+*/
+
+/**
+ * The icons the dock bar's four slots may choose from.
+ *
+ * A fixed list rather than the whole sprite, for the reason CONTACT_ICONS is:
+ * the backend offers the choice and the frontend has to be able to draw
+ * whatever was chosen. A slot carrying an icon the frontend has never heard of
+ * renders as an empty box.
+ *
+ * Deliberately short. The bar is four buttons wide at the bottom of a phone
+ * screen, and the list only has to cover the kinds of place a slot can point
+ * at -- the site's own pages and its services. One mark per kind, not one per
+ * taste.
+ *
+ * Every name here must also be in ADMIN_ICONS in the backend's lib/admin.php,
+ * or the editor's live preview draws an empty box for it;
+ * tools/check_content_model.py says so when one is missing.
+ *
+ * Order is picker order, and it runs the way somebody choosing one thinks:
+ * home, then the sections, then the ways to get in touch.
+ */
+const CHROME_BAR_ICONS = [
+    'home'        => 'Home',
+    'cogs'        => 'Cogs',
+    'building'    => 'Building',
+    'users'       => 'People',
+    'briefcase'   => 'Briefcase',
+    'certificate' => 'Certificate',
+    'shield-alt'  => 'Shield',
+    'cloud'       => 'Cloud',
+    'code'        => 'Code',
+    'server'      => 'Server',
+    'chart-line'  => 'Chart',
+    'comment-alt' => 'Speech bubble',
+    'envelope'    => 'Envelope',
+    'phone'       => 'Phone',
+    'globe'       => 'Globe',
+];
+
+/**
+ * The mark a footer contact row draws, by what kind of thing it holds.
+ *
+ * Not a picker, and deliberately not one. The kind already decides how the row
+ * links -- tel:, mailto:, or no link at all -- so letting it decide the icon
+ * too is one fewer field to fill in and one fewer way for a phone number to
+ * end up beside a clock. These are the four marks the footer's <address>
+ * block has carried since it was written by hand.
+ */
+const CHROME_CONTACT_ICONS = [
+    'phone'   => 'phone',
+    'email'   => 'envelope',
+    'address' => 'map-marker-alt',
+    'hours'   => 'clock',
+];
+
+/**
+ * The mark a footer social link draws, by the host its URL points at.
+ *
+ * The footer's social links are derived from the SEO document's `sameas` rows,
+ * which hold a URL and a label and nothing about how to draw one -- so the
+ * host is what there is to go on. Matched as a suffix of the hostname, so
+ * www.linkedin.com and linkedin.com are the same site, which is how anybody
+ * pasting a profile URL would expect it to behave.
+ *
+ * Two entries, because assets/icons/sprite.svg holds exactly two brand marks.
+ * Anything else gets CHROME_SOCIAL_FALLBACK, which is why a Facebook row added
+ * tomorrow renders as a globe rather than as nothing at all.
+ */
+const CHROME_SOCIAL_ICONS = [
+    'linkedin.com' => 'linkedin',
+    'github.com'   => 'github',
+];
+
+/** What a social link draws when CHROME_SOCIAL_ICONS does not know its host. */
+const CHROME_SOCIAL_FALLBACK = 'globe';
+
+
+/* -------------------------------------------------------- the document
+
+   THE CHROME IS THE FURNITURE AROUND EVERY PAGE: the header, the footer and
+   the small-screen dock. It was literal markup in seventeen page files, kept
+   in step by tools/propagate_shared.py, and that arrangement had produced
+   three live defects by the time it was replaced -- a service list that said
+   "Human Resource Provision" where the services document said something else,
+   a seventh service that could never appear in the footer at all, and phone
+   numbers that went stale for weeks because a script had to be run by hand
+   before a deploy.
+
+   A LINK POINTS AT A ROUTE, NEVER AT A URL. Every destination here is a key:
+   'about', 'services', 'service:cybersecurity'. SEO_ROUTES already says routes
+   are code and cannot be added, renamed or removed from the editor, and this
+   follows from that -- the nav is the one component on every page of the site,
+   and a nav that can point anywhere can point at a 404. Picking also means a
+   service renamed in the editor renames its footer link by itself, which is
+   the first of the three defects above, fixed by construction.
+
+   THE FOOTER'S CONTACT ROWS ARE ITS OWN AND ARE NOT SYNCED. That is a
+   deliberate choice and the opposite of the services column beside them. The
+   contact page holds everything, in full; the footer holds the part worth
+   putting in a footer, in whatever order and wording suits it, with rows that
+   can be hidden without hiding anything on the contact page. What keeps the
+   two honest is a NOTICE rather than a rule -- the editor draws it and nothing
+   here refuses a save. The privacy policy struck the same bargain for the same
+   reason -- see "THE POLICY STATES FACTS ANOTHER DOCUMENT ALREADY MANAGES" in
+   section 9 -- and it is the pattern tools/check_shared_facts.py reports on.
+
+   WHAT IS DELIBERATELY NOT STORED HERE:
+
+     the services column   derived from content/services.json, so a seventh
+                           service appears by itself and a hidden one goes
+     the social links      derived from the SEO document's sameas rows, so a
+                           URL is changed in one place and the footer can never
+                           disagree with the structured data
+     the four columns      the grid is code. Their HEADINGS and CONTENTS are
+                           here; their number and order are not, because a
+                           footer that can be given a fifth column is a footer
+                           that can be broken at a width nobody tested
+     the dock's circuit    decoration with nothing to say, and no content
+*/
+
+/** The three parts of the chrome, in the order they render. */
+const CHROME_PARTS = ['header', 'footer', 'dock'];
+
+/**
+ * Free-text single-line fields, by the path that holds them.
+ *
+ * A DOTTED PATH, unlike every other document here, because the chrome is two
+ * levels deep where the others are one: a heading belongs to a column, which
+ * belongs to the footer. Every path is exactly one or two segments, which is
+ * what chrome_normalise() relies on.
+ */
+const CHROME_TEXT_FIELDS = [
+    'header'            => ['brand_label'],
+    'footer'            => ['brand_label', 'tagline', 'description'],
+    'footer.links'      => ['heading'],
+    'footer.services'   => ['heading', 'index_label'],
+    'footer.contact'    => ['heading'],
+    'footer.copyright'  => ['name', 'rights'],
+    'dock'              => ['menu_label'],
+];
+
+/**
+ * The lists, and the function that fills one of their rows.
+ *
+ * Named once so chrome_normalise() and chrome_identify() drive themselves off
+ * it, exactly as ABOUT_LISTS and COMPANY_LISTS do. A list added to the chrome
+ * is normalised and given ids by being added here, not by somebody also
+ * remembering two lines further down.
+ */
+const CHROME_LISTS = [
+    'header.nav'     => 'chrome_link_defaults',
+    'footer.links'   => 'chrome_link_defaults',
+    'footer.legal'   => 'chrome_link_defaults',
+    'footer.contact' => 'chrome_contact_defaults',
+    'dock.panel'     => 'chrome_panel_defaults',
+    'dock.bar'       => 'chrome_bar_defaults',
+];
+
+/* What a row is called before it is called anything. Deliberately the same
+   value as the other documents' and deliberately a separate constant: each
+   document owns its own id vocabulary. See chrome_identify(). */
+const CHROME_ID_PLACEHOLDER = 'row';
+
+/**
+ * What a footer contact row holds, which decides how it links and what it draws.
+ *
+ * 'address' and 'hours' deliberately make no link -- a street and an opening
+ * time are facts, not destinations. Same reasoning as CONTACT_REACH_TYPES'
+ * 'text' entry, and the marks are in CHROME_CONTACT_ICONS.
+ */
+const CHROME_CONTACT_KINDS = [
+    'phone'   => 'Phone number',
+    'email'   => 'Email address',
+    'address' => 'Address',
+    'hours'   => 'Opening hours',
+];
+
+/**
+ * How many keys the dock's bar has, and it is not a preference.
+ *
+ * The bar is a fixed grid at the bottom of a phone screen: four destinations
+ * and the menu button that opens the panel. A fifth would not wrap, it would
+ * shrink the other four below a thumb's width. tools/test_nav.py asserts this
+ * number, and chrome_normalise() pads or truncates to it rather than trusting
+ * whatever arrived -- a document is a file as often as it is a form.
+ */
+const CHROME_BAR_SLOTS = 4;
+
+/** How a bar key is drawn. One of the four may be given the filled disc. */
+const CHROME_BAR_EMPHASIS = [
+    'plain' => 'Plain',
+    'disc'  => 'Filled disc',
+];
+
+/**
+ * The chrome as it ships, and the fallback for anything missing from the file.
+ *
+ * EXTRACTED FROM THE MARKUP, NOT TYPED. Every value below was read out of
+ * tools/templates/header.html, footer.html and dock.html by a script, so a
+ * host with no content/chrome.json renders the site exactly as it rendered
+ * before any of this existed. That is the whole safety property of the
+ * conversion, and it is proved by rendering all seventeen pages before and
+ * after and comparing.
+ *
+ * A LABEL LEFT EMPTY MEANS "whatever that page calls itself". Every one of the
+ * nav, quick-link, legal and panel rows below ships with an empty label,
+ * because every one of them already agreed with its route's own name --
+ * checked, not assumed. So renaming a page in the SEO screen renames it in the
+ * header, the footer and the dock at once, and the operator has to type a
+ * label only where they want the chrome to disagree on purpose.
+ */
+function chrome_defaults(): array
+{
+    return [
+        'updated'  => '',
+        'revision' => 0,
+
+        'header' => [
+            /* The accessible name of the logo link. It is not the alt text:
+               the picture says "Tech4TIME" and the link says where it goes. */
+            'brand_label' => 'Tech4TIME — home',
+            'logo' => [
+                'alt'    => 'Tech4TIME',
+                /* Three widths behind one displayed size. The header shows the
+                   lockup at 140px on a phone and 180px above 48em. */
+                'sizes'  => '(max-width: 48em) 140px, 180px',
+                'width'  => 360,
+                'height' => 128,
+                'light'  => [
+                    'src'    => '/assets/images/logo/logo-light-360.png',
+                    'srcset' => '/assets/images/logo/logo-light-180.png 180w, /assets/images/logo/logo-light-360.png 360w, /assets/images/logo/logo-light-540.png 540w',
+                    'webp'   => '/assets/images/logo/logo-light-180.webp 180w, /assets/images/logo/logo-light-360.webp 360w, /assets/images/logo/logo-light-540.webp 540w',
+                ],
+                'dark'   => [
+                    'src'    => '/assets/images/logo/logo-dark-360.png',
+                    'srcset' => '/assets/images/logo/logo-dark-180.png 180w, /assets/images/logo/logo-dark-360.png 360w, /assets/images/logo/logo-dark-540.png 540w',
+                    'webp'   => '/assets/images/logo/logo-dark-180.webp 180w, /assets/images/logo/logo-dark-360.webp 360w, /assets/images/logo/logo-dark-540.webp 540w',
+                ],
+            ],
+            'nav' => ['items' => [
+                ['id' => 'home',     'target' => 'home',     'label' => '', 'status' => 'shown'],
+                ['id' => 'about',    'target' => 'about',    'label' => '', 'status' => 'shown'],
+                ['id' => 'services', 'target' => 'services', 'label' => '', 'status' => 'shown'],
+                ['id' => 'company',  'target' => 'company',  'label' => '', 'status' => 'shown'],
+                ['id' => 'careers',  'target' => 'careers',  'label' => '', 'status' => 'shown'],
+                ['id' => 'contact',  'target' => 'contact',  'label' => '', 'status' => 'shown'],
+            ]],
+        ],
+
+        'footer' => [
+            'brand_label' => 'Tech4TIME — home',
+            'logo' => [
+                'alt'    => 'Tech4TIME',
+                /* No sizes and no srcset: the footer draws one width and
+                   always has. An empty srcset is not a missing value, it says
+                   "emit no srcset attribute". */
+                'sizes'  => '',
+                'width'  => 360,
+                'height' => 128,
+                'light'  => [
+                    'src'    => '/assets/images/logo/logo-light-360.png',
+                    'srcset' => '',
+                    'webp'   => '/assets/images/logo/logo-light-360.webp',
+                ],
+                'dark'   => [
+                    'src'    => '/assets/images/logo/logo-dark-360.png',
+                    'srcset' => '',
+                    'webp'   => '/assets/images/logo/logo-dark-360.webp',
+                ],
+            ],
+            'tagline'     => 'Orchestrating Technology with Time',
+            'description' => 'Open-Source & Enterprise-grade cybersecurity, software '
+                           . 'development, and IT solutions. Orchestrate, build, maintain '
+                           . 'and protect your business with our profound solutions.',
+
+            'links' => [
+                'heading' => 'Quick Links',
+                'items'   => [
+                    ['id' => 'home',           'target' => 'home',           'label' => '', 'status' => 'shown'],
+                    ['id' => 'about',          'target' => 'about',          'label' => '', 'status' => 'shown'],
+                    ['id' => 'company',        'target' => 'company',        'label' => '', 'status' => 'shown'],
+                    ['id' => 'careers',        'target' => 'careers',        'label' => '', 'status' => 'shown'],
+                    ['id' => 'certifications', 'target' => 'certifications', 'label' => '', 'status' => 'shown'],
+                    ['id' => 'branding',       'target' => 'branding',       'label' => '', 'status' => 'shown'],
+                    ['id' => 'contact',        'target' => 'contact',        'label' => '', 'status' => 'shown'],
+                ],
+            ],
+
+            /* No items. The rows ARE content/services.json, read at render
+               time, which is the whole point of this column. index_label names
+               the row above them that goes to the index itself -- "All
+               Services" rather than the index's own name, because it is
+               introducing the list under it rather than naming a page. */
+            'services' => [
+                'heading'     => 'Our Services',
+                'index_label' => 'All Services',
+            ],
+
+            /* THE FOOTER'S OWN CONTACT DETAILS. Not read from
+               content/contact.json and not kept in step with it -- see the
+               note at the top of this section. Consecutive rows sharing a kind
+               render inside ONE .contact-item, under one icon, which is what
+               the CSS's `.contact-item__label ~ .contact-item__label` rule is
+               written against. */
+            'contact' => [
+                'heading' => 'Contact Info',
+                'items'   => [
+                    ['id' => 'phone-bangladesh', 'kind' => 'phone', 'label' => 'Bangladesh',
+                     'lines' => ['+880 1320571562', '+880 1881873463', '+880 1847313835'],
+                     'note' => 'Sunday – Thursday', 'status' => 'shown'],
+                    ['id' => 'phone-malaysia', 'kind' => 'phone', 'label' => 'Malaysia',
+                     'lines' => ['+60 198527096'],
+                     'note' => 'Monday – Friday', 'status' => 'shown'],
+                    ['id' => 'phone-belgium', 'kind' => 'phone', 'label' => 'Belgium',
+                     'lines' => ['+32 2 555 75 25', '+32 2 999 55 75'],
+                     'note' => '', 'status' => 'shown'],
+                    ['id' => 'email', 'kind' => 'email', 'label' => '',
+                     'lines' => ['info@tech4time.bd'],
+                     'note' => '', 'status' => 'shown'],
+                    ['id' => 'address-bangladesh', 'kind' => 'address', 'label' => 'Bangladesh',
+                     'lines' => ['278/3, Manikdi, Dhaka - 1206'],
+                     'note' => '', 'status' => 'shown'],
+                    ['id' => 'address-malaysia', 'kind' => 'address', 'label' => 'Malaysia',
+                     'lines' => ['68100 Batu Caves, Selangor, Malaysia'],
+                     'note' => '', 'status' => 'shown'],
+                    ['id' => 'address-belgium', 'kind' => 'address', 'label' => 'Belgium',
+                     'lines' => ['367, Avenue Louise, Brussels, Belgium'],
+                     'note' => '', 'status' => 'shown'],
+                    ['id' => 'hours-bangladesh-office', 'kind' => 'hours', 'label' => 'Bangladesh Office',
+                     'lines' => ['Sun – Thu: 9:00 AM – 6:00 PM'],
+                     'note' => '', 'status' => 'shown'],
+                    ['id' => 'hours-malaysia-office', 'kind' => 'hours', 'label' => 'Malaysia Office',
+                     'lines' => ['Mon – Fri: 9:00 AM – 6:00 PM'],
+                     'note' => '', 'status' => 'shown'],
+                ],
+            ],
+
+            'legal' => ['items' => [
+                ['id' => 'privacy', 'target' => 'privacy', 'label' => '', 'status' => 'shown'],
+            ]],
+
+            /* The year is not here. It is stamped by the page as it renders,
+               and refreshCopyrightYear() in assets/js/main.js corrects it in a
+               tab left open across midnight on 31 December. */
+            'copyright' => [
+                'name'   => 'Tech4TIME',
+                'rights' => 'All rights reserved.',
+            ],
+        ],
+
+        'dock' => [
+            'panel' => ['items' => [
+                ['id' => 'home', 'target' => 'home', 'label' => '',
+                 'description' => 'Start here', 'status' => 'shown'],
+                ['id' => 'about', 'target' => 'about', 'label' => '',
+                 'description' => 'Who we are and how we work', 'status' => 'shown'],
+                ['id' => 'services', 'target' => 'services', 'label' => '',
+                 'description' => 'Security, development, cloud and people', 'status' => 'shown'],
+                ['id' => 'company', 'target' => 'company', 'label' => '',
+                 'description' => 'Milestones, clients and the technology we use', 'status' => 'shown'],
+                ['id' => 'careers', 'target' => 'careers', 'label' => '',
+                 'description' => 'Open roles, and speculative applications', 'status' => 'shown'],
+                ['id' => 'contact', 'target' => 'contact', 'label' => '',
+                 'description' => 'Reach us any way you prefer', 'status' => 'shown'],
+            ]],
+
+            /* Exactly CHROME_BAR_SLOTS of these, and their labels are typed
+               rather than left to the route: "Profile" and "Contact" are what
+               fits under a 44px key, where "Company Profile" and "Contact Us"
+               are what fits in a nav. */
+            'bar' => ['items' => [
+                ['id' => 'home', 'target' => 'home', 'label' => 'Home',
+                 'icon' => 'home', 'emphasis' => 'plain'],
+                ['id' => 'services', 'target' => 'services', 'label' => 'Services',
+                 'icon' => 'cogs', 'emphasis' => 'plain'],
+                ['id' => 'contact', 'target' => 'contact', 'label' => 'Contact',
+                 'icon' => 'comment-alt', 'emphasis' => 'disc'],
+                ['id' => 'company', 'target' => 'company', 'label' => 'Profile',
+                 'icon' => 'building', 'emphasis' => 'plain'],
+            ]],
+
+            'menu_label' => 'Menu',
+        ],
+    ];
+}
+
+/* ----------------------------------------------------------- the rows */
+
+/**
+ * One link: where it goes, what to call it, and whether anybody sees it.
+ *
+ * 'target' is a key from chrome_targets(), never a URL. It is not validated
+ * here -- a key whose page has since been removed still round-trips, so the
+ * editor can show it and the operator can fix it, where dropping it would lose
+ * the row silently. The renderer skips what it cannot resolve.
+ */
+function chrome_link_defaults(array $row): array
+{
+    $row += ['id' => '', 'target' => '', 'label' => '', 'status' => 'shown'];
+
+    $row['id']     = trim((string)$row['id']);
+    $row['target'] = trim((string)$row['target']);
+    $row['label']  = trim((string)$row['label']);
+    $row['status'] = $row['status'] === 'hidden' ? 'hidden' : 'shown';
+
+    return ['id' => $row['id'], 'target' => $row['target'],
+            'label' => $row['label'], 'status' => $row['status']];
+}
+
+/**
+ * One footer contact row: a labelled group under one of the four marks.
+ *
+ * 'lines' is a list because a group is usually more than one thing -- three
+ * numbers for Dhaka, two for Brussels -- and the renderer joins them with
+ * <br>. An empty line is dropped rather than rendered: a stray blank in the
+ * middle of an address is a gap nobody typed on purpose.
+ *
+ * 'note' is the quiet second line under a group, "Sunday – Thursday".
+ */
+function chrome_contact_defaults(array $row): array
+{
+    $row += ['id' => '', 'kind' => 'phone', 'label' => '', 'lines' => [],
+             'note' => '', 'status' => 'shown'];
+
+    $lines = is_array($row['lines']) ? $row['lines'] : [];
+    $lines = array_values(array_filter(
+        array_map(static fn($l): string => trim((string)$l), $lines),
+        static fn(string $l): bool => $l !== ''
+    ));
+
+    return [
+        'id'     => trim((string)$row['id']),
+        'kind'   => isset(CHROME_CONTACT_KINDS[$row['kind']]) ? (string)$row['kind'] : 'phone',
+        'label'  => trim((string)$row['label']),
+        'lines'  => $lines,
+        'note'   => trim((string)$row['note']),
+        'status' => $row['status'] === 'hidden' ? 'hidden' : 'shown',
+    ];
+}
+
+/** One row of the dock's panel: a link with a line of explanation under it. */
+function chrome_panel_defaults(array $row): array
+{
+    $row += ['id' => '', 'target' => '', 'label' => '', 'description' => '',
+             'status' => 'shown'];
+
+    return [
+        'id'          => trim((string)$row['id']),
+        'target'      => trim((string)$row['target']),
+        'label'       => trim((string)$row['label']),
+        'description' => trim((string)$row['description']),
+        'status'      => $row['status'] === 'hidden' ? 'hidden' : 'shown',
+    ];
+}
+
+/**
+ * One key of the dock's bar.
+ *
+ * No status. There are exactly CHROME_BAR_SLOTS keys and a hidden one would
+ * leave a hole in a fixed grid; a slot that is not wanted is pointed somewhere
+ * else instead.
+ *
+ * The label is NOT optional here, unlike every other row: it is what fits
+ * under a 44px key, and falling back to a route called "Branding &
+ * Advertisement" would overflow the bar rather than rename it.
+ */
+function chrome_bar_defaults(array $row): array
+{
+    $row += ['id' => '', 'target' => '', 'label' => '', 'icon' => '',
+             'emphasis' => 'plain'];
+
+    $icon = trim((string)$row['icon']);
+
+    return [
+        'id'       => trim((string)$row['id']),
+        'target'   => trim((string)$row['target']),
+        'label'    => trim((string)$row['label']),
+        'icon'     => isset(CHROME_BAR_ICONS[$icon]) ? $icon : '',
+        'emphasis' => isset(CHROME_BAR_EMPHASIS[$row['emphasis']])
+                      ? (string)$row['emphasis'] : 'plain',
+    ];
+}
+
+/**
+ * One logo lockup: the pair of pictures, and the box they are drawn in.
+ *
+ * NOT contract_image_defaults(). That one validates 'webp' as a single path,
+ * and the header's is a three-width srcset list -- so it would empty the field
+ * and the header would lose its WebP on the next normalise. The paths are
+ * checked here the same way, one entry at a time.
+ *
+ * width and height are the intrinsic size of the file, not the displayed one.
+ * They are what lets the browser reserve the box before the bytes arrive, and
+ * this site's Cumulative Layout Shift is zero rather than nearly zero.
+ */
+function chrome_logo_defaults(mixed $logo, array $fallback): array
+{
+    $logo = is_array($logo) ? $logo : [];
+    $logo += $fallback;
+
+    $out = [
+        'alt'    => trim((string)$logo['alt']),
+        'sizes'  => trim((string)$logo['sizes']),
+        'width'  => max(0, (int)$logo['width']),
+        'height' => max(0, (int)$logo['height']),
+    ];
+
+    foreach (['light', 'dark'] as $mode) {
+        $image = is_array($logo[$mode] ?? null) ? $logo[$mode] : [];
+        $image += ['src' => '', 'srcset' => '', 'webp' => ''];
+
+        $out[$mode] = [
+            'src'    => contract_safe_image_path((string)$image['src']),
+            'srcset' => chrome_srcset((string)$image['srcset']),
+            'webp'   => chrome_srcset((string)$image['webp']),
+        ];
+    }
+
+    return $out;
+}
+
+/**
+ * A srcset list with every path checked, or as much of one as survives.
+ *
+ * "url 180w, url 360w" and a bare "url" are both valid srcset syntax, which is
+ * why one field carries the header's three widths and the footer's single
+ * file. An entry whose path is not under CONTRACT_IMAGE_ROOTS is dropped
+ * rather than escaped -- this ends up inside an attribute the browser fetches
+ * from, and there is no legitimate logo this rejects.
+ */
+function chrome_srcset(string $value): string
+{
+    $out = [];
+
+    foreach (explode(',', $value) as $entry) {
+        $entry = trim($entry);
+        if ($entry === '') {
+            continue;
+        }
+
+        $bits       = preg_split('/\s+/', $entry) ?: [];
+        $path       = contract_safe_image_path((string)array_shift($bits));
+        $descriptor = trim(implode(' ', $bits));
+
+        if ($path === '' || !preg_match('/^(\d+(\.\d+)?[wx])?$/', $descriptor)) {
+            continue;
+        }
+
+        $out[] = $descriptor === '' ? $path : $path . ' ' . $descriptor;
+    }
+
+    return implode(', ', $out);
+}
+
+/* ------------------------------------------------------ normalising */
+
+/**
+ * Bring the chrome to the current shape, whatever it arrived as.
+ *
+ * Explicit rather than a recursive merge. The document is two levels deep and
+ * one of those levels holds LISTS, which must not be filled from the defaults
+ * entry by entry -- a six-row nav cut to four would silently grow its last two
+ * rows back. So the scalars are filled from CHROME_TEXT_FIELDS, the pictures
+ * from chrome_logo_defaults(), and every list is rebuilt from what arrived.
+ *
+ * A LIST THAT IS NOT THERE AND A LIST THAT IS EMPTY ARE DIFFERENT THINGS, and
+ * the difference is the whole of the paragraph above. An empty list ARRIVED:
+ * somebody removed every row, and giving them back is the silent regrowth that
+ * must not happen. An ABSENT list did not arrive at all -- a document that has
+ * never been published, or one damaged in transit -- and there the answer is
+ * the shipped rows, exactly as it is for every scalar and both logos.
+ *
+ * That is not a nicety here the way it is elsewhere. This document is on every
+ * page of the site, so "no list at all" used to mean a header with no
+ * navigation, a footer with no links and no contact details, and a dock with
+ * no panel -- on all seventeen pages, from one file not arriving.
+ * tools/test_chrome.py in the frontend renders every page with the file moved
+ * away and says so.
+ */
+function chrome_normalise(array $data): array
+{
+    $defaults = chrome_defaults();
+
+    $data['updated']  = is_string($data['updated'] ?? null) ? $data['updated'] : '';
+    $data['revision'] = max(0, (int)($data['revision'] ?? 0));
+
+    foreach (CHROME_PARTS as $part) {
+        $data[$part] = is_array($data[$part] ?? null) ? $data[$part] : [];
+    }
+
+    foreach (CHROME_TEXT_FIELDS as $path => $fields) {
+        $bits = explode('.', $path);
+        $part = $bits[0];
+        $band = $bits[1] ?? '';
+
+        foreach ($fields as $field) {
+            if ($band === '') {
+                $was = $data[$part][$field] ?? null;
+                $data[$part][$field] = is_string($was) ? trim($was)
+                                                       : $defaults[$part][$field];
+                continue;
+            }
+            $data[$part][$band] = is_array($data[$part][$band] ?? null)
+                                  ? $data[$part][$band] : [];
+            $was = $data[$part][$band][$field] ?? null;
+            $data[$part][$band][$field] = is_string($was) ? trim($was)
+                                          : $defaults[$part][$band][$field];
+        }
+    }
+
+    foreach (['header', 'footer'] as $part) {
+        $data[$part]['logo'] = chrome_logo_defaults($data[$part]['logo'] ?? null,
+                                                    $defaults[$part]['logo']);
+    }
+
+    foreach (CHROME_LISTS as $path => $filler) {
+        [$part, $band] = explode('.', $path);
+
+        $rows = $data[$part][$band]['items'] ?? null;
+        $rows = is_array($rows) ? $rows
+                                : ($defaults[$part][$band]['items'] ?? []);
+
+        $data[$part][$band]['items'] = array_map(
+            $filler,
+            array_values(array_filter($rows, 'is_array'))
+        );
+    }
+
+    /* The bar is a fixed grid, so it is padded and truncated rather than
+       trusted. A short document gets the shipped keys back; a long one loses
+       the overflow, which is the only outcome that keeps the bar usable. */
+    $bar = $data['dock']['bar']['items'];
+    for ($i = count($bar); $i < CHROME_BAR_SLOTS; $i++) {
+        $bar[$i] = $defaults['dock']['bar']['items'][$i]
+                   ?? chrome_bar_defaults([]);
+    }
+    $data['dock']['bar']['items'] = array_slice($bar, 0, CHROME_BAR_SLOTS);
+
+    /* The services column stores no rows and must not be able to grow any:
+       they are content/services.json, read as the footer renders. */
+    unset($data['footer']['services']['items']);
+
+    return chrome_identify($data);
+}
+
+/**
+ * Give every row an id, unique within its own list.
+ *
+ * Through contract_identify_rows(), so everything already named claims its id
+ * before anything provisional is minted around it. A contact row is named
+ * after its label AND its kind, because three offices contribute a row to each
+ * of three kinds and "bangladesh" cannot be all of them -- the phone row is
+ * 'phone-bangladesh' and the address row is 'address-bangladesh'.
+ */
+function chrome_identify(array $data): array
+{
+    foreach (CHROME_LISTS as $path => $_filler) {
+        [$part, $band] = explode('.', $path);
+
+        $ids = contract_identify_rows(
+            $data[$part][$band]['items'],
+            CHROME_ID_PLACEHOLDER,
+            static fn(array $row): string => chrome_row_name($band, $row)
+        );
+
+        foreach ($ids as $i => $id) {
+            $data[$part][$band]['items'][$i]['id'] = $id;
+        }
+    }
+
+    return $data;
+}
+
+/** What a row's id is minted from, whichever list it is in. */
+function chrome_row_name(string $band, array $row): string
+{
+    if ($band === 'contact') {
+        $label = trim((string)($row['label'] ?? ''));
+        $kind  = trim((string)($row['kind'] ?? ''));
+        return $label === '' ? $kind : $kind . ' ' . $label;
+    }
+
+    /* A link is named after its destination and not its label, because the
+       label is usually empty on purpose -- it means "whatever that page calls
+       itself" -- and a list of rows all named '' would be row, row-2, row-3. */
+    $target = trim((string)($row['target'] ?? ''));
+
+    return $target !== '' ? str_replace(':', '-', $target)
+                          : trim((string)($row['label'] ?? ''));
+}
+
+/* --------------------------------------------------------- queries */
+
+/**
+ * Every destination a chrome link may point at, in nav order.
+ *
+ * The nine routes that resolve to an address, then every service -- so a
+ * service added this morning is in the picker this afternoon, and the footer's
+ * services column is built from the same enumeration that offers it.
+ *
+ * TAKES THE SERVICES DOCUMENT RATHER THAN LOADING IT. This file has no reader:
+ * services_load() lives in each repository's own lib/services.php and they are
+ * not the same function. Handing it in is what keeps the contract pure, and it
+ * is what services_all() beside it already does.
+ *
+ * The 404 is not here. Its route is '' because it is served at every address
+ * that does not exist, so there is nothing to link to.
+ *
+ *   route     the address, with its trailing slash
+ *   name      what the page calls itself, as the constant has it
+ *   hidden    a service switched off in the editor: offered, but not rendered
+ *   service   true when this is a row of a document rather than a file
+ */
+function chrome_targets(array $services): array
+{
+    $out = [];
+
+    foreach (SEO_ROUTES as $key => [$route, $name, $_document]) {
+        if ($route === '') {
+            continue;
+        }
+
+        $out[$key] = ['route' => $route, 'name' => $name,
+                      'hidden' => false, 'service' => false];
+
+        /* The services sit directly under their index, which is where they sit
+           on the site, in the sitemap and on the SEO screen. */
+        if ($key !== 'services') {
+            continue;
+        }
+
+        foreach (services_all($services) as $service) {
+            $id   = trim((string)($service['id'] ?? ''));
+            $slug = trim((string)($service['slug'] ?? ''));
+
+            if ($id === '' || $slug === '') {
+                continue;
+            }
+
+            $out['service:' . $id] = [
+                'route'   => '/pages/services/' . $slug . '/',
+                'name'    => trim((string)($service['name'] ?? '')) ?: $slug,
+                'hidden'  => ($service['status'] ?? 'shown') === 'hidden',
+                'service' => true,
+            ];
+        }
+    }
+
+    return $out;
+}
+
+/** Only the rows of a chrome list a visitor should see. */
+function chrome_rows_shown(mixed $rows): array
+{
+    return contract_rows_shown($rows);}
+
+/**
+ * Every picture the chrome points at, as web paths, without duplicates.
+ *
+ * Both logos, both modes, and every entry of every srcset -- the 540px file is
+ * only ever named inside a srcset, and a sweep that counted the <img src>
+ * alone would offer to delete it.
+ */
+function chrome_images(array $data): array
+{
+    $seen = [];
+
+    foreach (['header', 'footer'] as $part) {
+        foreach (['light', 'dark'] as $mode) {
+            $image = $data[$part]['logo'][$mode] ?? [];
+
+            foreach ([$image['src'] ?? ''] as $path) {
+                $path = trim((string)$path);
+                if ($path !== '') {
+                    $seen[$path] = true;
+                }
+            }
+
+            foreach ([$image['srcset'] ?? '', $image['webp'] ?? ''] as $list) {
+                foreach (explode(',', (string)$list) as $entry) {
+                    $path = trim((string)(preg_split('/\s+/', trim($entry))[0] ?? ''));
+                    if ($path !== '') {
+                        $seen[$path] = true;
+                    }
+                }
+            }
+        }
+    }
+
+    return array_keys($seen);
+}
+
+/* ------------------------------------------------------- the drift notice
+
+   THE FOOTER'S CONTACT ROWS ARE A SECOND COPY, ON PURPOSE. That is settled
+   above and in ADR 0023: the contact page holds every detail in full and the
+   footer holds the part worth putting in a footer, worded and ordered to suit
+   it, with rows that can be hidden without hiding anything on the contact
+   page.
+
+   What a deliberate second copy still needs is somewhere the difference is
+   VISIBLE. This is that. It reports; it never refuses, and nothing that calls
+   it may make it refuse -- which is the same bargain privacy_shared_facts()
+   struck for the same reason, and for a second reason worth stating: after an
+   office moves, whichever of the two pages you edit first would be unsavable
+   if agreement were a rule.
+   -------------------------------------------------------------------------- */
+
+/**
+ * Every footer contact value the contact page does not carry.
+ *
+ * Returns [['kind' => 'phone'|'email'|'address', 'label' => …, 'value' => …], …]
+ * in the footer's own row order. Empty means the two agree.
+ *
+ * ONE DIRECTION, AND THAT IS THE WHOLE DESIGN. What this exists to catch is a
+ * footer value that has gone STALE -- the Brussels telephone numbers were wrong
+ * for weeks under the old arrangement, and nothing said so. The other
+ * direction, "the contact page has something the footer does not", is not
+ * drift: it is what a footer IS. The contact page holds three offices in full
+ * and the footer holds the part worth putting in a footer, so reporting the
+ * remainder would fire on every correctly-short footer there has ever been,
+ * and an alarm nobody can silence is an alarm everybody learns to ignore.
+ *
+ * An operator who wants the rest can press Copy from the Contact page.
+ *
+ * COMPARED BY VALUE, NEVER BY LABEL OR BY ROW. A footer row called "Head
+ * office" and a contact office called "Bangladesh" are the same office if they
+ * carry the same address, and renaming either is not drift. Telephone numbers
+ * are compared as bare digits -- "+880 1320571562" and "+880 1320 571562" are
+ * one number -- and everything else through privacy_fact_key(), which folds
+ * case, collapses whitespace and drops commas and full stops. That is what
+ * makes this useful rather than noisy: it reports a different street and stays
+ * quiet about a different comma.
+ *
+ * A HIDDEN FOOTER ROW IS NOT COMPARED. Hiding one is how an operator says "not
+ * in the footer", and it cannot be stale if nobody can read it.
+ *
+ * HOURS ARE NOT COMPARED EITHER, deliberately. The footer writes "Sun - Thu:
+ * 9:00 AM - 6:00 PM" as one line of prose, the contact page writes the same
+ * words in its own field, and the SEO screen holds the machine-readable
+ * version in days and 24-hour times. Three spellings of one fact would report
+ * each other forever; tools/check_shared_facts.py is where that pair is looked
+ * at, and it looks at the two that are meant to be the same words.
+ */
+function chrome_contact_drift(array $chrome, array $contact): array
+{
+    $theirs = ['phone' => [], 'email' => [], 'address' => []];
+
+    /* The contact page's reach rows are classified by SHAPE rather than by
+       their label, exactly as privacy_shared_facts() classifies them, so
+       renaming "Phone" to "Call us" does not switch a comparison off. */
+    foreach (contract_rows_shown($contact['reach']['items'] ?? []) as $row) {
+        foreach ($row['values'] ?? [] as $value) {
+            $value = trim((string)$value);
+            $kind  = '';
+
+            if (str_contains($value, '@') && !str_contains($value, '/')) {
+                $kind = 'email';
+            } elseif (preg_match('/^[+0-9()\s\-]+$/', $value)
+                      && strlen((string)preg_replace('/\D+/', '', $value)) >= 7) {
+                $kind = 'phone';
+            }
+
+            $key = $kind === '' ? '' : chrome_drift_key($kind, $value);
+            if ($key !== '') {
+                $theirs[$kind][$key] = true;
+            }
+        }
+    }
+
+    foreach (contract_rows_shown($contact['offices']['items'] ?? []) as $office) {
+        $key = chrome_drift_key('address', (string)($office['address'] ?? ''));
+        if ($key !== '') {
+            $theirs['address'][$key] = true;
+        }
+
+        foreach ($office['phones'] ?? [] as $phone) {
+            $key = chrome_drift_key('phone', (string)$phone);
+            if ($key !== '') {
+                $theirs['phone'][$key] = true;
+            }
+        }
+    }
+
+    $out = [];
+
+    foreach (contract_rows_shown($chrome['footer']['contact']['items'] ?? []) as $row) {
+        $kind = (string)($row['kind'] ?? '');
+        if (!isset($theirs[$kind])) {
+            continue;
+        }
+
+        foreach ($row['lines'] ?? [] as $line) {
+            $key = chrome_drift_key($kind, (string)$line);
+            if ($key !== '' && !isset($theirs[$kind][$key])) {
+                $out[] = ['kind'  => $kind,
+                          'label' => trim((string)($row['label'] ?? '')),
+                          'value' => trim((string)$line)];
+            }
+        }
+    }
+
+    return $out;
+}
+
+/** One contact value as the two sides can be compared on. '' means "skip". */
+function chrome_drift_key(string $kind, string $value): string
+{
+    $value = trim($value);
+    if ($value === '') {
+        return '';
+    }
+
+    /* A telephone number is its digits. contact_tel() is the rule the tel:
+       href uses, so the comparison and the link cannot disagree about what
+       two spellings of one number are. */
+    return $kind === 'phone'
+        ? contact_tel($value)
+        : privacy_fact_key($value);
+}
+
+/* ==========================================================================
+   12. Revisions
    ========================================================================== */
 
 /**
@@ -5227,7 +6124,7 @@ function contract_next_revision(array $data): int
 }
 
 /* ==========================================================================
-   12. Normalising and re-sanitising on receipt
+   13. Normalising and re-sanitising on receipt
    ========================================================================== */
 
 /**
@@ -5258,6 +6155,7 @@ function contract_normalise(string $document, array $data): array
         'branding' => branding_normalise($data),
         'privacy'  => privacy_normalise($data),
         'seo'      => seo_normalise($data),
+        'chrome'   => chrome_normalise($data),
         default    => throw new RuntimeException('Unknown document: ' . $document),
     };
 }
@@ -5296,6 +6194,9 @@ function contract_images(string $document, array $data): array
         'services' => array_values(array_unique([...services_images($data), ...$meta])),
         'careers', 'contact', 'certifications', 'privacy' => $meta,
         'seo'      => seo_images($data),
+        /* No meta band: the chrome is not a page and has no <head> of its own.
+           Its pictures are the two logo lockups, srcsets included. */
+        'chrome'   => chrome_images($data),
         default    => throw new RuntimeException('Unknown document: ' . $document),
     };
 }
@@ -5435,6 +6336,16 @@ function contract_sanitise(string $document, array $data): array
        below is a refusal, and "nothing to sanitise" must not arrive at the
        same line as "document I do not know". */
     if ($document === 'seo') {
+        return $data;
+    }
+
+    /* The chrome has no rich text and must not grow any. A nav label, a
+       tagline and a phone number are words, and the one place markup could
+       plausibly be wanted -- the footer's description -- is a paragraph the
+       renderer already wraps in <p>. The branch is explicit for the reason
+       seo's is: "nothing to sanitise" must not arrive at the same line as
+       "document I do not know". */
+    if ($document === 'chrome') {
         return $data;
     }
 

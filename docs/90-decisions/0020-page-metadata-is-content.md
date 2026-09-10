@@ -39,8 +39,9 @@ at birth, by `assemble_page.py`.
 It drifted exactly as that arrangement guarantees. The Organization graph carried three office
 addresses and four telephone numbers as literal JSON in sixteen of the seventeen heads; only
 `tech4time-website-frontend/pages/contact/index.php` rendered them from `content/contact.json`. Editing an office in the admin
-left sixteen pages advertising the old one — and `tech4time-website-frontend/tools/sync_site_contact.py` existed to paste the
-new values back in before a deploy, which is a workaround describing a defect.
+left sixteen pages advertising the old one — and a build script, `sync_site_contact.py`, existed to
+paste the new values back in before a deploy, which is a workaround describing a defect. (That
+script is deleted; see [ADR 0023](0023-the-header-and-footer-are-emitted-once.md).)
 
 The measurement that settled it: the Belgium office had been given three telephone numbers in
 `content/contact.json` and the contact page had been rendering them all along. The pasted graph on
@@ -103,8 +104,9 @@ document — which is what it is for.
   weigh up, it is the off switch, and `tech4time-website-frontend/robots.php` writes `Allow: /` above it either way.
 - **`404.html` became `tech4time-website-frontend/404.php`**, so the site has no static page left. It has no canonical and no
   `og:url`: it is served at every address that does not exist and has none of its own.
-- **`tech4time-website-frontend/tools/sync_site_contact.py` lost its JSON-LD half** and keeps only the footer block, which is
-  still literal markup on all sixteen pages.
+- **`sync_site_contact.py` lost its JSON-LD half** and kept only the footer block, which was still
+  literal markup on all sixteen pages. It has since lost that half too, and the file with it —
+  [ADR 0023](0023-the-header-and-footer-are-emitted-once.md).
 - **The cache-bust version query for the five shared stylesheets is bumped in one file**, not in
   sixteen pages.
 

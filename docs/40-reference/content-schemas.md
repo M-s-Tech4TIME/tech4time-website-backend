@@ -2,10 +2,11 @@
 
 **Applies to:** both
 
-Three of the nine JSON files the dynamic pages render from, field by field: the ones whose shape
+Three of the eleven JSON files the dynamic pages render from, field by field: the ones whose shape
 this half needs spelled out. **The full set is in
-`tech4time-website-frontend/docs/40-reference/content-schemas.md`**, which documents all nine
-including `company`, `home`, `services`, `certifications`, `branding` and `privacy`.
+`tech4time-website-frontend/docs/40-reference/content-schemas.md`**, which documents all eleven —
+`CONTRACT_DOCUMENTS` is the list — including `company`, `home`, `services`, `certifications`,
+`branding`, `privacy`, `seo` and `chrome`.
 
 **The defaults functions are the definition of the shape**, not these files —
 `careers_load()` in `lib/careers.php`, and `contact_defaults()` / `contact_office_defaults()` /
@@ -64,7 +65,6 @@ structured data from these.
 ```json
 {
   "updated": "…",
-  "footer_synced": "…",
   "meta":    { … },
   "hero":    { "title": "…", "subtitle": "…" },
   "form":    { "title": "…", "lead": "…", "subject_hint": "…", "note": "…",
@@ -78,7 +78,6 @@ structured data from these.
 | Field | |
 |---|---|
 | `updated` | ISO 8601, written on save. Bookkeeping |
-| `footer_synced` | the fingerprint of the contact details as last pushed into the pages' footers. Drives the drift banner — *shared-markup.md* (in tech4time-website-frontend) |
 | `meta` | everything the `<head>` says about this page — see [The `meta` band](#the-meta-band-on-every-document) |
 | `hero` | the page's heading and subheading |
 | `form` | the enquiry form's copy, and `service_types` — the subject options offered |
@@ -182,8 +181,9 @@ logo". A new light logo may read poorly on a dark background; the previous brand
 poorly, it is wrong. The editor says so and offers the second slot.
 
 **This is the logo in that section and nowhere else.** The header, the footer, the browser tab,
-the social share card and `Organization.logo` in the structured data are shared markup and build
-artefacts, not content, and still need a developer and a deploy.
+the social share card and `Organization.logo` in the structured data are build artefacts, not
+content, and still need a developer and a deploy. The header's and the footer's are fields of
+`tech4time-website-frontend/content/chrome.json`, edited on the **Header & Footer** screen.
 
 A picture record is kept rather than cleared on a row whose layout is not `logo`, so switching back
 does not lose it — which is also why `about_images()` counts both halves when the unused-upload
@@ -287,6 +287,125 @@ graph and the visible page cannot disagree.
 
 ---
 
+## `content/chrome.json`
+
+The furniture around every page of the public site: the header, the footer and the small-screen
+dock. Rendered by `tech4time-website-frontend/lib/body.php` on the request. It was literal markup in
+seventeen page files until 2026-09-10 — about 6,800 lines of duplication kept in step by
+`propagate_shared.py` —
+[ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md).
+
+```json
+{
+  "updated":  "…",
+  "revision": 0,
+  "header": { "brand_label": "…",
+              "logo": { "alt": "…", "sizes": "…", "width": 360, "height": 128,
+                        "light": { "src": "…", "srcset": "…", "webp": "…" },
+                        "dark":  { "src": "…", "srcset": "…", "webp": "…" } },
+              "nav":  { "items": [] } },
+  "footer": { "brand_label": "…", "logo": {}, "tagline": "…", "description": "…",
+              "links":     { "heading": "…", "items": [] },
+              "services":  { "heading": "…", "index_label": "…" },
+              "contact":   { "heading": "…", "items": [] },
+              "legal":     { "items": [] },
+              "copyright": { "name": "…", "rights": "…" } },
+  "dock":   { "panel": { "items": [] },
+              "bar":   { "items": [] },
+              "menu_label": "…" }
+}
+```
+
+| Band | | Edited at |
+|---|---|---|
+| `header` | the logo lockup, the link's accessible name, and the six-row main nav | `?s=chrome&part=header` |
+| `footer.links` | the "Quick Links" column: a heading and rows | `?s=chrome&part=footer` |
+| `footer.services` | a heading and the label of the row above the list. **The rows are not here** | `?s=chrome&part=footer` |
+| `footer.contact` | the footer's **own** contact rows — see below | `?s=chrome&part=footer` |
+| `footer.legal` | the bottom bar's links | `?s=chrome&part=footer` |
+| `footer.copyright` | the name and the rights sentence. **The year is not here** — it is stamped as the page renders, and `refreshCopyrightYear()` in `main.js` corrects it for a tab left open across midnight on 31 December | `?s=chrome&part=footer` |
+| `dock.panel` | the card that rises above the bar: a row per section, each with a line of explanation | `?s=chrome&part=dock` |
+| `dock.bar` | exactly four keys, each with a destination, a short label, an icon and an emphasis | `?s=chrome&part=dock` |
+
+### A link row points at a route, never at a URL
+
+```json
+{ "id": "about", "target": "about", "label": "", "status": "shown" }
+```
+
+`target` is a key of `chrome_targets()` — one of the nine routes that resolve to an address, or
+`service:<id>` for a row of `content/services.json`. There is no way to type an address into a nav
+link, which is what makes it impossible for one to 404 in the single component that appears on
+every page of the site. `SEO_ROUTES` already says routes are code; this follows from it.
+
+**An empty label means "whatever that page calls itself".** Every link the site ships with has
+one, because every one already agreed with its route's own name. So renaming a page in `?s=seo`
+renames it in the header, the footer and the dock at once, and a label is typed only where the
+chrome should disagree on purpose. The dock's bar is the exception: its labels are always typed,
+because what fits under a 44px key is not what fits in a nav — "Profile", not "Company Profile".
+
+### A footer contact row
+
+```json
+{ "id": "phone-bangladesh", "kind": "phone", "label": "Bangladesh",
+  "lines": ["+880 1320571562", "+880 1881873463"],
+  "note": "Sunday – Thursday", "status": "shown" }
+```
+
+`kind` is `phone`, `email`, `address` or `hours`. It decides both the mark drawn beside the row and
+how the lines link — `tel:`, `mailto:`, or not at all, because a street and an opening time are
+facts rather than destinations. **Consecutive rows sharing a kind render inside one
+`.contact-item`, under one icon**, which is what the CSS's `.contact-item__label ~
+.contact-item__label` rule is written against.
+
+### Two columns store nothing, and are derived
+
+**The services list** is read from `content/services.json` as the footer renders, so a seventh
+service appears in the footer by itself and a hidden one disappears. Before this, the footer's copy
+said "Human Resource Provision" where the services document said something else, and a service
+added in the editor could never appear in the footer at all.
+
+**The social links** are read from the SEO document's `sameas` rows, so a profile URL is changed in
+one place and the footer cannot disagree with the Organization graph. The mark comes from the URL's
+host — `CHROME_SOCIAL_ICONS` — with a globe behind anything the sprite has no brand mark for.
+
+### The footer's contact rows deliberately are not
+
+They are the footer's own: added, worded, ordered, shown and hidden on the footer screen, owing
+nothing to `content/contact.json`. The contact page holds every detail in full; a footer holds the
+part worth putting in a footer, in whatever wording suits it.
+
+What keeps the two honest is a **notice, never a refusal** — for the reason the privacy policy's
+duplicated facts are reported rather than forbidden: requiring the two to agree before either could
+be saved means that after an office move, whichever page you edited first could not be saved, and
+there is no order that avoids it.
+
+### The four columns and the four keys are code
+
+Their headings and contents are here; their number is not. A footer that can be given a fifth
+column is a footer that can be broken at a width nobody tested, and a fifth key would not wrap —
+it would shrink the other four below a thumb's width. `chrome_normalise()` pads and truncates the
+bar to `CHROME_BAR_SLOTS` rather than trusting what arrived, because a document is a file as often
+as it is a form.
+
+### `chrome_defaults()` is the markup, extracted rather than typed
+
+Every value in it was read out of the three templates by a script before they were deleted, so a
+host with no `content/chrome.json` renders the site exactly as it rendered before any of this
+existed — which is the whole safety property of the conversion, and the reason the header, footer
+and dock cannot vanish because one file failed to arrive.
+
+**A band that is absent and a band that is empty are not the same thing.** A missing document, or
+one that predates a band, falls back to `chrome_defaults()` for that band — that is what makes the
+paragraph above true. A band that arrived as an empty list is an operator who hid or removed every
+row, and it stays empty; filling it back in would resurrect links somebody had deliberately taken
+away, on every page at once. `chrome_normalise()` tells them apart by asking whether the key is
+an array at all, not whether it is truthy, and `tech4time-website-frontend/tools/test_chrome.py`
+holds both halves down: every page renders with no document at all, and a nav emptied on purpose
+stays empty while the other bands keep their rows.
+
+---
+
 ## Rules that apply to both
 
 **Written atomically.** `store_write()` writes a temp file and renames it over the target, keeping
@@ -298,7 +417,7 @@ so alignment is a class from a fixed list.
 
 **Everything is escaped on output** with `h()`, regardless of having been sanitised on the way in.
 
-**Bookkeeping fields** — `updated`, `footer_synced` — are exempt from the content-model check in
+**Bookkeeping fields** — `updated`, `revision` — are exempt from the content-model check in
 both directions. Nothing renders them and the form does not write them.
 
 **Ids are generated, not typed.** `careers_slug()` and `contact_slug()` make them.

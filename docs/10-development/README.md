@@ -35,8 +35,10 @@ an account, pair an authenticator app. See [running-locally.md](running-locally.
 **Your secrets live outside the repository**, at `../t4t-private-admin`, beside your clone — the same
 shape as `/home/USER/t4t-private-admin` on the host, so nothing about the layout differs in development.
 
-**The header and footer are copied into every page**, not included at runtime. Edit
-`tools/templates/`, then propagate. Never hand-edit one page's header.
+**The public site's header, footer and dock are emitted, not copied.** `tech4time-website-frontend/lib/body.php` renders them
+from `content/chrome.json` on the request, and every link, label and contact row in them is edited
+here, at `/?s=chrome`. What is still copied into every page is the hero circuit and the script
+tags.
 *shared-markup.md* (in tech4time-website-frontend)
 
 ---

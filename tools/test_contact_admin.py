@@ -235,6 +235,24 @@ def run(client, r, site):
     r.check("and marks the one showing",
             html.count('aria-current="page"') == 1)
 
+    # THE OVERVIEW IS THE RAIL, AND IT HAD DRIFTED. Its tile list was written
+    # by hand and had fallen to six against nine editors -- services,
+    # certifications, branding and privacy had been editable for weeks with
+    # nothing on the front page saying so, which is the exact failure that
+    # screen exists to prevent. It is derived from ADMIN_RAIL_SECTIONS now, and
+    # this is what says so: one tile per rail row, minus the Overview's own.
+    _, front = client.get("/")
+    r.check("the Overview draws one tile per rail row",
+            front.count('class="admin-tile__title"') == len(rail) - 1,
+            f'{len(rail) - 1} expected, {front.count(chr(34) + "admin-tile__title")} drawn')
+    r.check("and every one of them has a summary written for it",
+            "No summary is written" not in front,
+            "a rail section reached the Overview with no facts of its own")
+    r.check("and the SEO tile counts the pages rather than saying nothing",
+            re.search(r"<li>\s*\d+ pages with a title", front) is not None,
+            "it read three variables that were assigned forty lines later, so "
+            "it said 0 pages whatever the data held")
+
     token = csrf_of(html)
     base = form_fields(html)
     r.check("the offices are all in the form",
@@ -542,12 +560,6 @@ def run(client, r, site):
             "not-an-address" not in sent and "javascript:alert" not in sent,
             "a refused save must not reach the live site at all")
 
-    # Hiding an office and changing a number both change what the footer
-    # should say, so the editor must already be flagging the drift by now.
-    _, html = client.get(ADMIN)
-    r.check("changing the details raises the footer warning",
-            "site footer is showing older details" in html)
-
     # ------------------------------------------------------ sanitising HTML
     print("\nwhat it stores from the rich fields")
     for name, sent, expect_absent in [
@@ -566,14 +578,6 @@ def run(client, r, site):
     lead = published(site).get("form", {}).get("lead", "")
     r.check("but ordinary formatting is",
             "<strong>anything</strong>" in lead and "<li>Security</li>" in lead, lead[:160])
-
-    # ---------------------------------------------------------- the footer
-    print("\nthe footer that this editor cannot reach")
-    _, html = client.get(ADMIN)
-    r.check("the editor says so once the details have changed",
-            "site footer is showing older details" in html)
-    r.check("and names the tool that fixes it",
-            "sync_site_contact.py" in html)
 
     # ------------------------------------------------------ publishing again
     print("\nthe retry the failed-publish notice offers")
@@ -668,11 +672,11 @@ def region(page: str, css_class: str) -> str:
     """One band of the rendered page.
 
     Assertions are made against a band rather than the whole document for a
-    reason worth stating: the head's base Organization graph and the footer
-    both repeat the addresses and numbers as literal markup, and they stay put
-    until tools/sync_site_contact.py runs. Searching the whole page would find
-    them there and conclude the office card had not changed — or that a hidden
-    office was still being shown.
+    reason worth stating: the footer repeats an address and a telephone number
+    of its own, from content/chrome.json, which this editor does not write and
+    is not meant to (ADR 0023). Searching the whole page would find them there
+    and conclude the office card had not changed — or that a hidden office was
+    still being shown.
     """
     m = re.search(r'<ul class="' + re.escape(css_class) + r'"[^>]*>(.*?)</ul>',
                   page, re.S)
@@ -694,8 +698,8 @@ def first_office(html: str) -> str:
 
 def contact_schema(page: str) -> str:
     """The generated ContactPage block, which is the only structured data on
-    this page that follows the editor. The base Organization graph above it is
-    literal markup and moves only when sync_site_contact.py runs."""
+    this page that this editor writes. The Organization graph above it is
+    built by seo_graph() from this same document, so it follows too."""
     for body in re.findall(
         r'<script type="application/ld\+json">\s*(\{.*?\})\s*</script>', page, re.S
     ):

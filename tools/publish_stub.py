@@ -77,9 +77,8 @@ class PublishStub:
             site.fail_with = "unreachable" | a code | None
     """
 
-    def __init__(self, key: bytes, footer_synced: str = "f" * 64) -> None:
+    def __init__(self, key: bytes) -> None:
         self.key = key
-        self.footer_synced = footer_synced
         self.documents: dict[str, dict] = {}
         self.revisions: dict[str, int] = {d: 0 for d in DOCUMENTS}
         self.received: list[dict] = []
@@ -204,8 +203,7 @@ class PublishStub:
                 stub.revisions[document] = int(envelope["revision"])
 
                 self._answer(200, {"ok": True, "document": document,
-                                   "revision": stub.revisions[document],
-                                   "footer_synced": stub.footer_synced})
+                                   "revision": stub.revisions[document]})
         return Handler
 
     def __enter__(self):

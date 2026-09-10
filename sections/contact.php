@@ -295,8 +295,6 @@ function contact_take_uploads(array $data, array &$errors): array
    sections/company.php did not quite make, which is how the two editors ended
    up laying the same row out differently. */
 
-$inStep = contact_footer_in_step($data);
-
 /* The "On this page" column beside this editor — see COMPANY_OUTLINE. */
 const CONTACT_OUTLINE = [
     'band-hero'    => 'The banner',
@@ -320,26 +318,6 @@ if (!$errors && $pending !== '') {
     echo '<p class="admin__notice admin__notice--ok">' . h($pending) . '</p>';
 }
 ?>
-
-<?php /* ----------------------------------------------------------- drift */ ?>
-<?php if (!$inStep): ?>
-  <div class="admin__notice admin__notice--warn">
-    <p class="admin__notice-line"><?= admin_icon('info-circle', 'icon icon--sm') ?>
-       <strong>The site footer is showing older details.</strong></p>
-    <p>
-      Every page repeats the email address, phone numbers, addresses and opening
-      hours in its footer. Those are part of each page's own file, so this
-      editor cannot reach them — the contact page below is correct, the footers
-      elsewhere are not.
-    </p>
-    <p class="admin__fineprint">
-      To bring them into line, whoever maintains the site runs
-      <code>python3 tools/sync_site_contact.py</code> against this
-      <code>content/contact.json</code> and re-uploads the pages. This notice
-      clears itself once that is done.
-    </p>
-  </div>
-<?php endif; ?>
 
 <?php /* enctype, because an office can carry an uploaded flag. Without it a
          file input posts the FILENAME and not the file, silently — the browser

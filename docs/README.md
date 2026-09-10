@@ -35,7 +35,7 @@ in the other repository.
 | Behaviour in the browser | *10-development/frontend/javascript.md* (in tech4time-website-frontend) |
 | Animation, sliders, the reveal | *10-development/frontend/motion.md* (in tech4time-website-frontend) |
 | Icons | [10-development/server-side/icons.md](10-development/server-side/icons.md) |
-| The header or footer | *10-development/frontend/shared-markup.md* (in tech4time-website-frontend) |
+| The header, footer or dock | their **words and links** are edited at `/?s=chrome`; the markup is *10-development/frontend/shared-markup.md* (in tech4time-website-frontend) |
 | Add a whole new page | *10-development/frontend/adding-a-page.md* (in tech4time-website-frontend) |
 | Server-side code | [10-development/server-side/libraries.md](10-development/server-side/libraries.md) |
 | Make a page editable in `/admin` | [10-development/server-side/adding-an-editor.md](10-development/server-side/adding-an-editor.md) |

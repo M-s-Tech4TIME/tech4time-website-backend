@@ -410,48 +410,6 @@ def page_reads(php: str) -> set[str]:
 # -------------------------------------------------------------------- main
 
 
-def fingerprints_agree() -> str:
-    """The contact fingerprint is computed twice — once in PHP for the editor,
-    once in Python for the sync tool — and the two must produce the same digest
-    from the same file. They are what decides whether the editor tells someone
-    the site footer is stale, so a disagreement is a warning that never clears
-    or never appears.
-
-    This has already gone wrong once: the reach rows gained a list of values
-    and the Python side went on reading the single value they used to have.
-    Returns a problem, or "" when they agree.
-    """
-    if not shutil.which("php"):
-        return ""      # nothing to compare against; serve.py already says so
-
-    php = subprocess.run(
-        ["php", "-r", "require 'lib/contact.php'; echo contact_fingerprint(contact_load());"],
-        cwd=ROOT, capture_output=True, text=True,
-    )
-    if php.returncode != 0:
-        return f"could not run lib/contact.php: {php.stderr.strip()[:200]}"
-
-    sync = ROOT / "tools" / "sync_site_contact.py"
-    if not sync.is_file():
-        return ""
-
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("sync_site_contact", sync)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    mine = module.fingerprint(module.load())
-
-    if mine == php.stdout.strip():
-        return ""
-
-    return (
-        "contact_fingerprint() in lib/contact.php and fingerprint() in "
-        "tools/sync_site_contact.py disagree about the same contact.json "
-        f"({php.stdout.strip()[:12]}… vs {mine[:12]}…) — the editor's "
-        "footer-drift warning is therefore wrong in one direction or the other"
-    )
-
-
 def icons_are_drawable() -> list[str]:
     """Every icon the model offers can actually be drawn, on this side.
 
@@ -470,6 +428,13 @@ def icons_are_drawable() -> list[str]:
     backend half, and the failure is silent: an icon in the model that the
     admin does not inline renders in the editor as an empty box, and only
     somebody looking at that one row would ever notice.
+
+    THE CHROME IS HERE FOR THE BACKEND'S HALF ONLY. The header, footer and
+    dock inline what they draw as they render it, the way lib/services.php
+    does, so the frontend half of this needs no comment block and
+    inject_icons.py never sees those names -- but the sprite still has to hold
+    a symbol for every one of them, and the editor still previews the ones a
+    picker offers. Both halves of that are checked here.
     """
     problems = []
 
@@ -480,7 +445,16 @@ def icons_are_drawable() -> list[str]:
          "                  'company' => array_keys(COMPANY_ICONS),"
          "                  'about'   => array_keys(ABOUT_ICONS),"
          "                  'home'    => array_keys(HOME_ICONS),"
-         "                  'services' => array_keys(SERVICES_ICONS)]);"],
+         "                  'services' => array_keys(SERVICES_ICONS),"
+         # The chrome names icons three ways: a picker for the dock bar, a
+         # fixed mark per kind of footer contact row, and a mark per social
+         # host with a fallback for the rest. All three end up as a <use> in
+         # the header, footer or dock, so all three are checked.
+         "                  'chrome'  => array_values(array_unique(array_merge("
+         "                                   array_keys(CHROME_BAR_ICONS),"
+         "                                   array_values(CHROME_CONTACT_ICONS),"
+         "                                   array_values(CHROME_SOCIAL_ICONS),"
+         "                                   [CHROME_SOCIAL_FALLBACK])))]);"],
         cwd=ROOT, capture_output=True, text=True,
     )
     if php.returncode != 0:
@@ -546,15 +520,6 @@ def main() -> None:
         "backend":  "the backend half   —  model against the editor",
         "both":     "both halves        —  model, editor and renderer together",
     }[SIDE])
-
-    drift = fingerprints_agree()
-    if drift:
-        problems.append(drift)
-    elif (ROOT / "tools" / "sync_site_contact.py").is_file():
-        print("fingerprint  —  PHP and Python agree")
-    else:
-        print("fingerprint  —  not checked here; the footers are the frontend's")
-
 
     problems.extend(icons_are_drawable())
 

@@ -16,7 +16,7 @@ Fast, no browser needed. Run all seven.
 ```bash
 python3 tools/check_contrast.py        # WCAG AA in both colour modes
 python3 tools/inject_icons.py --check  # every page's inlined icon block is current
-python3 tools/check_shared_markup.py   # no page's header or footer has drifted
+python3 tools/check_shared_markup.py   # no page's copied markup has drifted  (frontend)
 python3 tools/check_content_model.py   # model, form and renderer still agree
 python3 tools/check_secrets.py         # nothing secret committed; no protection removed
 python3 tools/check_docs.py            # the docs still describe the code
@@ -47,6 +47,7 @@ python3 tools/test_certifications_admin.py  # the certifications editor — thre
 python3 tools/test_branding_admin.py    # the branding editor — logos and the files in them
 python3 tools/test_privacy_admin.py     # the privacy editor — three lists deep, and the anchor rule
 python3 tools/test_seo_admin.py         # the SEO editor — and that no other editor blanks a meta band
+python3 tools/test_chrome_admin.py      # the header, footer and dock editor — four screens
 python3 tools/test_svg.py               # the SVG sanitiser, which is a security boundary
 python3 tools/test_store.py             # the JSON store itself
 python3 tools/test_qr.py                # the pairing code, against libqrencode
@@ -84,11 +85,13 @@ never covered these screens — before the split as well as after it. They went 
 said the admin had never been checked for focus visibility, tap targets at 320px, or dark mode.
 
 It has now. `check_admin_a11y.py` signs in the way `test_editor.py` does and walks every screen —
-the ones anyone can reach, the ones behind the sign-in, and all five of the SEO editor's — asserting
-four families of thing at 1200px and 320px. It also measures the rail: **every label must render as
-one line box that is not cut off**, at both rail widths and in the 320px chip strip, so renaming a
-section to something too long fails a check instead of being noticed by eye. It is one file rather than four because there are nine screens here and
-four copies of the sign-in would be four things to fix when the login markup moves.
+the ones anyone can reach, the ones behind the sign-in, all five of the SEO editor's and all four of
+the Header & Footer editor's — asserting four families of thing at 1200px and 320px. It also
+measures the rail: **every label must render as one line box that is not cut off**, at both rail
+widths and in the 320px chip strip, so renaming a section to something too long fails a check
+instead of being noticed by eye. It is one file rather than four because `SIGNED_IN_SCREENS` is a
+dozen screens and four copies of the sign-in would be four things to fix when the login markup
+moves.
 
 **It was not a formality.** The first run found that five `admin.css` rules wrote
 `outline: var(--focus-ring)` — a shorthand taking a colour token, which resets `outline-style` to
@@ -109,7 +112,7 @@ keeps them fixed.
 |---|---|
 | `check_contrast.py` | every text/background pair in `theme.css` meets WCAG AA, in both modes, including the 3:1 bar for component boundaries |
 | `inject_icons.py --check` | each page inlines exactly the icon symbols it references — no missing symbol, no dead weight |
-| `check_shared_markup.py` | every page's header, footer and script block is byte-identical to `tools/templates/` |
+| `check_shared_markup.py` | *(frontend)* every page's hero circuit and script block is byte-identical to `tools/templates/`, and `tech4time-website-frontend/lib/head.php` and `tech4time-website-frontend/lib/body.php` still emit the script hooks whose absence nothing else would notice |
 | `check_content_model.py` | the model, the editor form and the page renderer describe the same fields — **in both directions**, so a field dropped from the page but left in the form is caught; and that every editor in `ADMIN_PAGE_SECTIONS` is checked either here or by a named test that exists |
 | `check_secrets.py` | no secret is committed; the private store still refuses the web root; no auth bypass constant has returned; cookie flags intact; no password reachable by the audit log; every admin page shape noindexed |
 | `check_docs.py` | every tool, library and admin section is documented; no doc cites a path that does not exist; no internal link is broken; no doc quotes a constant that has changed |
@@ -128,6 +131,7 @@ These start a real PHP server on a spare port and drive it over HTTP.
 | `test_publish_client.py` | `publish_push()` and the save that calls it: a payload an **independent** verifier accepts, and every way it can fail arriving as something the editor can show |
 | `test_careers_admin.py` | the job post editor: add, edit, reorder, delete, validation, CSRF, the atomic write — and that **every field the model declares reaches the live site**, by pushing a marker through each one and reading it out of the published document |
 | `test_contact_admin.py` | the contact page editor, and the icon rail |
+| `test_chrome_admin.py` | the header, footer and dock editor, whose document is on **every** page of the site — so a bug in this save path does not take one page down, it takes the site's navigation with it. Every field round-trips; add, remove, reorder and hide on all five row bands, with a new row **arriving hidden**; a row keeps the id it was minted with through a reorder; saving one part leaves the other two exactly as they were, because each screen merges them back from the file; the dock bar stays at four keys with no Add and no Remove; a destination that is not a route is refused and a row with none at all likewise, while a **hidden** row may be half-finished; and the standing notice about the footer's contact rows appears, names the values it means, ignores a hidden row and **never blocks a save** |
 | `test_home_admin.py` | the home page editor: **six** lists, so add, remove, hide and reorder are exercised across them rather than on one — the mechanics are shared, and a break in the shared part would otherwise surface only in whichever list happened to be tested. Also each terminal line's kind and colour, the light/dark picture pair on a card, and the accent phrase that has to appear in the headline |
 | `test_services_admin.py` | the services editor — the only one split across two screens, and the only one whose save **merges** rather than replaces. Both halves of that are covered: saving one service must not disturb another, saving the index must not write the six pages it never showed, and a service added on the list screen must survive the round trip. Plus add, remove, hide and reorder on the lists — including the **nested** one, a solution inside a group, which nothing else exercises — and that a hand-written solution id is kept rather than re-minted from its name |
 | `test_certifications_admin.py` | the certifications editor — the only one with a list **inside a list**, so add, remove, hide and reorder are exercised at all three levels and, more to the point, a button pressed on one role group is checked to have left the others alone. Also that a new group arrives hidden, that its web address is minted from its first role and then **survives that role being renamed**, and that the counts shown beside the prose are the live ones rather than anything stored |
@@ -166,8 +170,10 @@ so a machine without a browser can still run everything else.
 
 ## Reading a failure
 
-**`check_shared_markup.py` fails** — someone edited a header or footer in a page instead of in
-`tools/templates/`. Fix the template, then `python3 tools/propagate_shared.py`.
+**`check_shared_markup.py` fails** — someone edited the hero circuit in a page instead of in
+`tools/templates/`. Fix the template, then `python3 tools/propagate_shared.py`. If it names
+`tech4time-website-frontend/lib/body.php` instead, a `data-` hook has been dropped from the emitter and a browser behaviour has
+silently gone with it; the message says which one.
 
 **`check_content_model.py` fails** — you changed a content shape in one of the three places it
 lives. The message names the field and which layer is missing it.

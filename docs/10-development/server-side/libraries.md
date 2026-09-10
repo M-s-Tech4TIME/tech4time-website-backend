@@ -27,10 +27,10 @@ store they read from is outside the document root entirely.
 | [`home.php`](#homephp) | what this side does with the home page | `contract`, `store` |
 | [`services.php`](#servicesphp) | what this side does with the services document | `contract`, `store`, `publish_client` |
 | [`seo.php`](#seophp) | what every page says about itself in its `<head>` — read from ten documents, written to whichever one owns the field | `contract`, `store`, `services`, `publish_client` |
+| [`chrome.php`](#chromephp) | the header, footer and dock every page of the public site carries | `contract`, `store`, `services`, `contact`, `publish_client` |
 | [`upload.php`](#uploadphp) *(backend)* | a file somebody chose, turned into a picture this site will show | `publish` |
 | [`publish.php`](#publishphp) **shared** | how a document is signed and checked on the wire | `private`, `contract` |
 | [`publish_client.php`](#publish_clientphp) *(backend)* | sending one | `publish` |
-| [`footer-fingerprint.php`](#footer-fingerprintphp) *(frontend, generated)* | what this site's footers currently say | — |
 | [`private.php`](#privatephp) | where the secrets are, and key derivation | — |
 | [`totp.php`](#totpphp) | RFC 6238 authenticator codes | `qr` |
 | [`qr.php`](#qrphp) | the pairing code, as SVG | — |
@@ -99,8 +99,8 @@ damage is recovered from. `tools/test_store.py` covers both.
 **Shared — byte-identical in `tech4time-website-frontend` and `tech4time-website-backend`.**
 
 `CONTRACT_VERSION` · `CONTRACT_DOCUMENTS` · `CONTRACT_BOOKKEEPING` · `careers_normalise()` ·
-`contact_normalise()` · `contact_defaults()` · `contact_fingerprint()` · `contract_sanitise()` ·
-`contract_next_revision()` · …
+`contact_normalise()` · `contact_defaults()` · `chrome_defaults()` · `chrome_normalise()` ·
+`chrome_targets()` · `chrome_contact_drift()` · `contract_sanitise()` · `contract_next_revision()` · …
 
 **The shape of a document, and nothing else.** Field lists, the defaults a missing key falls back
 to, the normalising that turns whatever arrived into that shape, and the queries that read it. Both
@@ -121,8 +121,8 @@ disagreeing would only make one side's own page look wrong, it is not.
 `content/contact.json`, because the file is one instance of the shape and an optional field that
 happens to be absent from it is still a field.
 
-`CONTRACT_BOOKKEEPING` names the fields a document keeps about *itself* — `updated`, `revision`,
-`footer_synced`. Nothing edits them and nothing renders them, so both directions of
+`CONTRACT_BOOKKEEPING` names the fields a document keeps about *itself* — `updated` and `revision`.
+Nothing edits them and nothing renders them, so both directions of
 `check_content_model.py` and the round trip in `test_careers_admin.py` exempt them, and all three
 read the one list. They did not, once: `revision` was added, the careers test treated it as a
 site-wide setting, posted it on its own, and blanked `cv_form_url` doing so.
@@ -154,10 +154,10 @@ investigate.
 
 The same division for the contact page.
 
-The footer-drift banner is powered by `contact_footer_in_step()` in `contract.php`, comparing the
-details now held against `footer_synced` — which after the split is **what the frontend reported in
-the last publish response**, not something this side computed. See
-[`footer-fingerprint.php`](#footer-fingerprintphp).
+It used to carry a footer-drift banner and a **second `store_write()`** after the publish, to record
+the fingerprint the frontend reported for its own footers. The footer renders from
+`tech4time-website-frontend/content/chrome.json` now and holds no copy of these details to go stale,
+so both are gone — [ADR 0023](../../90-decisions/0023-the-header-and-footer-are-emitted-once.md).
 
 ### `company.php`
 
@@ -328,6 +328,12 @@ service read out of `content/services.json`. A service added this morning has a 
 with no key to register anywhere, because **its record is its row** — there is nothing to orphan
 when somebody renames a slug.
 
+**That enumeration is `chrome_targets()`**, in the contract, which is also the list the Header &
+Footer screen offers as link destinations. It was written twice, and two answers to "what pages are
+there" is two things to keep true. The one thing `seo_pages()` adds back is the **404**, which
+`chrome_targets()` omits on purpose: it has no address of its own, so a nav link must not be able to
+point at it — but it has a title and a search description like every other page.
+
 `seo_effective_description()` exists because one page's description is not literal: the
 certifications page fills a `{certifications}` token with a live count. The editor shows what a
 search engine will actually see, and its length check measures *that* — a description that fits
@@ -487,6 +493,57 @@ never derived from `secret.key` (the two stores have different master keys, so a
 would differ by construction). It is never created on demand — see
 [`make_publish_key.py`](../../40-reference/tools.md).
 
+### `chrome.php`
+
+`chrome_load()` · `chrome_target_list()` · `chrome_edit()` · `chrome_validate()` ·
+`chrome_contact_import()`
+
+The furniture around every page of the public site: the logo lockups and the main navigation, the
+footer's four columns and its bottom bar, and the small-screen dock. One document,
+`content/chrome.json`, published like any other.
+
+It was literal markup in seventeen page files until 2026-09-10 — about 6,800 lines of duplication —
+and nothing in it could be changed without a developer and a deploy: not a nav link, not the
+tagline, not a phone number, not the copyright name.
+[ADR 0023](../../90-decisions/0023-the-header-and-footer-are-emitted-once.md)
+
+**This side has no renderer.** `tech4time-website-frontend/lib/chrome.php` is the other half of this
+file and holds the reverse — `chrome_link()`, `chrome_social()`, `chrome_sprite()` and the rest of
+what the emitter needs, and none of the writing here. That split is the one `company.php` and
+`privacy.php` already use.
+
+**A link points at a route, never at a URL.** Every destination is a key of `chrome_targets()` —
+`about`, `service:cybersecurity` — and `chrome_validate()` refuses anything else. The nav is the one
+component on every page of the site, and a nav that can point anywhere can point at a 404. It also
+means renaming a service renames its footer link by itself.
+
+**`chrome_edit()` locks, for the reason `seo_edit()` does.** Each screen holds one *part* — the
+header screen never sees the footer's rows — so a save merges the other two back from the file under
+`store_edit()`'s `flock`. Two people on two screens cannot lose each other's work.
+
+**`chrome_validate()` judges one part at a time**, and that is not a convenience. Judging the whole
+document would let a fault in the header — typed by somebody else, an hour ago, on another screen —
+refuse a save on the footer, which the person at the footer screen cannot see and cannot fix from
+there. It also validates the **normalised** document rather than the raw form, because normalising
+is what decides what would actually be stored: a logo pointing at another site is emptied by
+`contract_safe_image_path()` before this ever sees it, so judging the raw POST would pass a document
+and then store a different one.
+
+**A hidden row is not validated at all.** Hiding is how somebody parks a row they are still working
+on, and a half-finished row that cannot be saved is a row that has to be finished or deleted, which
+is the opposite of what hiding is for. Nothing hidden reaches a visitor.
+
+**`chrome_contact_import()` seeds; it does not sync.** The footer's contact rows are its own,
+deliberately — see the drift note below — and this reads `content/contact.json` once, in the order a
+footer wants it: every telephone, the email, every address, then the opening hours. What it cannot
+bring is the wording that makes a footer a footer, so the button that calls it fills the **form** and
+saves nothing.
+
+**The drift notice is `chrome_contact_drift()`, in the contract.** It reports what the footer says
+that the contact page does not, and never the other way round: the other direction is not drift, it
+is what a footer *is*, and an alarm that fired on every correctly-short footer is an alarm nobody
+would read. `tools/check_shared_facts.py` draws the same comparison over the committed seeds.
+
 ### `publish_client.php`
 
 **Backend only.** `publish_push()` · `publish_endpoint()`
@@ -499,21 +556,6 @@ The certificate is verified and there is no option to turn that off; redirects a
 because a redirect on this route would post a signed document wherever it pointed.
 
 `$T4T_PUBLISH_URL` overrides the endpoint — how `test_publish.py` points it at a local server.
-
-### `footer-fingerprint.php`
-
-**Frontend only, and generated** by `tech4time-website-frontend/tools/sync_site_contact.py`. One constant,
-`FOOTER_FINGERPRINT`.
-
-The footer's contact details are literal markup in all sixteen pages, because the project forbids
-runtime partials. So the moment somebody edits an address in the admin, the contact page is right
-and the footers are behind — until the pages are rebuilt and deployed.
-
-This records the fingerprint the footers were last rebuilt **for**. It used to be stamped into
-`contact.json`, which stopped being possible when the backend took ownership of that file: the
-frontend's copy is a replica, and the next publish overwrites anything written into it. So the
-frontend keeps its own record, reports it in every publish response, and the backend compares. The
-side that knows what its own footers say is the side that answers.
 
 ---
 

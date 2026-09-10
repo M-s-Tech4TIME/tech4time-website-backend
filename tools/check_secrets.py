@@ -53,7 +53,6 @@ FRONTEND_ONLY = [
     "api",
     "contact-handler.php",
     "index.html",
-    "lib/footer-fingerprint.php",
 ]
 
 problems: list[str] = []

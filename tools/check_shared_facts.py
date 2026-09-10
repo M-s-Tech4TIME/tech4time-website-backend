@@ -35,34 +35,32 @@ whitespace collapsed, commas and full stops dropped, case folded. That is what
 makes it useful rather than noisy -- it reports a different street and stays
 quiet about a different comma.
 
-THE SECOND COMPARISON, AND WHY IT ONLY NOTICES
-The Organization graph carries a sameAs list -- the profiles that are this
-company elsewhere -- and it is edited on the SEO screen. The footer links to
-the same profiles, in literal markup, in tools/templates/footer.html. Two
-copies again, and this time neither is wrong when they differ: a profile can
-legitimately be in the graph and not in the footer (an old account a search
-engine should still connect) or in the footer and not the graph (a link added
-for readers, not for machines).
+THE SECOND COMPARISON IS THE FOOTER'S CONTACT ROWS, and it is here for exactly
+the same reason as the first. content/chrome.json holds the footer's OWN
+telephone numbers, email and addresses -- deliberately, because the contact
+page holds every detail in full and a footer holds the part worth putting in
+one, worded and ordered to suit it. Two copies again, and this one has already
+gone stale once: the Brussels numbers were wrong for weeks under the
+arrangement ADR 0023 replaced, and nothing said so.
 
-So this half REPORTS and never refuses. It exists because the disagreement is
-invisible otherwise -- the footer is markup and the graph is a document, and
-nobody reading one is looking at the other. It cannot affect the exit code, on
-purpose: a check that fails on a decision somebody is entitled to make is a
-check people learn to skip.
+It looks ONE WAY: what the footer says that the contact page does not. The
+other direction is not drift, it is what a footer is, and an alarm that fired
+on every correctly-short footer is an alarm nobody would read. chrome_contact_
+drift() in lib/contract.php has the rest of the reasoning.
+
+A THIRD COMPARISON USED TO BE HERE and has stopped having anything to compare.
+The Organization graph's sameAs list -- the profiles that are this company
+elsewhere -- was edited on the SEO screen while the footer linked to the same
+profiles in literal markup. The footer's social links are DERIVED from those
+rows now (chrome_social() in the frontend's lib/chrome.php), so there is one
+copy and nothing to draw.
 """
 import json
-import re
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-FOOTER = ROOT / "tools" / "templates" / "footer.html"
-
-# The footer's social list, and the hrefs inside it. Scoped to the list so the
-# brand link, the two link columns and the legal line are not read as profiles.
-SOCIAL_LIST = re.compile(r'<ul class="site-footer__social">(.*?)</ul>', re.S)
-SOCIAL_HREF = re.compile(r'href="(https?://[^"]+)"')
 
 PHP = r"""
 require __DIR__ . '/lib/contract.php';
@@ -75,62 +73,55 @@ if (!is_array($privacy) || !is_array($contact)) {
     exit(2);
 }
 
-$seo = json_decode(file_get_contents(__DIR__ . '/content/seo.json'), true);
-$same = [];
-if (is_array($seo)) {
-    foreach (contract_normalise('seo', $seo)['sameas']['items'] as $row) {
-        if (($row['status'] ?? 'shown') === 'shown' && trim((string)$row['url']) !== '') {
-            $same[] = ['label' => $row['label'], 'url' => trim((string)$row['url'])];
-        }
-    }
-}
+/* The chrome document is the frontend's; this file is byte-identical in both
+   repositories, so it is read where it is and reported as absent where it is
+   not, rather than skipped in silence. */
+$chrome = @file_get_contents(__DIR__ . '/content/chrome.json');
+$chrome = $chrome === false ? null : json_decode($chrome, true);
 
 echo json_encode([
-    'facts'  => privacy_shared_facts(
+    'facts' => privacy_shared_facts(
         contract_normalise('privacy', $privacy),
         contract_normalise('contact', $contact)
     ),
-    'sameas' => $same,
+    'footer' => is_array($chrome) ? chrome_contact_drift(
+        contract_normalise('chrome', $chrome),
+        contract_normalise('contact', $contact)
+    ) : null,
 ]);
 """
 
 
-def social_notice(sameas: list[dict]) -> None:
-    """Say whether the graph's sameAs and the footer's links agree.
+KIND = {"phone": "Telephone", "email": "Email address", "address": "Address"}
 
-    Prints. Returns nothing, and the caller ignores it -- see the docstring.
+
+def footer_notice(drift: list | None) -> None:
+    """Say whether the footer's contact rows still agree with the contact page.
+
+    Prints. Returns nothing, and the caller ignores the result -- see the
+    docstring. A difference here is a decision somebody is entitled to make,
+    and a check that fails on one of those is a check people learn to skip.
     """
     print()
-    if not FOOTER.is_file():
-        # This file is byte-identical in both repositories, and only one of
-        # them has a footer to compare against: the markup lives with the
-        # pages. Said plainly rather than skipped in silence, so a run here
-        # does not read as "the two agree".
-        print("sameAs — not checked here; the footer is the frontend's.")
+    if drift is None:
+        # This file is byte-identical in both repositories and only one of them
+        # holds the chrome document. Said plainly rather than skipped in
+        # silence, so a run here does not read as "the two agree".
+        print("the footer — not checked here; content/chrome.json is the frontend's.")
         return
 
-    block = SOCIAL_LIST.search(FOOTER.read_text())
-    if block is None:
-        print("sameAs — the footer template has no <ul class=\"site-footer__social\">.")
-        print("         It has been restructured; update SOCIAL_LIST in this file.")
+    if not drift:
+        print("the footer — every detail it carries is on the contact page too.")
         return
 
-    footer = {url.rstrip("/") for url in SOCIAL_HREF.findall(block.group(1))}
-    graph = {row["url"].rstrip("/") for row in sameas}
-
-    if footer == graph:
-        print(f"sameAs — the graph and the footer name the same "
-              f"{len(graph)} profile(s).")
-        return
-
-    print("sameAs — the graph and the footer do not name the same profiles.")
-    print("         Not a failure: either may legitimately carry one the other does not.")
-    for url in sorted(graph - footer):
-        print(f"    in the graph only    {url}")
-    for url in sorted(footer - graph):
-        print(f"    in the footer only   {url}")
-    print("         The graph is edited on the SEO screen; the footer is markup,")
-    print("         in tools/templates/footer.html.")
+    print(f"the footer — {len(drift)} detail(s) the contact page does not carry.")
+    print("             Not a failure: the footer's rows are its own, and it holds")
+    print("             the part worth putting in a footer rather than all of it.")
+    for row in drift:
+        label = f" — {row['label']}" if row["label"] else ""
+        print(f"    {KIND.get(row['kind'], row['kind'])}{label}: {row['value']}")
+    print("             Worth a look when an office has moved or a number has changed.")
+    print("             The footer's rows are edited at ?s=chrome&part=footer.")
 
 
 def main() -> int:
@@ -148,7 +139,7 @@ def main() -> int:
     facts = payload["facts"]
     if not facts:
         print("The contact document states no facts the policy repeats.")
-        social_notice(payload["sameas"])
+        footer_notice(payload["footer"])
         return 0
 
     missing = []
@@ -161,7 +152,7 @@ def main() -> int:
     print()
     if not missing:
         print(f"The privacy policy still states all {len(facts)} facts the contact page manages.")
-        social_notice(payload["sameas"])
+        footer_notice(payload["footer"])
         return 0
 
     for fact in missing:
@@ -172,7 +163,7 @@ def main() -> int:
     print("policy has not been reviewed. Both are decisions for a person: edit content/privacy.json")
     print("through the admin, not by hand — content/ on the host is live data and the seed here is")
     print("only what a fresh deploy starts from.")
-    social_notice(payload["sameas"])
+    footer_notice(payload["footer"])
     return 1
 
 

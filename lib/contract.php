@@ -1029,6 +1029,126 @@ function company_principle_defaults(array $row): array
    shape, checked one way, wherever it hangs. */
 const CONTRACT_IMAGE_ROOTS = ['/assets/images/', '/uploads/'];
 
+/**
+ * How wide each uploaded picture is actually DRAWN, and what to tell the
+ * browser about it.
+ *
+ * ONE NUMBER, TWO CONSUMERS, WHICH IS THE WHOLE POINT. The uploader builds a
+ * ladder of widths from 'width'; the renderer builds its sizes= attribute from
+ * 'sizes'. Keeping them in one row is what stops the two drifting into
+ * disagreeing about the same picture -- a ladder the browser cannot choose
+ * from correctly is worse than no ladder, because without sizes= a browser
+ * assumes the picture fills the viewport and picks the LARGEST rung.
+ *
+ * THESE NUMBERS WERE MEASURED, NOT ESTIMATED. Firefox, every page, ten
+ * viewports from 320 to 1920, each in an iframe of its own so the width asked
+ * for is the width tested -- the same technique and the same reason as
+ * tools/check_responsive.py. Two of them are not where anybody would guess:
+ *
+ *   - about.story is widest at 768 (693px), NOT on a desktop. One column up to
+ *     768 and two above it, so the last single-column width is the largest the
+ *     picture is ever drawn; at 1280 it is 534.
+ *   - company.clients is widest at 360 (249px), also not on a desktop. The
+ *     grid drops to one column, so a phone draws the biggest logo tile.
+ *
+ * Guessing either would have shipped a picture too small on the width that
+ * needed it most, and nothing in this repository would have said so.
+ *
+ * 'width' is the CSS width at the widest point. The uploader stores it at 1x,
+ * 2x and 3x for the screens that have those densities, never upscaling past
+ * what arrived and never past its own ceiling.
+ *
+ * A slot with width 0 DOES NOT LADDER, and each has a reason:
+ *   - branding.file is a deliverable somebody downloads, not something a page
+ *     draws. One file, at the download ceiling.
+ *   - seo.share is read by scrapers that do not implement srcset and want
+ *     exactly 1200x630. A ladder there is ignored at best.
+ *   - seo.logo is Organization.logo in the structured data: one image, named
+ *     once, by a consumer that picks nothing.
+ *
+ * To re-measure after a layout change, see "If you are measuring geometry"
+ * in tech4time-website-frontend/docs/10-development/testing.md -- named with
+ * the repository because this file is shared and the pages are over there.
+ */
+const CONTRACT_IMAGE_SLOTS = [
+    /* slot                    drawn at                          measured max */
+    'about.story'       => ['width' => 700,
+                            'sizes' => '(min-width: 769px) min(44vw, 534px), 90vw'],
+    'company.journey'   => ['width' => 480,
+                            'sizes' => '(min-width: 641px) 478px, 90vw'],
+    'home.destinations' => ['width' => 400,
+                            'sizes' => '(min-width: 415px) 400px, 90vw'],
+    'branding.asset'    => ['width' => 360,
+                            'sizes' => '(min-width: 415px) 360px, 90vw'],
+    'company.clients'   => ['width' => 250,
+                            'sizes' => '(max-width: 414px) 90vw, 132px'],
+    'company.technology'=> ['width' => 120,
+                            'sizes' => '(max-width: 414px) 33vw, 80px'],
+    'contact.offices'   => ['width' => 56,  'sizes' => '56px'],
+
+    /* No ladder -- see the docblock above. */
+    'branding.file'     => ['width' => 0, 'sizes' => ''],
+    'seo.share'         => ['width' => 0, 'sizes' => ''],
+    'seo.logo'          => ['width' => 0, 'sizes' => ''],
+];
+
+/** The screen densities a stored ladder is built for. */
+const CONTRACT_IMAGE_DPR = [1, 2, 3];
+
+/**
+ * What to put in sizes= for a slot, or '' when it does not ladder.
+ *
+ * Asked by the renderer rather than typed beside the markup, so the attribute
+ * and the widths that were stored come from the same row.
+ */
+function contract_slot_sizes(string $slot): string
+{
+    return (string)(CONTRACT_IMAGE_SLOTS[$slot]['sizes'] ?? '');
+}
+
+/**
+ * The widths a slot's ladder should hold, given the picture that arrived.
+ *
+ * Never upscales, and never stores a rung nothing can use. Each density is
+ * capped at what actually arrived -- a 500px picture in a 700px slot yields
+ * 500 alone, because inventing pixels makes a bigger file that is no sharper
+ * -- and the ladder stops at 3x, because no screen asks for more. A 1600px
+ * flag in a 56px slot therefore stores 56/112/168 and NOT 1600: the largest
+ * rung any display can draw from is the last one, not the biggest file on
+ * hand.
+ *
+ * Capping each density is what handles both directions with one rule. Above
+ * 3x the extra pixels are dropped; below it the cap collapses the higher rungs
+ * onto the source width and array_unique() folds them together, so a 900px
+ * source in a 700px slot gives 700 and 900 rather than 700 three times.
+ *
+ * $ceiling is the caller's own bound. The uploader has one and the contract
+ * should not hold an opinion about the uploader's limits.
+ *
+ * Returns widths ascending and deduplicated, or [] for a slot that does not
+ * ladder.
+ */
+function contract_slot_widths(string $slot, int $source, int $ceiling): array
+{
+    $width = (int)(CONTRACT_IMAGE_SLOTS[$slot]['width'] ?? 0);
+
+    if ($width <= 0 || $source <= 0 || $ceiling <= 0) {
+        return [];
+    }
+
+    $top = min($source, $ceiling);
+    $out = [];
+
+    foreach (CONTRACT_IMAGE_DPR as $density) {
+        $out[] = min($width * $density, $top);
+    }
+
+    $out = array_values(array_unique($out));
+    sort($out);
+
+    return $out;
+}
+
 /* What a row is called before it is called anything. See company_identify(). */
 const COMPANY_ID_PLACEHOLDER = 'row';
 
@@ -1057,6 +1177,46 @@ function contract_safe_image_path(string $path): string
 }
 
 /**
+ * A srcset list with every path checked, or as much of one as survives.
+ *
+ * "url 180w, url 360w" and a bare "url" are both valid srcset syntax, which is
+ * why one field can carry the header's three widths and the footer's single
+ * file. An entry whose path is not under CONTRACT_IMAGE_ROOTS is dropped
+ * rather than escaped -- this ends up inside an attribute the browser fetches
+ * from, and there is no legitimate picture this rejects.
+ *
+ * HERE, AND NOT WITH THE CHROME, BECAUSE IT IS NO LONGER THE CHROME'S. It was
+ * written for the header lockup, which was for a long time the only picture on
+ * this site stored at more than one width. It is the same check every picture
+ * record needs the moment any of them carries a ladder of widths, so it sits
+ * beside contract_safe_image_path() -- the rule it applies to each entry --
+ * rather than being copied a second time further down this file.
+ */
+function contract_srcset(string $value): string
+{
+    $out = [];
+
+    foreach (explode(',', $value) as $entry) {
+        $entry = trim($entry);
+        if ($entry === '') {
+            continue;
+        }
+
+        $bits       = preg_split('/\s+/', $entry) ?: [];
+        $path       = contract_safe_image_path((string)array_shift($bits));
+        $descriptor = trim(implode(' ', $bits));
+
+        if ($path === '' || !preg_match('/^(\d+(\.\d+)?[wx])?$/', $descriptor)) {
+            continue;
+        }
+
+        $out[] = $descriptor === '' ? $path : $path . ' ' . $descriptor;
+    }
+
+    return implode(', ', $out);
+}
+
+/**
  * Fill in a picture, whatever it arrived with.
  *
  * width and height are not decoration. They are what lets the browser reserve
@@ -1068,16 +1228,31 @@ function contract_safe_image_path(string $path): string
  * webp is optional and empty is meaningful: it says "there is no WebP sibling,
  * emit a bare <img> and no <picture> wrapper". That is how the SVG and AVIF
  * entries have always rendered.
+ *
+ * srcset and webp_srcset are the SAME PICTURE AT SEVERAL WIDTHS, and are
+ * likewise optional and likewise meaningful when empty: no ladder was stored,
+ * so the renderer emits src alone exactly as it always did. They are separate
+ * fields rather than a widened 'webp' because 'webp' here is ONE path -- the
+ * chrome's logo record uses that key for a list, and conflating the two would
+ * make a picture record mean different things in different documents.
+ *
+ * src and webp stay the single files they were, and stay REQUIRED in practice:
+ * they are what a browser too old for srcset is served, and what every scraper
+ * that reads an <img> without parsing a candidate list will take. A ladder is
+ * an addition to a working picture, never a replacement for one.
  */
 function contract_image_defaults(mixed $image): array
 {
     $image = is_array($image) ? $image : [];
-    $image += ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0];
+    $image += ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0,
+               'srcset' => '', 'webp_srcset' => ''];
 
-    $image['src']    = contract_safe_image_path((string)$image['src']);
-    $image['webp']   = contract_safe_image_path((string)$image['webp']);
-    $image['width']  = max(0, (int)$image['width']);
-    $image['height'] = max(0, (int)$image['height']);
+    $image['src']         = contract_safe_image_path((string)$image['src']);
+    $image['webp']        = contract_safe_image_path((string)$image['webp']);
+    $image['width']       = max(0, (int)$image['width']);
+    $image['height']      = max(0, (int)$image['height']);
+    $image['srcset']      = contract_srcset((string)$image['srcset']);
+    $image['webp_srcset'] = contract_srcset((string)$image['webp_srcset']);
 
     return $image;
 }
@@ -5724,45 +5899,12 @@ function chrome_logo_defaults(mixed $logo, array $fallback): array
 
         $out[$mode] = [
             'src'    => contract_safe_image_path((string)$image['src']),
-            'srcset' => chrome_srcset((string)$image['srcset']),
-            'webp'   => chrome_srcset((string)$image['webp']),
+            'srcset' => contract_srcset((string)$image['srcset']),
+            'webp'   => contract_srcset((string)$image['webp']),
         ];
     }
 
     return $out;
-}
-
-/**
- * A srcset list with every path checked, or as much of one as survives.
- *
- * "url 180w, url 360w" and a bare "url" are both valid srcset syntax, which is
- * why one field carries the header's three widths and the footer's single
- * file. An entry whose path is not under CONTRACT_IMAGE_ROOTS is dropped
- * rather than escaped -- this ends up inside an attribute the browser fetches
- * from, and there is no legitimate logo this rejects.
- */
-function chrome_srcset(string $value): string
-{
-    $out = [];
-
-    foreach (explode(',', $value) as $entry) {
-        $entry = trim($entry);
-        if ($entry === '') {
-            continue;
-        }
-
-        $bits       = preg_split('/\s+/', $entry) ?: [];
-        $path       = contract_safe_image_path((string)array_shift($bits));
-        $descriptor = trim(implode(' ', $bits));
-
-        if ($path === '' || !preg_match('/^(\d+(\.\d+)?[wx])?$/', $descriptor)) {
-            continue;
-        }
-
-        $out[] = $descriptor === '' ? $path : $path . ' ' . $descriptor;
-    }
-
-    return implode(', ', $out);
 }
 
 /* ------------------------------------------------------ normalising */

@@ -143,6 +143,58 @@ def run(r: Results, gd: bool) -> None:
     # asks which paths a document CLAIMS -- so gating it behind GD would mean
     # the one check that caught a real deletion bug never ran on a machine
     # without the extension, which is most of them.
+    # ALSO BEFORE THE GD GATE. This is arithmetic over a table, not a picture
+    # being decoded, and it decides how many files every future upload writes.
+    print("\nwhat widths a slot stores")
+    ladder = php("$out = [];"
+                 "foreach ([['about.story',4000],['about.story',900],['about.story',500],"
+                 "         ['company.clients',1200],['company.clients',300],"
+                 "         ['contact.offices',1600],['contact.offices',40],"
+                 "         ['branding.file',3000],['seo.share',1200],"
+                 "         ['about.story',0],['not.a.slot',1200]] as [$s,$n]) {"
+                 "  $out[$s.'@'.$n] = contract_slot_widths($s,$n,UPLOAD_MAX_DIMENSION); }"
+                 "echo json_encode($out);")
+
+    r.check("a big photograph ladders to 1x, 2x and the ceiling",
+            ladder.get("about.story@4000") == [700, 1400, 1600], str(ladder)[:200])
+    # Capping each density is what makes both directions one rule: above 3x the
+    # extra pixels go, below it the higher rungs collapse onto the source.
+    r.check("a source below 2x collapses rather than upscaling",
+            ladder.get("about.story@900") == [700, 900], str(ladder)[:200])
+    r.check("a source below the slot itself stores only itself",
+            ladder.get("about.story@500") == [500], str(ladder)[:200])
+    # The rung nothing can draw from is the one worth catching: a 1600px flag
+    # in a 56px slot must not carry a 1600px file to every phone that asks.
+    r.check("a flag never stores a rung no screen can use",
+            ladder.get("contact.offices@1600") == [56, 112, 168], str(ladder)[:200])
+    r.check("nor does a large logo in a small tile",
+            ladder.get("company.clients@1200") == [250, 500, 750], str(ladder)[:200])
+    r.check("a download does not ladder", ladder.get("branding.file@3000") == [])
+    r.check("nor does the share card", ladder.get("seo.share@1200") == [])
+    r.check("nothing arrived, nothing stored", ladder.get("about.story@0") == [])
+    r.check("an unknown slot ladders nothing rather than guessing",
+            ladder.get("not.a.slot@1200") == [])
+
+    for key, widths in (ladder or {}).items():
+        if not isinstance(widths, list) or not widths:
+            continue
+        source = int(key.rsplit("@", 1)[1])
+        r.check(f"{key}: no rung is wider than what arrived",
+                max(widths) <= min(source, 1600), str(widths))
+        r.check(f"{key}: rungs ascend and do not repeat",
+                widths == sorted(set(widths)), str(widths))
+
+    # A LADDER WITHOUT sizes= IS WORSE THAN NO LADDER. With no sizes attribute a
+    # browser assumes the picture fills the viewport and picks the widest
+    # candidate, so a slot that ladders and says nothing about its width would
+    # send every phone the 3x file. One table, both halves, checked together.
+    slots = php("echo json_encode(CONTRACT_IMAGE_SLOTS);")
+    for name, row in (slots or {}).items():
+        if row.get("width", 0) > 0:
+            r.check(f"'{name}' ladders, so it declares sizes=",
+                    (row.get("sizes") or "").strip() != "",
+                    "a ladder with no sizes= sends every screen the widest rung")
+
     print("\nwhat counts as a picture in use")
     used = php(
         "$d = contact_normalise(contact_defaults());"
@@ -292,15 +344,32 @@ def main() -> None:
         print("  sudo apt install php-gd\n")
 
     UPLOADS.mkdir(parents=True, exist_ok=True)
-    before = {p.name for p in UPLOADS.iterdir() if p.is_file()}
+
+    # THE WHOLE DIRECTORY, CONTENTS AND ALL, not a list of names. run() deletes
+    # this directory outright to prove upload_store() recreates it, which also
+    # destroys the committed .gitignore sitting in it -- and a cleanup that only
+    # removes files it did not recognise cannot put that back. It did not: the
+    # suite deleted a tracked file every run and printed "restored" afterwards.
+    #
+    # It stayed invisible because the rmtree is past the GD gate, so it never
+    # fired on a machine without the extension. CI has GD and did the same, but
+    # CI never commits. Had the deletion ever been committed, public/uploads/*
+    # would have stopped being ignored -- on a public repository, with real
+    # uploaded pictures in that directory.
+    before = {p.name: p.read_bytes() for p in UPLOADS.iterdir() if p.is_file()}
 
     r = Results()
     try:
         run(r, gd)
     finally:
+        UPLOADS.mkdir(parents=True, exist_ok=True)
         for p in list(UPLOADS.iterdir()):
             if p.is_file() and p.name not in before:
                 p.unlink()
+        for name, blob in before.items():
+            target = UPLOADS / name
+            if not target.is_file() or target.read_bytes() != blob:
+                target.write_bytes(blob)
         print("\npublic/uploads/ restored")
 
     total = r.passed + len(r.failed)

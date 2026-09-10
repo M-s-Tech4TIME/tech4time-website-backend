@@ -127,6 +127,16 @@ Nothing edits them and nothing renders them, so both directions of
 read the one list. They did not, once: `revision` was added, the careers test treated it as a
 site-wide setting, posted it on its own, and blanked `cv_form_url` doing so.
 
+`CONTRACT_IMAGE_SLOTS` is the one place that knows how wide an uploaded picture is **drawn**, and it
+is here for the reason above: the uploader decides how many files to write from it and the renderer
+decides its `sizes=` attribute from it, so the two sides disagreeing would mean a browser choosing
+the wrong file for every picture on the site. `contract_slot_widths()` turns a row into a ladder —
+never upscaling, and never storing a rung nothing can draw from — and `contract_slot_sizes()` gives
+the attribute. `contract_srcset()` checks each candidate path the way `contract_safe_image_path()`
+checks a single one; it was `chrome_srcset()` while the header lockup was the only picture stored at
+more than one width.
+
+
 `contract_sanitise()` runs every rich field back through `html.php`, driven off
 `CAREERS_RICH_FIELDS` / `CONTACT_RICH_FIELDS` rather than a list of its own — so a rich field added
 to the contract is sanitised on receipt *by having been added*.

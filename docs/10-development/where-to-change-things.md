@@ -28,6 +28,9 @@ breath**.
 | The home page's hero, badges, tags, terminal and cards | `/?s=home` |
 | What the enquiry form says | `/?s=contact` |
 | Anything the privacy policy says — a clause, the retention table, the effective date | `/?s=privacy` |
+| A navigation link, on the site or in the footer or the mobile dock | `/?s=chrome` |
+| The footer's tagline, its contact rows, the copyright line | `/?s=chrome` |
+| The logo lockup at the top or the bottom of every page | `/?s=chrome` |
 
 Saving writes `content/careers.json` or `content/contact.json` here — **the system of record** —
 and then pushes a signed copy to the public site, which verifies it, re-sanitises it and writes its
@@ -39,10 +42,6 @@ replica. If that push fails the editor says so, in words, with a **Publish again
 > holds everything in full; the footer holds the part worth putting in a footer, in whatever order
 > and wording suits it. A standing notice reports when the two differ, and never blocks a save.
 > [ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md)
-
-> **Not built yet:** that screen. The public site already renders its header, footer and dock from
-> `tech4time-website-frontend/content/chrome.json`; the editor that will change them is the next
-> piece of work.
 
 ---
 

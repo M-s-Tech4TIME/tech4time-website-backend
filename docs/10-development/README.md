@@ -37,9 +37,8 @@ shape as `/home/USER/t4t-private-admin` on the host, so nothing about the layout
 
 **The public site's header, footer and dock are emitted, not copied.** `tech4time-website-frontend/lib/body.php` renders them
 from `content/chrome.json` on the request, and every link, label and contact row in them is edited
-here, at `/?s=chrome` — **a screen that is not built yet**, so until it is, that document is what
-the public site shipped with. What is still copied into every page is the hero circuit and the
-script tags.
+here, at `/?s=chrome`. What is still copied into every page is the hero circuit and the script
+tags.
 *shared-markup.md* (in tech4time-website-frontend)
 
 ---

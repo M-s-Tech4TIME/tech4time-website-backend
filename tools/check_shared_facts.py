@@ -35,13 +35,25 @@ whitespace collapsed, commas and full stops dropped, case folded. That is what
 makes it useful rather than noisy -- it reports a different street and stays
 quiet about a different comma.
 
-THERE USED TO BE A SECOND COMPARISON HERE and it has stopped having anything to
-compare. The Organization graph's sameAs list -- the profiles that are this
-company elsewhere -- was edited on the SEO screen while the footer linked to
-the same profiles in literal markup, so the two could part and nobody reading
-one was looking at the other. The footer's social links are DERIVED from those
+THE SECOND COMPARISON IS THE FOOTER'S CONTACT ROWS, and it is here for exactly
+the same reason as the first. content/chrome.json holds the footer's OWN
+telephone numbers, email and addresses -- deliberately, because the contact
+page holds every detail in full and a footer holds the part worth putting in
+one, worded and ordered to suit it. Two copies again, and this one has already
+gone stale once: the Brussels numbers were wrong for weeks under the
+arrangement ADR 0023 replaced, and nothing said so.
+
+It looks ONE WAY: what the footer says that the contact page does not. The
+other direction is not drift, it is what a footer is, and an alarm that fired
+on every correctly-short footer is an alarm nobody would read. chrome_contact_
+drift() in lib/contract.php has the rest of the reasoning.
+
+A THIRD COMPARISON USED TO BE HERE and has stopped having anything to compare.
+The Organization graph's sameAs list -- the profiles that are this company
+elsewhere -- was edited on the SEO screen while the footer linked to the same
+profiles in literal markup. The footer's social links are DERIVED from those
 rows now (chrome_social() in the frontend's lib/chrome.php), so there is one
-copy and no comparison to draw. ADR 0023.
+copy and nothing to draw.
 """
 import json
 import subprocess
@@ -61,13 +73,55 @@ if (!is_array($privacy) || !is_array($contact)) {
     exit(2);
 }
 
+/* The chrome document is the frontend's; this file is byte-identical in both
+   repositories, so it is read where it is and reported as absent where it is
+   not, rather than skipped in silence. */
+$chrome = @file_get_contents(__DIR__ . '/content/chrome.json');
+$chrome = $chrome === false ? null : json_decode($chrome, true);
+
 echo json_encode([
     'facts' => privacy_shared_facts(
         contract_normalise('privacy', $privacy),
         contract_normalise('contact', $contact)
     ),
+    'footer' => is_array($chrome) ? chrome_contact_drift(
+        contract_normalise('chrome', $chrome),
+        contract_normalise('contact', $contact)
+    ) : null,
 ]);
 """
+
+
+KIND = {"phone": "Telephone", "email": "Email address", "address": "Address"}
+
+
+def footer_notice(drift: list | None) -> None:
+    """Say whether the footer's contact rows still agree with the contact page.
+
+    Prints. Returns nothing, and the caller ignores the result -- see the
+    docstring. A difference here is a decision somebody is entitled to make,
+    and a check that fails on one of those is a check people learn to skip.
+    """
+    print()
+    if drift is None:
+        # This file is byte-identical in both repositories and only one of them
+        # holds the chrome document. Said plainly rather than skipped in
+        # silence, so a run here does not read as "the two agree".
+        print("the footer — not checked here; content/chrome.json is the frontend's.")
+        return
+
+    if not drift:
+        print("the footer — every detail it carries is on the contact page too.")
+        return
+
+    print(f"the footer — {len(drift)} detail(s) the contact page does not carry.")
+    print("             Not a failure: the footer's rows are its own, and it holds")
+    print("             the part worth putting in a footer rather than all of it.")
+    for row in drift:
+        label = f" — {row['label']}" if row["label"] else ""
+        print(f"    {KIND.get(row['kind'], row['kind'])}{label}: {row['value']}")
+    print("             Worth a look when an office has moved or a number has changed.")
+    print("             The footer's rows are edited at ?s=chrome&part=footer.")
 
 
 def main() -> int:
@@ -85,6 +139,7 @@ def main() -> int:
     facts = payload["facts"]
     if not facts:
         print("The contact document states no facts the policy repeats.")
+        footer_notice(payload["footer"])
         return 0
 
     missing = []
@@ -97,6 +152,7 @@ def main() -> int:
     print()
     if not missing:
         print(f"The privacy policy still states all {len(facts)} facts the contact page manages.")
+        footer_notice(payload["footer"])
         return 0
 
     for fact in missing:
@@ -107,6 +163,7 @@ def main() -> int:
     print("policy has not been reviewed. Both are decisions for a person: edit content/privacy.json")
     print("through the admin, not by hand — content/ on the host is live data and the seed here is")
     print("only what a fresh deploy starts from.")
+    footer_notice(payload["footer"])
     return 1
 
 

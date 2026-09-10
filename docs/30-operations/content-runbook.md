@@ -139,10 +139,6 @@ Both are live the moment you save. Neither needs a developer or a deploy any mor
 true and stopped being true with
 [ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md).
 
-> **Not built yet:** the `/?s=chrome` screen. The public site already renders its header,
-> footer and dock from that document; the editor that will change them is the next piece of
-> work.
-
 ---
 
 ## The company profile
@@ -308,6 +304,93 @@ Exactly as on the company profile: JPEG, PNG or WebP up to 5 MB, re-encoded on a
 camera and location details a photograph carries are removed, and the description is not optional.
 The stored-pictures count at the bottom is shared across every editor, which is why nothing is ever
 swept automatically.
+
+## Header & Footer
+
+**Admin → Header & Footer**
+
+The parts of the site that are on **every** page: the logo and the navigation across the top, the
+four columns at the bottom, and the bar a phone shows within thumb reach. Until 2026-09-10 none of
+it could be changed without a developer and a deploy.
+[ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md)
+
+**The first screen is a list** of the three parts, with what is in each. Click **Edit** on one to
+open it. They are separate screens because they are separate forms, and a form that outgrows what
+PHP will accept loses its tail without saying so.
+
+### A link picks a page; it never types an address
+
+Every link here — in the navigation, in Quick Links, in the bottom bar, on a dock key — chooses its
+destination from a list of the site's own pages. There is no box to type an address into, and that
+is deliberate: this navigation is on every page of the site, and a link that could point anywhere
+could point at a page that does not exist.
+
+**Leave the "Called" box empty and the link uses whatever that page calls itself** — which is its
+breadcrumb on the SEO screen. So renaming a page there renames it in the header, the footer and the
+dock at once. Fill the box in when a link should read differently in one place: "Profile" fits under
+a dock key where "Company Profile" does not.
+
+**Every service is in the list too.** Add a service in the Services editor and it can be linked to
+here immediately.
+
+### Two parts of the footer are not on this screen
+
+The **services column** is read from the Services editor as the page is drawn. Add a service there
+and it appears in the footer by itself, under the name it is given there; hide it and it goes. Only
+the column's heading is here.
+
+The **social icons** are the profiles on the SEO screen — the same list a search engine is told is
+also this company. One address, in one place.
+
+Neither can go stale, because neither is a copy.
+
+### The footer has its own contact details, and that is on purpose
+
+See the section above under **Contact details**. In short: the Contact page holds everything in
+full, and the footer holds the part worth putting in a footer, in whatever order and wording suits
+it, with rows you can hide without hiding anything on the Contact page.
+
+**A notice tells you when the two differ.** It reads *"the footer says N things the Contact page does
+not"*, and lists them. It is a notice and not a refusal — it never stops you saving — because a
+difference is usually a choice. Read it when an office has moved or a number has changed; that is
+the case it exists for, and it is the only place the difference is visible.
+
+It looks one way only: what the **footer** says that the Contact page does not. The other direction
+is not a problem, it is what a footer is.
+
+**Copy from the Contact page** fills these rows in from the Contact page — every telephone, the
+email, every address, then the opening hours. It writes nothing: read the rows over, add any wording
+of their own, and press Save. It cannot bring the small notes like *"Sunday – Thursday"*, because the
+Contact page has no field for them.
+
+### Rows behave the way they do everywhere else
+
+Add, remove, reorder and hide, on the navigation, Quick Links, the bottom-bar links, the contact
+details and the dock panel. **A new row arrives hidden** — an empty entry appearing in the
+navigation of every page the moment you press Add is not what pressing Add means. Fill it in, set it
+to Shown, and save.
+
+Nothing is written to the site until you press **Save**, including the reordering and the import.
+
+### The dock is four keys, and stays four
+
+The bar at the bottom of a phone screen holds exactly four keys and a menu button. They can be
+reordered and each can be pointed somewhere else, given a different label and a different icon —
+but there is no Add and no Remove, because the layout is built for four and a fifth would break it
+at a width nobody has measured.
+
+One key may be drawn on a filled disc. It is still an ordinary link: every key works with
+JavaScript switched off, and only the panel above them needs a script to open — which is why the
+footer carries the same links again.
+
+### What is not editable, and why
+
+The logo link always goes to the home page. The footer always has four columns. The navigation is
+always at the top. Those are the layout, not the content — a footer that could be given a fifth
+column is a footer that could be broken at a width nobody tested.
+
+The **year** in the copyright line is not a field either. It is stamped as the page is drawn, and a
+script corrects it in a tab left open across midnight on 31 December.
 
 ## SEO Management
 

@@ -242,8 +242,8 @@ every page.
 | `ADMIN_PAGE_SECTIONS` | the subset that edits a page of the website; what anything counting "the pages you can edit" asks |
 
 Registry order is **not** rail order any more. `ADMIN_RAIL_SECTIONS` decides that, and it holds
-eleven of the twelve sections: `account` is registered and deliberately absent, because it is about
-the person rather than a page and is reached from the avatar menu at the foot of the rail.
+twelve of the thirteen sections: `account` is registered and deliberately absent, because it is
+about the person rather than a page and is reached from the avatar menu at the foot of the rail.
 
 **Do not "simplify" that by deleting the entry from the registry.** `admin_section()` returns
 `'overview'` for any name `ADMIN_SECTIONS` does not list, so `?s=account` would land silently on the

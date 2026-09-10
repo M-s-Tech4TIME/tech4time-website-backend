@@ -5955,6 +5955,135 @@ function chrome_images(array $data): array
     return array_keys($seen);
 }
 
+/* ------------------------------------------------------- the drift notice
+
+   THE FOOTER'S CONTACT ROWS ARE A SECOND COPY, ON PURPOSE. That is settled
+   above and in ADR 0023: the contact page holds every detail in full and the
+   footer holds the part worth putting in a footer, worded and ordered to suit
+   it, with rows that can be hidden without hiding anything on the contact
+   page.
+
+   What a deliberate second copy still needs is somewhere the difference is
+   VISIBLE. This is that. It reports; it never refuses, and nothing that calls
+   it may make it refuse -- which is the same bargain privacy_shared_facts()
+   struck for the same reason, and for a second reason worth stating: after an
+   office moves, whichever of the two pages you edit first would be unsavable
+   if agreement were a rule.
+   -------------------------------------------------------------------------- */
+
+/**
+ * Every footer contact value the contact page does not carry.
+ *
+ * Returns [['kind' => 'phone'|'email'|'address', 'label' => …, 'value' => …], …]
+ * in the footer's own row order. Empty means the two agree.
+ *
+ * ONE DIRECTION, AND THAT IS THE WHOLE DESIGN. What this exists to catch is a
+ * footer value that has gone STALE -- the Brussels telephone numbers were wrong
+ * for weeks under the old arrangement, and nothing said so. The other
+ * direction, "the contact page has something the footer does not", is not
+ * drift: it is what a footer IS. The contact page holds three offices in full
+ * and the footer holds the part worth putting in a footer, so reporting the
+ * remainder would fire on every correctly-short footer there has ever been,
+ * and an alarm nobody can silence is an alarm everybody learns to ignore.
+ *
+ * An operator who wants the rest can press Copy from the Contact page.
+ *
+ * COMPARED BY VALUE, NEVER BY LABEL OR BY ROW. A footer row called "Head
+ * office" and a contact office called "Bangladesh" are the same office if they
+ * carry the same address, and renaming either is not drift. Telephone numbers
+ * are compared as bare digits -- "+880 1320571562" and "+880 1320 571562" are
+ * one number -- and everything else through privacy_fact_key(), which folds
+ * case, collapses whitespace and drops commas and full stops. That is what
+ * makes this useful rather than noisy: it reports a different street and stays
+ * quiet about a different comma.
+ *
+ * A HIDDEN FOOTER ROW IS NOT COMPARED. Hiding one is how an operator says "not
+ * in the footer", and it cannot be stale if nobody can read it.
+ *
+ * HOURS ARE NOT COMPARED EITHER, deliberately. The footer writes "Sun - Thu:
+ * 9:00 AM - 6:00 PM" as one line of prose, the contact page writes the same
+ * words in its own field, and the SEO screen holds the machine-readable
+ * version in days and 24-hour times. Three spellings of one fact would report
+ * each other forever; tools/check_shared_facts.py is where that pair is looked
+ * at, and it looks at the two that are meant to be the same words.
+ */
+function chrome_contact_drift(array $chrome, array $contact): array
+{
+    $theirs = ['phone' => [], 'email' => [], 'address' => []];
+
+    /* The contact page's reach rows are classified by SHAPE rather than by
+       their label, exactly as privacy_shared_facts() classifies them, so
+       renaming "Phone" to "Call us" does not switch a comparison off. */
+    foreach (contract_rows_shown($contact['reach']['items'] ?? []) as $row) {
+        foreach ($row['values'] ?? [] as $value) {
+            $value = trim((string)$value);
+            $kind  = '';
+
+            if (str_contains($value, '@') && !str_contains($value, '/')) {
+                $kind = 'email';
+            } elseif (preg_match('/^[+0-9()\s\-]+$/', $value)
+                      && strlen((string)preg_replace('/\D+/', '', $value)) >= 7) {
+                $kind = 'phone';
+            }
+
+            $key = $kind === '' ? '' : chrome_drift_key($kind, $value);
+            if ($key !== '') {
+                $theirs[$kind][$key] = true;
+            }
+        }
+    }
+
+    foreach (contract_rows_shown($contact['offices']['items'] ?? []) as $office) {
+        $key = chrome_drift_key('address', (string)($office['address'] ?? ''));
+        if ($key !== '') {
+            $theirs['address'][$key] = true;
+        }
+
+        foreach ($office['phones'] ?? [] as $phone) {
+            $key = chrome_drift_key('phone', (string)$phone);
+            if ($key !== '') {
+                $theirs['phone'][$key] = true;
+            }
+        }
+    }
+
+    $out = [];
+
+    foreach (contract_rows_shown($chrome['footer']['contact']['items'] ?? []) as $row) {
+        $kind = (string)($row['kind'] ?? '');
+        if (!isset($theirs[$kind])) {
+            continue;
+        }
+
+        foreach ($row['lines'] ?? [] as $line) {
+            $key = chrome_drift_key($kind, (string)$line);
+            if ($key !== '' && !isset($theirs[$kind][$key])) {
+                $out[] = ['kind'  => $kind,
+                          'label' => trim((string)($row['label'] ?? '')),
+                          'value' => trim((string)$line)];
+            }
+        }
+    }
+
+    return $out;
+}
+
+/** One contact value as the two sides can be compared on. '' means "skip". */
+function chrome_drift_key(string $kind, string $value): string
+{
+    $value = trim($value);
+    if ($value === '') {
+        return '';
+    }
+
+    /* A telephone number is its digits. contact_tel() is the rule the tel:
+       href uses, so the comparison and the link cannot disagree about what
+       two spellings of one number are. */
+    return $kind === 'phone'
+        ? contact_tel($value)
+        : privacy_fact_key($value);
+}
+
 /* ==========================================================================
    12. Revisions
    ========================================================================== */

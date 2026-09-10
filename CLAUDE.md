@@ -1,6 +1,6 @@
 # Tech4TIME — backend
 
-The editor at **`admin.tech4time.bd`**: a sign-in of its own, twelve screens, and the content of
+The editor at **`admin.tech4time.bd`**: a sign-in of its own, thirteen screens, and the content of
 record for **every page of the public site** — including what each of them tells a search engine. No
 build step, no framework — the files here are the files that run on the server.
 
@@ -55,7 +55,7 @@ its record before acting.
 | | |
 |---|---|
 | `public/` | **the document root** — six entry points, `robots.txt`, `.htaccess`, and the assets a browser fetches |
-| `sections/` | the twelve screens, included by `public/index.php` |
+| `sections/` | the thirteen screens, included by `public/index.php` |
 | `lib/` | the sign-in, the contract, the publish client, the store |
 | `content/` | the JSON the editors write — **the system of record** |
 | `tools/` | build, audit and test scripts — never deployed |
@@ -131,7 +131,7 @@ python3 tools/check_form_dom.py
 
 Touched the admin, auth or an editor? Also `test_admin_auth.py`, `test_careers_admin.py`,
 `test_contact_admin.py`, `test_company_admin.py`, `test_about_admin.py`,
-`test_home_admin.py`, `test_publish_client.py`.
+`test_home_admin.py`, `test_chrome_admin.py`, `test_publish_client.py`.
 
 Touched `lib/upload.php` or anything a picture passes through? Also `test_upload.py` — it needs
 PHP's GD extension (`sudo apt install php-gd`) and skips the re-encoding cases with a notice

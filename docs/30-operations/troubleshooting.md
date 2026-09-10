@@ -206,10 +206,6 @@ save. If the difference is an oversight rather than a choice, edit the footer's 
 or press **Copy from the Contact page** to reseed them, and save.
 [ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md)
 
-> **Not built yet:** the `/?s=chrome` screen. The public site already renders its header,
-> footer and dock from that document; the editor that will change them is the next piece of
-> work.
-
 There used to be a different banner here saying the footer was *out of step*, which meant something
 else entirely: the footer was markup in sixteen of the public site's pages, a build script had to
 push the details into them, and closing the gap was a deploy of that repository. That is gone.

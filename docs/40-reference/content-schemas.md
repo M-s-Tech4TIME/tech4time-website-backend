@@ -294,10 +294,6 @@ seventeen page files until 2026-09-10 — about 6,800 lines of duplication kept 
 `propagate_shared.py` —
 [ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md).
 
-> **The screen is not built yet.** That document already renders every page's header, footer and
-> dock, and it is what the public site shipped with. The editor that will change them — `?s=chrome`,
-> referred to throughout this section — is the next piece of work.
-
 ```json
 {
   "updated":  "…",

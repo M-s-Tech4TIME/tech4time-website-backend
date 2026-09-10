@@ -131,9 +131,6 @@ nothing to push and nothing to fall behind. What keeps the two honest is a stand
 editor that never blocks a save.
 [ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md)
 
-> **Not built yet:** the `/?s=chrome` screen. The public site already renders from that document;
-> the editor that will change it is the next piece of work.
-
 ---
 
 ## Rolling back

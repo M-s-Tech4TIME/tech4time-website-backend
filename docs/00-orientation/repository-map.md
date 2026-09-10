@@ -91,6 +91,8 @@ sections/
 ├── privacy.php         the privacy policy       → content/privacy.json
 ├── services.php        the services editor, and each service page beneath it
 │                                                → content/services.json
+├── chrome.php          the header, footer and mobile dock every page carries
+│                                                → content/chrome.json
 ├── seo.php             every page's search and share metadata, and the
 │                       site-wide graph          → content/seo.json AND the
 │                                                  meta band of nine others
@@ -113,6 +115,10 @@ and description from `ADMIN_SECTIONS` — both in `lib/admin.php`:
 | `/?s=certifications` | `certifications` | `content/certifications.json`, then publishes |
 | `/?s=branding` | `branding` | `content/branding.json`, then publishes |
 | `/?s=privacy` | `privacy` | `content/privacy.json`, then publishes |
+| `/?s=chrome` | `chrome` | nothing — it lists the three parts and links to each |
+| `/?s=chrome&part=header` | `chrome` | the `header` band of `content/chrome.json`, then publishes |
+| `/?s=chrome&part=footer` | `chrome` | the `footer` band, likewise |
+| `/?s=chrome&part=dock` | `chrome` | the `dock` band, likewise |
 | `/?s=seo` | `seo` | nothing — it lists every page and links to its screen |
 | `/?s=seo&page=<key>` | `seo` | the `meta` band of that page's own document |
 | `/?s=seo&page=service:<id>` | `seo` | the `meta` band of one service row |
@@ -121,8 +127,10 @@ and description from `ADMIN_SECTIONS` — both in `lib/admin.php`:
 | `/?s=account` | `account` | your own password, second factor and recovery codes |
 
 `ADMIN_PAGE_SECTIONS` names the subset that edits a page of the public website
-— everything but `overview`, `seo` and `account` — so anything counting "the
-pages you can edit" asks there rather than filtering the registry by hand.
+— everything but `overview`, `chrome`, `seo` and `account` — so anything counting
+"the pages you can edit" asks there rather than filtering the registry by hand.
+`chrome` is not one of them for the same reason `seo` is not: it does not edit a
+page, it edits something on **every** page.
 
 **`account` is in the registry and not in the rail.** `ADMIN_RAIL_SECTIONS`
 holds the rail's eleven rows and their order; `ADMIN_SECTIONS` holds every

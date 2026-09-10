@@ -116,6 +116,13 @@ anybody meant to publish.
 | `status` | `shown` or hidden — `contact_shown_offices()` filters on it |
 | `schema` | `street`, `locality`, `region`, `postal_code`, `country` — for `PostalAddress` structured data |
 
+**`contact_images()` counts an office picture when the unused-upload sweep asks what is in use** —
+and it did not exist until it had to. `contract_images()` put `contact` in the arm that returns the
+`meta` band alone, so an office photograph was claimed by nothing: every other screen's sweep
+counted it unused and offered to delete a picture that was on this page. The `flag` slug is
+deliberately not counted, because it names a file that ships with the site rather than one anybody
+uploaded.
+
 `contact_page_schema()` emits `ContactPage` and `PostalAddress` from these, and so does the
 `Organization` graph at the top of `tech4time-website-frontend/pages/contact/index.php` — `contact_addresses()` and
 `contact_points()` are spliced into it. That block used to write the three offices out by hand,

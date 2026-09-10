@@ -461,8 +461,17 @@ only its own document's pictures to `upload_unused()`. So the about screen count
 uploads as *"not used by any row"* and its sweep button offered to delete them: three editors, each
 able to delete the other two's artwork, and nothing anywhere said so. The set of pictures in use is
 a property of the site, so it is asked of the site. `contract_images()` is the per-document half,
-and a document it does not know answers with none — which is what stops a new document becoming a
-new way to lose files.
+and a document it does not know **throws** rather than answering with none: a silent empty answer is
+exactly how a new document becomes a new way to lose files, so the contract refuses to give one.
+
+**That guarantee only holds for a document listed in the right arm, and `contact` was not.** An
+office carries an uploaded photograph — a real file on the same signed asset channel as every other
+— but the dispatch had `contact` in the meta-only branch, so `contract_images('contact', …)`
+returned the share card and nothing else. Every other screen's sweep therefore counted an office
+photograph as unused and offered to delete a picture that was on the contact page: the failure this
+section describes, a second time, from listing a document in the wrong arm rather than from not
+listing it at all. `contact_images()` exists now, and `test_upload.py` asks **every** name in
+`CONTRACT_DOCUMENTS` for an answer rather than trusting that each was placed correctly.
 
 `upload_unused()` never deletes anything on its own. A reference count taken from a document
 somebody is halfway through editing is not a fact — which is also why `upload_in_use()` takes the

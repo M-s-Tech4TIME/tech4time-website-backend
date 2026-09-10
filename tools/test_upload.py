@@ -139,6 +139,52 @@ def run(r: Results, gd: bool) -> None:
                   % base64.b64encode(blob).decode())
         r.check(f"{label} is refused", "error" in got, str(got)[:200])
 
+    # BEFORE THE GD GATE, DELIBERATELY. Nothing here decodes a picture -- it
+    # asks which paths a document CLAIMS -- so gating it behind GD would mean
+    # the one check that caught a real deletion bug never ran on a machine
+    # without the extension, which is most of them.
+    print("\nwhat counts as a picture in use")
+    used = php(
+        "$d = contact_normalise(contact_defaults());"
+        "$d['offices']['items'][0]['image'] = contract_image_defaults(["
+        "  'src' => '/uploads/00112233aabbccdd.png',"
+        "  'webp' => '/uploads/44556677eeff0011.webp',"
+        "  'width' => 800, 'height' => 600]);"
+        "echo json_encode(contract_images('contact', contact_normalise($d)));"
+    )
+    # An office photograph is a real upload on the same signed channel as every
+    # other. It was invisible here: contract_images() fell through to the
+    # meta-only branch for 'contact', so the sweep on ANY other screen counted
+    # it unused and offered to delete a picture that was on the contact page.
+    r.check("an office photograph counts as used",
+            "/uploads/00112233aabbccdd.png" in (used if isinstance(used, list) else []),
+            str(used)[:200])
+    r.check("and so does its WebP sibling",
+            "/uploads/44556677eeff0011.webp" in (used if isinstance(used, list) else []),
+            str(used)[:200])
+
+    share = php(
+        "$d = contact_normalise(contact_defaults());"
+        "$d['meta']['share'] = contract_image_defaults(["
+        "  'src' => '/assets/images/og/tech4time-og.png',"
+        "  'width' => 1200, 'height' => 630]);"
+        "echo json_encode(contract_images('contact', contact_normalise($d)));"
+    )
+    # The half that already worked must not have been traded for the half that
+    # did not: this branch used to return the meta band and only the meta band.
+    r.check("without losing the share card the meta band already claimed",
+            "/assets/images/og/tech4time-og.png" in (share if isinstance(share, list) else []),
+            str(share)[:200])
+
+    # Every document must answer, or a new one silently loses its files. This is
+    # contract_images()' own promise -- it throws on a name it does not know --
+    # and asking it here is what turns that promise into something checked.
+    for name in php("echo json_encode(CONTRACT_DOCUMENTS);") or []:
+        got = php("echo json_encode(['n' => count(contract_images(%r, "
+                  "contract_normalise(%r, [])))]);" % (name, name))
+        r.check(f"contract_images() answers for '{name}'", "fatal" not in got,
+                str(got)[:200])
+
     if not gd:
         for case in ("EXIF is gone from what was written", "a picture is re-encoded",
                      "a payload appended to a picture does not survive",

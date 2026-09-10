@@ -623,6 +623,38 @@ function contact_find_office(array $data, string $id): ?array
     return null;
 }
 
+/**
+ * Every picture the document points at, as web paths, without duplicates.
+ *
+ * THIS DID NOT EXIST, AND ITS ABSENCE WAS A BUG. contract_images() fell
+ * through to the meta-only branch for 'contact', so an office photograph --
+ * a real upload, arriving through the same signed asset channel as every
+ * other -- was invisible to upload_in_use(). The sweep on any OTHER screen
+ * counted it as unused and offered to delete a picture that was on the
+ * contact page. That is precisely the failure upload_in_use()'s own docblock
+ * records having already happened once, for the same reason: a question about
+ * a SHARED directory answered from ONE document.
+ *
+ * The flag SLUG is deliberately not here. It names a file that ships with the
+ * public site rather than one somebody uploaded, so it is not the sweep's
+ * business -- only 'image' is.
+ */
+function contact_images(array $data): array
+{
+    $seen = [];
+
+    foreach ($data['offices']['items'] ?? [] as $office) {
+        foreach ([$office['image']['src'] ?? '', $office['image']['webp'] ?? ''] as $path) {
+            $path = trim((string)$path);
+            if ($path !== '') {
+                $seen[$path] = true;
+            }
+        }
+    }
+
+    return array_keys($seen);
+}
+
 /** A URL-safe id from a name, unique against the ids already in use. */
 function contact_slug(string $name, array $taken = []): string
 {
@@ -6192,7 +6224,8 @@ function contract_images(string $document, array $data): array
         'home'     => array_values(array_unique([...home_images($data), ...$meta])),
         'branding' => array_values(array_unique([...branding_images($data), ...$meta])),
         'services' => array_values(array_unique([...services_images($data), ...$meta])),
-        'careers', 'contact', 'certifications', 'privacy' => $meta,
+        'contact'  => array_values(array_unique([...contact_images($data), ...$meta])),
+        'careers', 'certifications', 'privacy' => $meta,
         'seo'      => seo_images($data),
         /* No meta band: the chrome is not a page and has no <head> of its own.
            Its pictures are the two logo lockups, srcsets included. */

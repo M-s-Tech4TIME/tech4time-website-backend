@@ -116,28 +116,32 @@ Each office can have a flag, and there are two ways to give it one:
 
 An uploaded flag always wins. Remove it to fall back to the bundled list.
 
-### The footer needs a developer
+### The footer has its own contact details, and that is on purpose
 
-> **Changing a phone number here does not change the footer.**
+> **Changing a phone number on the contact page does not change the footer.**
 
-The contact details repeated at the bottom of every page are part of each page's markup, not
-content, so the editor cannot reach them. The admin shows a banner when the two disagree.
+The footer's contact rows are the **footer's own**, on the **Header & Footer** screen —
+`https://admin.tech4time.bd/?s=chrome`. They are not a copy of this page's and are not kept in step
+with it.
 
-Closing the gap needs someone with the repository:
+That is deliberate, and it is the opposite of the services column beside them. The contact page
+holds everything, in full — three offices, every number, the opening hours, the languages. A footer
+that repeated all of that would be unreadable, so it holds the part worth putting in a footer, in
+whatever order and wording suits it, with rows you can hide without hiding anything on the contact
+page.
 
-```bash
-# 1. the server's copy is the real one — download it first
-scp user@tech4time.bd:~/public_html/content/contact.json content/contact.json
+**A standing notice tells you when the two differ.** It never blocks a save, because a difference is
+usually a choice. When it is not — an office moved, a number changed — either edit the footer's rows
+directly, or press **Copy from the Contact page**, which fills the rows in the form from this page's
+details and saves nothing until you press Save.
 
-# 2. push the details into every page
-python3 tools/sync_site_contact.py
-python3 tools/check_shared_markup.py
+Both are live the moment you save. Neither needs a developer or a deploy any more; that used to be
+true and stopped being true with
+[ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md).
 
-# 3. deploy the pages — and NOT content/
-```
-
-So: change it in the admin, then ask for a deploy. The contact page itself is correct immediately;
-only the footers lag.
+> **Not built yet:** the `/?s=chrome` screen. The public site already renders its header,
+> footer and dock from that document; the editor that will change them is the next piece of
+> work.
 
 ---
 

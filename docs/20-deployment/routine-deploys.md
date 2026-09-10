@@ -117,17 +117,22 @@ Changing one there still needs a version appended by hand, or a lower `max-age` 
 
 ## Changing the footer's contact details
 
-**Not a deploy of this repository, and not something you do here.** The public site's sixteen footers
-repeat the contact details as literal markup, so they go stale the moment an address is edited in
-this editor and stay stale until those pages are rebuilt.
+**Not a deploy of anything, and not something you do here.** It is a save, on the **Header & Footer**
+screen — `/?s=chrome`.
 
-The rebuild happens in the other half:
-`tech4time-website-frontend/tools/sync_site_contact.py`, then a deploy of *that* repository. The
-editor knows when it is needed — the frontend returns a footer fingerprint in every publish
-response, `contact_save()` records it, and the editor shows a banner when the two disagree.
-[publish-api.md](../10-development/server-side/publish-api.md)
+The public site's sixteen footers used to repeat the contact details as literal markup, so they went
+stale the moment an address was edited in this editor and stayed stale until those pages were
+rebuilt by a script in the other repository and deployed. The editor knew when that was needed
+because the frontend returned a footer fingerprint in every publish response.
 
-So the gap is never invisible. Closing it is a frontend deploy, not a save here.
+None of that exists now. The footer renders from `tech4time-website-frontend/content/chrome.json`,
+and its contact rows are the footer's **own** — not a copy of the contact page's — so there is
+nothing to push and nothing to fall behind. What keeps the two honest is a standing notice in the
+editor that never blocks a save.
+[ADR 0023](../90-decisions/0023-the-header-and-footer-are-emitted-once.md)
+
+> **Not built yet:** the `/?s=chrome` screen. The public site already renders from that document;
+> the editor that will change it is the next piece of work.
 
 ---
 

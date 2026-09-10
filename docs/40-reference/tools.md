@@ -245,5 +245,5 @@ and how to run it. Then add a row to this page — `tools/check_docs.py` fails i
 undocumented, or if this page names one that no longer exists.
 
 A tool that belongs to the other half is named with the repository in front —
-`tech4time-website-frontend/tools/sync_site_contact.py` — and that full path has to appear at least once,
+`tech4time-website-frontend/tools/inject_icons.py` — and that full path has to appear at least once,
 which is what stops "it is in the other one" from keeping a dead name in the prose forever.

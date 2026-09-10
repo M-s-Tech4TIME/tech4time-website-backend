@@ -20,9 +20,13 @@ The site is sixteen mostly-static pages. Almost none of what a framework provide
 **Good.** Deployment is a file copy. There is no dependency tree to audit, no lockfile to update, no
 build to break. Anyone with an editor can fix a typo. Onboarding is `git clone` and a server.
 
-**Costs.** No component reuse, so the header and footer are copied into every page — mitigated by
-`tools/templates/` and `check_shared_markup.py`. No asset hashing, so cache busting is manual. No
-minification.
+**Costs.** No component reuse *in the browser*. What is shared between pages is composed on the
+server instead — `tech4time-website-frontend/lib/head.php` for the `<head>`,
+`tech4time-website-frontend/lib/body.php` for the header, footer and dock —
+which is not a build step: it runs on the request, and the page a visitor receives is still one
+complete document. What genuinely cannot be composed that way, like the hero circuit's SVG, is
+copied into every page and mitigated by `tools/templates/` and `check_shared_markup.py`. No asset
+hashing, so cache busting is manual. No minification.
 
 **Forbids.** Adding any dependency that requires a build step. If a tool is genuinely needed, it goes
 in `tools/` as a Python script that a developer runs and whose *output* is committed — that is what

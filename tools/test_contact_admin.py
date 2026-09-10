@@ -542,12 +542,6 @@ def run(client, r, site):
             "not-an-address" not in sent and "javascript:alert" not in sent,
             "a refused save must not reach the live site at all")
 
-    # Hiding an office and changing a number both change what the footer
-    # should say, so the editor must already be flagging the drift by now.
-    _, html = client.get(ADMIN)
-    r.check("changing the details raises the footer warning",
-            "site footer is showing older details" in html)
-
     # ------------------------------------------------------ sanitising HTML
     print("\nwhat it stores from the rich fields")
     for name, sent, expect_absent in [
@@ -566,14 +560,6 @@ def run(client, r, site):
     lead = published(site).get("form", {}).get("lead", "")
     r.check("but ordinary formatting is",
             "<strong>anything</strong>" in lead and "<li>Security</li>" in lead, lead[:160])
-
-    # ---------------------------------------------------------- the footer
-    print("\nthe footer that this editor cannot reach")
-    _, html = client.get(ADMIN)
-    r.check("the editor says so once the details have changed",
-            "site footer is showing older details" in html)
-    r.check("and names the tool that fixes it",
-            "sync_site_contact.py" in html)
 
     # ------------------------------------------------------ publishing again
     print("\nthe retry the failed-publish notice offers")
@@ -668,11 +654,11 @@ def region(page: str, css_class: str) -> str:
     """One band of the rendered page.
 
     Assertions are made against a band rather than the whole document for a
-    reason worth stating: the head's base Organization graph and the footer
-    both repeat the addresses and numbers as literal markup, and they stay put
-    until tools/sync_site_contact.py runs. Searching the whole page would find
-    them there and conclude the office card had not changed — or that a hidden
-    office was still being shown.
+    reason worth stating: the footer repeats an address and a telephone number
+    of its own, from content/chrome.json, which this editor does not write and
+    is not meant to (ADR 0023). Searching the whole page would find them there
+    and conclude the office card had not changed — or that a hidden office was
+    still being shown.
     """
     m = re.search(r'<ul class="' + re.escape(css_class) + r'"[^>]*>(.*?)</ul>',
                   page, re.S)
@@ -694,8 +680,8 @@ def first_office(html: str) -> str:
 
 def contact_schema(page: str) -> str:
     """The generated ContactPage block, which is the only structured data on
-    this page that follows the editor. The base Organization graph above it is
-    literal markup and moves only when sync_site_contact.py runs."""
+    this page that this editor writes. The Organization graph above it is
+    built by seo_graph() from this same document, so it follows too."""
     for body in re.findall(
         r'<script type="application/ld\+json">\s*(\{.*?\})\s*</script>', page, re.S
     ):

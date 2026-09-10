@@ -1027,64 +1027,29 @@ def improvements(b: Browser, base: str, r: Results) -> None:
                 f"{b.js(SHELL)['marked'] is not True}")
 
     r.section("a standing warning does not steal the page")
-    # THE BUG BEHIND "the async never landed". The contact editor carries a
-    # warning whenever the site's footers have drifted from the record, and the
-    # swap used to scroll to the first error OR warning it found afterwards —
-    # so every press on that screen jumped to the top and looked like a reload.
-    # It could not be reproduced here because the development copy is in step.
-    import json as _json
-    record = _json.loads(CONTACT.read_text())
-    record["footer_synced"] = "deliberately-out-of-step"
-    CONTACT.write_text(_json.dumps(record, indent=4))
-
-    b.go(base + "/?s=contact")
-    r.check("the standing warning is on the page",
-            b.js("return document.querySelectorAll('.admin__notice--warn').length;") >= 1,
-            "the state this group is about could not be set up, so the check "
-            "below proves nothing")
-
-    # A ROW ACTION, NOT A SAVE. Saving also publishes, and publishing from a
-    # test has no key and fails — which raises a warning that genuinely IS the
-    # answer to what was just pressed, and being taken to that one is correct.
-    # Moving a row publishes nothing, so what is left on the page is only the
-    # standing advisory, which is the case this group is about. It is also the
-    # case that was reported: "add anything, or remove, or anything".
-    b.js("window.scrollTo({top: 2500, behavior: 'instant'});")
-    time.sleep(0.4)
-    was = b.js("return Math.round(window.scrollY);")
-    b.click('button[name="do"][value="reach-down:0"]')
-    now = b.js("return Math.round(window.scrollY);")
-
-    # NOT "the scroll is identical": a move deliberately follows the row it
-    # moved, which shifts the page a few hundred pixels. What must not happen
-    # is being taken to the top — so the assertion is that the warning is not
-    # what you are looking at, which is the thing that was reported.
-    warning = b.js("""
-    var w = document.querySelector('.admin__notice--warn');
-    return w ? Math.round(w.getBoundingClientRect().bottom) : null;""")
-
-    r.check("a row action does not take you to the standing warning",
-            now > 1000 and warning is not None and warning < 0,
-            f"was at {was}px, now at {now}px, and the warning's bottom edge is "
-            f"at {warning}px — at or below zero means it is above the screen "
-            f"and you were left where you were working. It used to scroll to "
-            f"it after every single press, which is what made the editor look "
-            f"like it was reloading")
-
-    # THE OTHER HALF OF THE SAME CONTRACT. A problem the press actually caused
-    # must still take the page to it, or the fix above would have traded one
-    # silence for another. The failed publish is that problem here.
-    b.js("window.scrollTo({top: 2500, behavior: 'instant'});")
-    time.sleep(0.4)
-    b.click('.admin-bar__actions button[name="do"][value="save"]')
-
-    r.check("but a problem the press CAUSED still shows itself",
-            b.js("return Math.round(window.scrollY);") < 600,
-            "a publish that failed is news, and it was not on the page before "
-            "the button was pressed")
-
-    CONTACT.write_text(_json.dumps(record, indent=4).replace(
-        '"deliberately-out-of-step"', '""'))
+    # PENDING, AND DELIBERATELY LOUD ABOUT IT.
+    #
+    # THE BUG THIS GUARDS. A screen that carries a standing advisory — one that
+    # is true of the record rather than an answer to what was just pressed —
+    # used to have every row action scroll to it, so every press looked like a
+    # reload. admin-forms.js scrolls to PROBLEM = ".admin__notice--error,
+    # .admin__notice--warn", and the fix was to scroll only to one the press
+    # itself raised.
+    #
+    # WHY IT CANNOT BE ASSERTED TODAY. It was asserted on ?s=contact, whose
+    # warning said the site's footers had drifted from this record. That
+    # warning is gone with the thing it was about: the footer renders from
+    # content/chrome.json now and holds no copy of these details to go stale
+    # (ADR 0023). Nothing else in this editor pairs a standing --warn notice
+    # with row controls on one screen — ?s=seo has the "Not indexed" warning
+    # but no reorderable rows, and ?s=account has warnings and no rows at all.
+    #
+    # WHERE IT GOES BACK. ?s=chrome, whose footer screen carries the standing
+    # notice that its contact rows differ from the contact page's — a notice
+    # that never blocks a save, which is exactly this shape. Restore this group
+    # there, against a `contact-down:0` row action, when that screen exists.
+    print("  ..... PENDING  a standing warning does not steal the page "
+          "— no screen pairs one with row controls until ?s=chrome exists")
 
     r.section("what the server said, said in the corner")
     b.go(base + "/?s=company")

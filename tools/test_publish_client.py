@@ -125,8 +125,8 @@ def run(r: Results, private: Path) -> None:
         r.check("publish_push() is accepted", result.get("ok") is True, str(result))
         r.check("the far side now holds the revision it was sent",
                 result.get("revision") == site.revisions["careers"], str(result))
-        r.check("and the footer fingerprint comes back to the editor",
-                len(str(result.get("footer_synced", ""))) == 64, str(result))
+        r.check("and nothing but ok and the revision comes back",
+                sorted(result) == ["ok", "revision"], str(result))
 
         sent = site.documents["careers"]
         r.check("the document arrived whole", sent["jobs"][0]["title"] == MARK, str(sent)[:160])

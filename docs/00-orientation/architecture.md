@@ -151,7 +151,7 @@ sequenceDiagram
     A->>C: read the revision we hold
     Note over A: re-sanitise every rich field<br/>through this side's own html.php
     A->>C: store_write() — atomic rename
-    A-->>BE: {"ok":true,"revision":12,"footer_synced":"…"}
+    A-->>BE: {"ok":true,"revision":12}
 ```
 
 Each check answers something the others do not, and the fourth is the one that is easy to

@@ -21,8 +21,10 @@ no loading state. Two of sixteen pages pay for PHP; the rest stay flat files.
 **Costs.** Those two pages require PHP on the host, and cannot be previewed with a plain static
 server — hence `tools/serve.py`.
 
-**Forbids.** Runtime `fetch()` for content, including for the header and footer. This is why the
-shared markup is copied into every page and kept honest by a check, rather than included at runtime.
+**Forbids.** Runtime `fetch()` for content, including for the header and footer — which are
+composed by PHP on the request ([0023](0023-the-header-and-footer-are-emitted-once.md)) rather than
+assembled in the browser. Markup that cannot be composed that way is copied into every page and kept
+honest by a check, rather than included at runtime.
 
 **Extends to the split.** The same reasoning is why the frontend will hold a replica and never call
 the backend at render time — [0010](0010-backend-pushes-content.md).

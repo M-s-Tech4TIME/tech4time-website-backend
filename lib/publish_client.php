@@ -172,7 +172,7 @@ function publish_asset(string $bytes, string $mime): array
 /**
  * Send one document. Returns what the editor should show.
  *
- *   ['ok' => true,  'revision' => 12, 'footer_synced' => '…']
+ *   ['ok' => true,  'revision' => 12]
  *   ['ok' => false, 'code' => 'not-newer', 'error' => '…', 'revision' => 12]
  *
  * Never throws for a network problem: an unreachable site is a thing to report
@@ -230,9 +230,8 @@ function publish_push(string $document, array $data): array
 
     if (($decoded['ok'] ?? false) === true) {
         return [
-            'ok'            => true,
-            'revision'      => (int)($decoded['revision'] ?? 0),
-            'footer_synced' => (string)($decoded['footer_synced'] ?? ''),
+            'ok'       => true,
+            'revision' => (int)($decoded['revision'] ?? 0),
         ];
     }
 

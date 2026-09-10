@@ -349,7 +349,9 @@ if the id is a fragment somebody linked to, that link now lands in the wrong pla
 `content/*.json` on the host is live data written by other people. Add it to the exclude list —
 [routine-deploys.md](../../20-deployment/routine-deploys.md).
 
-**The footer problem, if the page carries contact details.** Anything repeated in every page's
-footer is markup, not content, and the editor cannot reach it. That is what
-`tech4time-website-frontend/tools/sync_site_contact.py` exists for, and it needs a deploy to take effect.
+**The footer is a document too, and a separate one.** Anything repeated in every page's footer used
+to be markup the editor could not reach. It is `tech4time-website-frontend/content/chrome.json` now,
+edited on the **Header & Footer** screen — so if your new page carries contact details, the footer's
+are still not yours to write, and are deliberately not kept in step with them.
+[ADR 0023](../../90-decisions/0023-the-header-and-footer-are-emitted-once.md) ·
 *shared-markup.md* (in tech4time-website-frontend)

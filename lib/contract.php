@@ -95,7 +95,7 @@ function contract_path(string $document): string
  * entry reports it as "a field nobody edits" — which is true, and not the
  * point. That is exactly how 'revision' announced itself.
  */
-const CONTRACT_BOOKKEEPING = ['updated', 'revision', 'footer_synced'];
+const CONTRACT_BOOKKEEPING = ['updated', 'revision'];
 
 /* ---------------------------------------------------- page metadata
 
@@ -373,9 +373,8 @@ const CONTACT_RICH_FIELDS = [
 function contact_defaults(): array
 {
     return [
-        'updated'       => '',
-        'revision'      => 0,
-        'footer_synced' => '',
+        'updated'  => '',
+        'revision' => 0,
         'meta' => [
             'title'       => 'Contact Us | Tech4TIME',
             'description' => 'Get in touch with Tech4TIME.',
@@ -655,60 +654,6 @@ function contact_tel(string $number): string
 {
     $digits = preg_replace('/[^0-9]/', '', $number) ?? '';
     return (str_starts_with(trim($number), '+') ? '+' : '') . $digits;
-}
-
-/* ------------------------------------------------------------ footer drift
-
-   The same email, phone numbers, addresses and opening hours appear in the
-   site footer, which is pasted into every page as literal markup — the project
-   forbids runtime partials, so there is no include to point at contact.json.
-
-   The contact page updates the moment it is saved; the footer does not, and
-   cannot, until the frontend's pages are rebuilt and deployed. Rather than let
-   that difference go unnoticed, the details that appear in both places are
-   fingerprinted here.
-
-   AFTER THE SPLIT the two halves of that comparison live on different hosts.
-   The frontend's tools/sync_site_contact.py rebuilds the footers and writes
-   the fingerprint into lib/footer.php, which deploys with the site; the
-   frontend reports it back in every publish response; the backend records what
-   it was told and the editor compares. So the warning is still answered by the
-   side that actually knows, rather than by the side that would like to.
-   -------------------------------------------------------------------------- */
-
-/**
- * A stable digest of exactly the facts the site-wide footer repeats.
- *
- * Deliberately a delimited string rather than json_encode(): the same digest
- * has to be computed by the frontend's tools/sync_site_contact.py in Python,
- * and the two languages do not agree on how a JSON document is spelled — PHP
- * escapes the slash in "278/3" by default and Python does not. A string with
- * fixed separators is the same bytes in both.
- */
-function contact_fingerprint(array $data): string
-{
-    $parts = ['email=' . contact_email($data)];
-
-    foreach (contact_shown_offices($data) as $office) {
-        $parts[] = implode('|', [
-            trim((string)$office['name']),
-            trim((string)$office['address']),
-            implode(';', $office['phones']),
-            trim((string)$office['hours']),
-            trim((string)$office['schema']['street']),
-            trim((string)$office['schema']['locality']),
-            trim((string)$office['schema']['region']),
-            trim((string)$office['schema']['postal_code']),
-            strtoupper(trim((string)$office['schema']['country'])),
-        ]);
-    }
-
-    return hash('sha256', implode("\n", $parts));
-}
-
-function contact_footer_in_step(array $data): bool
-{
-    return trim((string)($data['footer_synced'] ?? '')) === contact_fingerprint($data);
 }
 
 /* ==========================================================================

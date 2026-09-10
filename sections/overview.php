@@ -167,9 +167,7 @@ $cards = [
         ],
         'saved'   => (string)($contact['updated'] ?? ''),
         'file'    => 'content/contact.json',
-        'warn'    => contact_footer_in_step($contact)
-            ? ''
-            : 'The site footer is showing older contact details.',
+        'warn'    => '',
     ],
     [
         'section' => 'seo',

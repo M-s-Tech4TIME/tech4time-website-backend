@@ -30,7 +30,6 @@ store they read from is outside the document root entirely.
 | [`upload.php`](#uploadphp) *(backend)* | a file somebody chose, turned into a picture this site will show | `publish` |
 | [`publish.php`](#publishphp) **shared** | how a document is signed and checked on the wire | `private`, `contract` |
 | [`publish_client.php`](#publish_clientphp) *(backend)* | sending one | `publish` |
-| [`footer-fingerprint.php`](#footer-fingerprintphp) *(frontend, generated)* | what this site's footers currently say | — |
 | [`private.php`](#privatephp) | where the secrets are, and key derivation | — |
 | [`totp.php`](#totpphp) | RFC 6238 authenticator codes | `qr` |
 | [`qr.php`](#qrphp) | the pairing code, as SVG | — |
@@ -121,8 +120,8 @@ disagreeing would only make one side's own page look wrong, it is not.
 `content/contact.json`, because the file is one instance of the shape and an optional field that
 happens to be absent from it is still a field.
 
-`CONTRACT_BOOKKEEPING` names the fields a document keeps about *itself* — `updated`, `revision`,
-`footer_synced`. Nothing edits them and nothing renders them, so both directions of
+`CONTRACT_BOOKKEEPING` names the fields a document keeps about *itself* — `updated` and `revision`.
+Nothing edits them and nothing renders them, so both directions of
 `check_content_model.py` and the round trip in `test_careers_admin.py` exempt them, and all three
 read the one list. They did not, once: `revision` was added, the careers test treated it as a
 site-wide setting, posted it on its own, and blanked `cv_form_url` doing so.
@@ -154,10 +153,10 @@ investigate.
 
 The same division for the contact page.
 
-The footer-drift banner is powered by `contact_footer_in_step()` in `contract.php`, comparing the
-details now held against `footer_synced` — which after the split is **what the frontend reported in
-the last publish response**, not something this side computed. See
-[`footer-fingerprint.php`](#footer-fingerprintphp).
+It used to carry a footer-drift banner and a **second `store_write()`** after the publish, to record
+the fingerprint the frontend reported for its own footers. The footer renders from
+`tech4time-website-frontend/content/chrome.json` now and holds no copy of these details to go stale,
+so both are gone — [ADR 0023](../../90-decisions/0023-the-header-and-footer-are-emitted-once.md).
 
 ### `company.php`
 
@@ -499,21 +498,6 @@ The certificate is verified and there is no option to turn that off; redirects a
 because a redirect on this route would post a signed document wherever it pointed.
 
 `$T4T_PUBLISH_URL` overrides the endpoint — how `test_publish.py` points it at a local server.
-
-### `footer-fingerprint.php`
-
-**Frontend only, and generated** by `tech4time-website-frontend/tools/sync_site_contact.py`. One constant,
-`FOOTER_FINGERPRINT`.
-
-The footer's contact details are literal markup in all sixteen pages, because the project forbids
-runtime partials. So the moment somebody edits an address in the admin, the contact page is right
-and the footers are behind — until the pages are rebuilt and deployed.
-
-This records the fingerprint the footers were last rebuilt **for**. It used to be stamped into
-`contact.json`, which stopped being possible when the backend took ownership of that file: the
-frontend's copy is a replica, and the next publish overwrites anything written into it. So the
-frontend keeps its own record, reports it in every publish response, and the backend compares. The
-side that knows what its own footers say is the side that answers.
 
 ---
 

@@ -315,7 +315,7 @@ the reason beside it. `test_careers_admin.py` is the worked example.
 - [ ] an `id` on every `<fieldset>` the outline names
 - [ ] `ADMIN_SECTIONS`, `ADMIN_RAIL_SECTIONS` and `ADMIN_PAGE_SECTIONS` updated; icon in `ADMIN_ICONS`
 - [ ] the rail label fits on one line — `check_admin_a11y.py` measures it
-- [ ] a card in `sections/overview.php`'s `$cards`, in the same order. **Nothing checks this** — the Overview would simply not mention the new editor
+- [ ] an entry in `sections/overview.php`'s `$facts`, keyed by section. The **tile** appears by itself — `$cards` walks `ADMIN_RAIL_SECTIONS` — and a section with no entry draws a tile saying it has no summary, which `test_contact_admin.py` fails on. It was a hand-written list and it had drifted to six tiles against nine editors
 - [ ] **no `meta` fieldset in the form.** A new page's title and description are edited on the SEO screen; the editor renders `admin_meta_band()` in that place instead, and its `*_from_post()` iterates `contract_page_bands()` so a save cannot blank them
 - [ ] `check_content_model.py`: a `SUBJECTS` entry, or a `COVERED_ELSEWHERE` one naming the test
 - [ ] `test_<name>_admin.py`

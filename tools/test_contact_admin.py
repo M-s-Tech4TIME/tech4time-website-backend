@@ -235,6 +235,24 @@ def run(client, r, site):
     r.check("and marks the one showing",
             html.count('aria-current="page"') == 1)
 
+    # THE OVERVIEW IS THE RAIL, AND IT HAD DRIFTED. Its tile list was written
+    # by hand and had fallen to six against nine editors -- services,
+    # certifications, branding and privacy had been editable for weeks with
+    # nothing on the front page saying so, which is the exact failure that
+    # screen exists to prevent. It is derived from ADMIN_RAIL_SECTIONS now, and
+    # this is what says so: one tile per rail row, minus the Overview's own.
+    _, front = client.get("/")
+    r.check("the Overview draws one tile per rail row",
+            front.count('class="admin-tile__title"') == len(rail) - 1,
+            f'{len(rail) - 1} expected, {front.count(chr(34) + "admin-tile__title")} drawn')
+    r.check("and every one of them has a summary written for it",
+            "No summary is written" not in front,
+            "a rail section reached the Overview with no facts of its own")
+    r.check("and the SEO tile counts the pages rather than saying nothing",
+            re.search(r"<li>\s*\d+ pages with a title", front) is not None,
+            "it read three variables that were assigned forty lines later, so "
+            "it said 0 pages whatever the data held")
+
     token = csrf_of(html)
     base = form_fields(html)
     r.check("the offices are all in the form",

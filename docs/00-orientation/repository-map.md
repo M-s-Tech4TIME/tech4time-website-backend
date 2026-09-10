@@ -104,7 +104,7 @@ and description from `ADMIN_SECTIONS` — both in `lib/admin.php`:
 
 | URL | Section | Edits |
 |---|---|---|
-| `/` | `overview` | nothing — it says what can and cannot be changed |
+| `/` | `overview` | nothing — one tile per rail row, derived from `ADMIN_RAIL_SECTIONS`, and a plain list of what a redeploy still owns |
 | `/?s=careers` | `careers` | `content/careers.json`, then publishes |
 | `/?s=contact` | `contact` | `content/contact.json`, then publishes |
 | `/?s=company` | `company` | `content/company.json`, then publishes |

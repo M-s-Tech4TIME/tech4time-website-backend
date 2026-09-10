@@ -136,6 +136,12 @@ the attribute. `contract_srcset()` checks each candidate path the way `contract_
 checks a single one; it was `chrome_srcset()` while the header lockup was the only picture stored at
 more than one width.
 
+`contract_image_paths()` answers the other half of the same question: **every** file a picture record
+names, srcset entries included. A ladder keeps most of its files inside `srcset` and nowhere else —
+only the top rung is also the `src` — so a caller reading `src` and `webp` alone sees two of six.
+The seven `*_images()` collectors all ask it rather than each carrying its own walk, which is what
+makes adding a field to a picture record one edit instead of seven.
+
 
 `contract_sanitise()` runs every rich field back through `html.php`, driven off
 `CAREERS_RICH_FIELDS` / `CONTACT_RICH_FIELDS` rather than a list of its own — so a rich field added
@@ -482,6 +488,15 @@ photograph as unused and offered to delete a picture that was on the contact pag
 section describes, a second time, from listing a document in the wrong arm rather than from not
 listing it at all. `contact_images()` exists now, and `test_upload.py` asks **every** name in
 `CONTRACT_DOCUMENTS` for an answer rather than trusting that each was placed correctly.
+
+**A laddered picture is mostly files that only `srcset` names.** Six files for one photograph, of
+which the sweep's old walk — `src` and `webp` — could see two. The other four would have come back
+as unused, and the sweep would have offered to delete the widths every phone is served, leaving a
+`<source srcset>` naming files that are not there: a broken image for everybody whose browser
+prefers WebP, which is nearly everybody. Every collector now asks `contract_image_paths()`, and
+`test_upload.py` puts a ladder in each of the twelve seats a document can hold a picture in and
+checks that the rungs named nowhere else come back. `chrome_images()` keeps its own walk, because
+the chrome's logo record is a different shape — there `webp` is itself a list.
 
 `upload_unused()` never deletes anything on its own. A reference count taken from a document
 somebody is halfway through editing is not a fact — which is also why `upload_in_use()` takes the

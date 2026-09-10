@@ -644,11 +644,8 @@ function contact_images(array $data): array
     $seen = [];
 
     foreach ($data['offices']['items'] ?? [] as $office) {
-        foreach ([$office['image']['src'] ?? '', $office['image']['webp'] ?? ''] as $path) {
-            $path = trim((string)$path);
-            if ($path !== '') {
-                $seen[$path] = true;
-            }
+        foreach (contract_image_paths($office['image'] ?? []) as $path) {
+            $seen[$path] = true;
         }
     }
 
@@ -1257,6 +1254,50 @@ function contract_image_defaults(mixed $image): array
     return $image;
 }
 
+/**
+ * Every web path a picture record names, without duplicates.
+ *
+ * THE SWEEP HAS TO SEE THE RUNGS. A ladder puts most of a picture's files
+ * inside srcset, named nowhere else: only the top one is also the src. A
+ * collector that read src and webp alone would report the other four as
+ * unused, and the sweep on any screen would offer to delete the widths every
+ * phone is served -- leaving a <source srcset> pointing at files that are not
+ * there, which is a broken image for everybody whose browser prefers WebP.
+ *
+ * chrome_images() has done this walk since the header lockup was the only
+ * laddered picture on the site. This is that walk, asked of the shape
+ * contract_image_defaults() fills, so the seven collectors below do not each
+ * carry their own copy of it -- and so that adding a field to a picture record
+ * is one edit here rather than seven edits nobody remembers to make.
+ *
+ * A path is returned exactly as stored, unvalidated: contract_safe_image_path()
+ * has already run on everything a normalised document holds, and the caller is
+ * comparing against a directory listing rather than emitting.
+ */
+function contract_image_paths(mixed $image): array
+{
+    $image = is_array($image) ? $image : [];
+    $seen  = [];
+
+    foreach ([$image['src'] ?? '', $image['webp'] ?? ''] as $path) {
+        $path = trim((string)$path);
+        if ($path !== '') {
+            $seen[$path] = true;
+        }
+    }
+
+    foreach ([$image['srcset'] ?? '', $image['webp_srcset'] ?? ''] as $list) {
+        foreach (explode(',', (string)$list) as $entry) {
+            $path = trim((string)(preg_split('/\s+/', trim((string)$entry))[0] ?? ''));
+            if ($path !== '') {
+                $seen[$path] = true;
+            }
+        }
+    }
+
+    return array_keys($seen);
+}
+
 /* ------------------------------------------------- rows, ids and bands
 
    SIX DOCUMENTS ASKED THE SAME FOUR QUESTIONS, so they are asked once here.
@@ -1510,16 +1551,8 @@ function contract_page_bands(array $text_fields): array
 function contract_meta_images(mixed $meta): array
 {
     $meta = is_array($meta) ? $meta : [];
-    $seen = [];
 
-    foreach ([$meta['share']['src'] ?? '', $meta['share']['webp'] ?? ''] as $path) {
-        $path = trim((string)$path);
-        if ($path !== '') {
-            $seen[$path] = true;
-        }
-    }
-
-    return array_keys($seen);
+    return contract_image_paths($meta['share'] ?? []);
 }
 
 /** Only the rows of a list a visitor should see. */
@@ -1553,11 +1586,8 @@ function company_images(array $data): array
 
     foreach (COMPANY_LISTS as $band => $_filler) {
         foreach ($data[$band]['items'] ?? [] as $row) {
-            foreach ([$row['image']['src'] ?? '', $row['image']['webp'] ?? ''] as $path) {
-                $path = trim((string)$path);
-                if ($path !== '') {
-                    $seen[$path] = true;
-                }
+            foreach (contract_image_paths($row['image'] ?? []) as $path) {
+                $seen[$path] = true;
             }
         }
     }
@@ -1908,10 +1938,8 @@ function about_images(array $data): array
     $seen = [];
 
     foreach ($data['story']['items'] ?? [] as $row) {
-        foreach ([$row['image']['src'] ?? '',      $row['image']['webp'] ?? '',
-                  $row['image_dark']['src'] ?? '', $row['image_dark']['webp'] ?? ''] as $path) {
-            $path = trim((string)$path);
-            if ($path !== '') {
+        foreach (['image', 'image_dark'] as $half) {
+            foreach (contract_image_paths($row[$half] ?? []) as $path) {
                 $seen[$path] = true;
             }
         }
@@ -2379,10 +2407,8 @@ function home_images(array $data): array
     $seen = [];
 
     foreach ($data['destinations']['items'] ?? [] as $row) {
-        foreach ([$row['image']['src'] ?? '',      $row['image']['webp'] ?? '',
-                  $row['image_dark']['src'] ?? '', $row['image_dark']['webp'] ?? ''] as $path) {
-            $path = trim((string)$path);
-            if ($path !== '') {
+        foreach (['image', 'image_dark'] as $half) {
+            foreach (contract_image_paths($row[$half] ?? []) as $path) {
                 $seen[$path] = true;
             }
         }
@@ -4086,16 +4112,14 @@ function branding_images(array $data): array
     $seen = [];
 
     foreach ($data['assets']['items'] ?? [] as $asset) {
-        $paths = [$asset['image']['src'] ?? '', $asset['image']['webp'] ?? ''];
+        $pictures = [$asset['image'] ?? []];
 
         foreach ($asset['files'] ?? [] as $file) {
-            $paths[] = $file['file']['src'] ?? '';
-            $paths[] = $file['file']['webp'] ?? '';
+            $pictures[] = $file['file'] ?? [];
         }
 
-        foreach ($paths as $path) {
-            $path = trim((string)$path);
-            if ($path !== '') {
+        foreach ($pictures as $picture) {
+            foreach (contract_image_paths($picture) as $path) {
                 $seen[$path] = true;
             }
         }
@@ -5340,11 +5364,8 @@ function seo_images(array $data): array
     $seen = [];
 
     foreach ([$data['site']['share'] ?? [], $data['identity']['logo'] ?? []] as $image) {
-        foreach ([$image['src'] ?? '', $image['webp'] ?? ''] as $path) {
-            $path = trim((string)$path);
-            if ($path !== '') {
-                $seen[$path] = true;
-            }
+        foreach (contract_image_paths($image) as $path) {
+            $seen[$path] = true;
         }
     }
 

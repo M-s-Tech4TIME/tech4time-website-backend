@@ -237,6 +237,70 @@ def run(r: Results, gd: bool) -> None:
         r.check(f"contract_images() answers for '{name}'", "fatal" not in got,
                 str(got)[:200])
 
+    print("\na ladder's rungs count as pictures in use")
+    # A laddered picture keeps most of its files inside srcset and nowhere
+    # else: only the top rung is also the src. A collector reading src and webp
+    # alone reports the other four as unused, and the sweep on ANY screen then
+    # offers to delete the widths every phone is served -- leaving a <source
+    # srcset> naming files that are not there, which is a broken image for
+    # everybody whose browser prefers WebP. chrome_images() has walked srcset
+    # since the header lockup was the only laddered picture on the site; this
+    # is that walk, asked of every document, before anything starts writing
+    # ladders.
+    LADDER = (
+        "contract_image_defaults(["
+        "  'src' => '/uploads/3333333333333333.png',"
+        "  'webp' => '/uploads/4444444444444444.webp',"
+        "  'width' => 168, 'height' => 126,"
+        "  'srcset' => '/uploads/1111111111111111.png 56w,"
+        " /uploads/2222222222222222.png 112w, /uploads/3333333333333333.png 168w',"
+        "  'webp_srcset' => '/uploads/5555555555555555.webp 56w,"
+        " /uploads/6666666666666666.webp 112w, /uploads/4444444444444444.webp 168w',"
+        "])")
+
+    every = ["/uploads/1111111111111111.png", "/uploads/2222222222222222.png",
+             "/uploads/3333333333333333.png", "/uploads/4444444444444444.webp",
+             "/uploads/5555555555555555.webp", "/uploads/6666666666666666.webp"]
+
+    got = php("echo json_encode(contract_image_paths(%s));" % LADDER)
+    have = got if isinstance(got, list) else []
+    r.check("a picture record answers with every file it names",
+            sorted(have) == sorted(every), str(got)[:300])
+    r.check("and names the top rung once, not twice", len(have) == 6, str(got)[:300])
+    r.check("a record with no ladder answers with its two files",
+            php("echo json_encode(contract_image_paths(['src' => '/uploads/a.png',"
+                " 'webp' => '/uploads/a.webp']));") == ["/uploads/a.png", "/uploads/a.webp"])
+    r.check("and one with nothing in it answers with none",
+            php("echo json_encode(['n' => contract_image_paths([])]);").get("n") == [])
+
+    # Only the rungs named NOWHERE but srcset. src and webp came back before
+    # this change too, so asking about them would not tell us anything.
+    only_in_srcset = [p for p in every
+                      if p not in ("/uploads/3333333333333333.png",
+                                   "/uploads/4444444444444444.webp")]
+
+    for doc, seat in (
+            ("about",    "$d['story']['items'][0]['image']"),
+            ("about",    "$d['story']['items'][0]['image_dark']"),
+            ("home",     "$d['destinations']['items'][0]['image']"),
+            ("home",     "$d['destinations']['items'][0]['image_dark']"),
+            ("company",  "$d['journey']['items'][0]['image']"),
+            ("company",  "$d['clients']['items'][0]['image']"),
+            ("company",  "$d['technology']['items'][0]['image']"),
+            ("branding", "$d['assets']['items'][0]['image']"),
+            ("branding", "$d['assets']['items'][0]['files'][0]['file']"),
+            ("contact",  "$d['offices']['items'][0]['image']"),
+            ("seo",      "$d['site']['share']"),
+            ("seo",      "$d['identity']['logo']")):
+        got = php("$d = contract_normalise(%r, %s_defaults());"
+                  "%s = %s;"
+                  "echo json_encode(contract_images(%r, contract_normalise(%r, $d)));"
+                  % (doc, doc, seat, LADDER, doc, doc))
+        have = got if isinstance(got, list) else []
+        missing = [p for p in only_in_srcset if p not in have]
+        r.check(f"{doc}: every rung of {seat[2:]} counts as used",
+                not missing, f"missing {missing} from {str(have)[:160]}")
+
     if not gd:
         for case in ("EXIF is gone from what was written", "a picture is re-encoded",
                      "a payload appended to a picture does not survive",

@@ -5743,6 +5743,20 @@ function chrome_srcset(string $value): string
  * entry by entry -- a six-row nav cut to four would silently grow its last two
  * rows back. So the scalars are filled from CHROME_TEXT_FIELDS, the pictures
  * from chrome_logo_defaults(), and every list is rebuilt from what arrived.
+ *
+ * A LIST THAT IS NOT THERE AND A LIST THAT IS EMPTY ARE DIFFERENT THINGS, and
+ * the difference is the whole of the paragraph above. An empty list ARRIVED:
+ * somebody removed every row, and giving them back is the silent regrowth that
+ * must not happen. An ABSENT list did not arrive at all -- a document that has
+ * never been published, or one damaged in transit -- and there the answer is
+ * the shipped rows, exactly as it is for every scalar and both logos.
+ *
+ * That is not a nicety here the way it is elsewhere. This document is on every
+ * page of the site, so "no list at all" used to mean a header with no
+ * navigation, a footer with no links and no contact details, and a dock with
+ * no panel -- on all seventeen pages, from one file not arriving.
+ * tools/test_chrome.py in the frontend renders every page with the file moved
+ * away and says so.
  */
 function chrome_normalise(array $data): array
 {
@@ -5783,8 +5797,10 @@ function chrome_normalise(array $data): array
     foreach (CHROME_LISTS as $path => $filler) {
         [$part, $band] = explode('.', $path);
 
-        $rows = is_array($data[$part][$band]['items'] ?? null)
-                ? $data[$part][$band]['items'] : [];
+        $rows = $data[$part][$band]['items'] ?? null;
+        $rows = is_array($rows) ? $rows
+                                : ($defaults[$part][$band]['items'] ?? []);
+
         $data[$part][$band]['items'] = array_map(
             $filler,
             array_values(array_filter($rows, 'is_array'))

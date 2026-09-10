@@ -394,6 +394,15 @@ host with no `content/chrome.json` renders the site exactly as it rendered befor
 existed — which is the whole safety property of the conversion, and the reason the header, footer
 and dock cannot vanish because one file failed to arrive.
 
+**A band that is absent and a band that is empty are not the same thing.** A missing document, or
+one that predates a band, falls back to `chrome_defaults()` for that band — that is what makes the
+paragraph above true. A band that arrived as an empty list is an operator who hid or removed every
+row, and it stays empty; filling it back in would resurrect links somebody had deliberately taken
+away, on every page at once. `chrome_normalise()` tells them apart by asking whether the key is
+an array at all, not whether it is truthy, and `tech4time-website-frontend/tools/test_chrome.py`
+holds both halves down: every page renders with no document at all, and a nav emptied on purpose
+stays empty while the other bands keep their rows.
+
 ---
 
 ## Rules that apply to both

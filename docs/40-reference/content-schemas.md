@@ -287,6 +287,114 @@ graph and the visible page cannot disagree.
 
 ---
 
+## `content/chrome.json`
+
+The furniture around every page: the header, the footer and the small-screen dock. It was literal
+markup in seventeen page files until 2026-09-10 — about 6,800 lines of duplication kept in step by
+`propagate_shared.py`.
+
+```json
+{
+  "updated":  "…",
+  "revision": 0,
+  "header": { "brand_label": "…",
+              "logo": { "alt": "…", "sizes": "…", "width": 360, "height": 128,
+                        "light": { "src": "…", "srcset": "…", "webp": "…" },
+                        "dark":  { "src": "…", "srcset": "…", "webp": "…" } },
+              "nav":  { "items": [] } },
+  "footer": { "brand_label": "…", "logo": {}, "tagline": "…", "description": "…",
+              "links":     { "heading": "…", "items": [] },
+              "services":  { "heading": "…", "index_label": "…" },
+              "contact":   { "heading": "…", "items": [] },
+              "legal":     { "items": [] },
+              "copyright": { "name": "…", "rights": "…" } },
+  "dock":   { "panel": { "items": [] },
+              "bar":   { "items": [] },
+              "menu_label": "…" }
+}
+```
+
+| Band | | Edited at |
+|---|---|---|
+| `header` | the logo lockup, the link's accessible name, and the six-row main nav | `?s=chrome&part=header` |
+| `footer.links` | the "Quick Links" column: a heading and rows | `?s=chrome&part=footer` |
+| `footer.services` | a heading and the label of the row above the list. **The rows are not here** | `?s=chrome&part=footer` |
+| `footer.contact` | the footer's **own** contact rows — see below | `?s=chrome&part=footer` |
+| `footer.legal` | the bottom bar's links | `?s=chrome&part=footer` |
+| `footer.copyright` | the name and the rights sentence. **The year is not here** — it is stamped as the page renders, and `refreshCopyrightYear()` in `main.js` corrects it for a tab left open across midnight on 31 December | `?s=chrome&part=footer` |
+| `dock.panel` | the card that rises above the bar: a row per section, each with a line of explanation | `?s=chrome&part=dock` |
+| `dock.bar` | exactly four keys, each with a destination, a short label, an icon and an emphasis | `?s=chrome&part=dock` |
+
+### A link row points at a route, never at a URL
+
+```json
+{ "id": "about", "target": "about", "label": "", "status": "shown" }
+```
+
+`target` is a key of `chrome_targets()` — one of the nine routes that resolve to an address, or
+`service:<id>` for a row of `content/services.json`. There is no way to type an address into a nav
+link, which is what makes it impossible for one to 404 in the single component that appears on
+every page of the site. `SEO_ROUTES` already says routes are code; this follows from it.
+
+**An empty label means "whatever that page calls itself".** Every link the site ships with has
+one, because every one already agreed with its route's own name. So renaming a page in `?s=seo`
+renames it in the header, the footer and the dock at once, and a label is typed only where the
+chrome should disagree on purpose. The dock's bar is the exception: its labels are always typed,
+because what fits under a 44px key is not what fits in a nav — "Profile", not "Company Profile".
+
+### A footer contact row
+
+```json
+{ "id": "phone-bangladesh", "kind": "phone", "label": "Bangladesh",
+  "lines": ["+880 1320571562", "+880 1881873463"],
+  "note": "Sunday – Thursday", "status": "shown" }
+```
+
+`kind` is `phone`, `email`, `address` or `hours`. It decides both the mark drawn beside the row and
+how the lines link — `tel:`, `mailto:`, or not at all, because a street and an opening time are
+facts rather than destinations. **Consecutive rows sharing a kind render inside one
+`.contact-item`, under one icon**, which is what the CSS's `.contact-item__label ~
+.contact-item__label` rule is written against.
+
+### Two columns store nothing, and are derived
+
+**The services list** is read from `content/services.json` as the footer renders, so a seventh
+service appears in the footer by itself and a hidden one disappears. Before this, the footer's copy
+said "Human Resource Provision" where the services document said something else, and a service
+added in the editor could never appear in the footer at all.
+
+**The social links** are read from the SEO document's `sameas` rows, so a profile URL is changed in
+one place and the footer cannot disagree with the Organization graph. The mark comes from the URL's
+host — `CHROME_SOCIAL_ICONS` — with a globe behind anything the sprite has no brand mark for.
+
+### The footer's contact rows deliberately are not
+
+They are the footer's own: added, worded, ordered, shown and hidden on the footer screen, owing
+nothing to `content/contact.json`. The contact page holds every detail in full; a footer holds the
+part worth putting in a footer, in whatever wording suits it.
+
+What keeps the two honest is a **notice, never a refusal** — for the reason the privacy policy's
+duplicated facts are reported rather than forbidden: requiring the two to agree before either could
+be saved means that after an office move, whichever page you edited first could not be saved, and
+there is no order that avoids it.
+
+### The four columns and the four keys are code
+
+Their headings and contents are here; their number is not. A footer that can be given a fifth
+column is a footer that can be broken at a width nobody tested, and a fifth key would not wrap —
+it would shrink the other four below a thumb's width. `chrome_normalise()` pads and truncates the
+bar to `CHROME_BAR_SLOTS` rather than trusting what arrived, because a document is a file as often
+as it is a form.
+
+### `chrome_defaults()` is the markup, extracted rather than typed
+
+Every value in it was read out of the three templates by a script before they were deleted, so a
+host with no `content/chrome.json` renders the site exactly as it rendered before any of this
+existed — which is the whole safety property of the conversion, and the reason the header, footer
+and dock cannot vanish because one file failed to arrive.
+
+---
+
 ## Rules that apply to both
 
 **Written atomically.** `store_write()` writes a temp file and renames it over the target, keeping

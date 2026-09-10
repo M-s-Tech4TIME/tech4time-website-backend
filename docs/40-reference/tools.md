@@ -112,7 +112,8 @@ that does the other, rather than quietly checking less than they used to.
 | `test_qr.py` | `lib/qr.php`, against **libqrencode** — every module compared at a matched mask, then our own symbol read back and checked to say what went in, then the SVG parsed to confirm it draws that symbol and carries nothing the CSP refuses. Skips with a notice if `qrencode` is not installed |
 | `test_store.py` | `lib/store.php`: telling apart missing, unreadable and corrupt; the atomic write; and the rule that a damaged file is never copied over a good `.bak`, because the backup is what damage is recovered from |
 | `admin_session.py` | *(not run directly)* gives a test an admin account and signs it in — `preview.py` uses it too |
-| `publish_stub.py` | *(not run directly)* the far side, implemented a second time in Python |
+| `publish_stub.py` | *(not run directly)* the far side, implemented a second time in Python — **both** of its endpoints, told apart by their path: a document is a signed JSON envelope with a revision, a picture is the signed bytes and nothing else |
+| `test_reconcile.py` | `reconcile.py`, against that stub. That every name in `CONTRACT_DOCUMENTS` has a model and every model is a document; that every function each of its PHP probes calls exists once that probe's `require`s have run; that a full run sends both halves and a second run sends nothing; that `--assets-limit` stops with a cursor, `--assets-after` carries on from it, and a refusal says which of those two to do; and that `--pace` is a real pause. It is the tool that repairs a live site, and until this existed nothing had ever run it |
 
 **`publish_stub.py` is the point, not a shortcut.** The real endpoint is `tech4time-website-frontend/api/publish.php`, and testing this half against it would check the two halves against each other
 rather than against the format they both implement — a bug they shared would pass. So each side is
@@ -156,7 +157,7 @@ The two halves and the one route between them — [the publish API](../10-develo
 | Script | Does |
 |---|---|
 | `make_publish_key.py` | Create the key both halves sign content with. Run **once**, then copy the printed value into the other half's private store by hand |
-| `reconcile.py` | *(uploaded and run on the host — see below)* Send anything the public site is behind on, and say plainly when the public site is **ahead** |
+| `reconcile.py` | *(uploaded and run on the host — see below)* Send anything the public site is behind on, and say plainly when the public site is **ahead**. The picture half **paces itself and can be resumed** — see below |
 | `check_shared_lib.py` | Assert the four shared files against a committed digest. `--update` re-records after a deliberate change |
 
 `make_publish_key.py` is deliberately not automatic. Every other secret here creates itself on first
@@ -231,6 +232,24 @@ python3 ~/reconcile.py ~/admin.tech4time.bd careers    # one of them
 With no argument it looks for `lib/publish_client.php` beside itself and then at
 `~/admin.tech4time.bd`, and refuses with the list of places it tried rather than guessing. Delete it
 when you are done — the next deploy would not, because it is outside the target.
+
+**The picture half paces itself, and has to.** Every picture is one signed POST, a picture is stored
+at three widths in two formats, and the host's firewall drops an IP that makes roughly a hundred
+requests in a few minutes — at the TCP layer, so it reads as an outage rather than as a limit. Three
+seconds between requests puts sixty in a three-minute window, so a few hundred files take minutes
+rather than seconds. That is the right trade for a repair tool somebody starts by hand and watches.
+
+Each name is printed as it goes, and **however a run stops it says how to carry on** — a limit
+reached, a refusal, a `^C`, a dropped connection:
+
+```bash
+python3 ~/reconcile.py ~/admin.tech4time.bd --assets-limit 40    # stop after forty
+python3 ~/reconcile.py ~/admin.tech4time.bd --assets-after 3f2a…  # carry on from there
+python3 ~/reconcile.py ~/admin.tech4time.bd --pace 0             # only against a host you know
+```
+
+Re-sending is always safe: a picture is content-addressed, so one the live site already holds is
+answered `held` and writes nothing.
 
 > Run `where` first, always. It prints the private store it resolved to, and a rescue tool pointed
 > at the wrong directory reports an account file that does not exist while the real one sits

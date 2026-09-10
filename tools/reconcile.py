@@ -8,9 +8,17 @@ Belongs to the BACKEND.
     python3 tools/reconcile.py                     # from the repository, locally
     python3 ~/reconcile.py ~/admin.tech4time.bd    # uploaded, on the host
     python3 tools/reconcile.py careers             # one document
+    python3 ~/reconcile.py --assets-after 3f2a…    # carry on where one stopped
 
 A full run also re-sends any uploaded picture the live site is missing. Content
 and pictures travel separately (ADR 0019), so they go missing separately.
+
+THE PICTURE HALF PACES ITSELF, and has to. Every picture is one signed POST,
+a picture is now stored at three widths in two formats, and the host's firewall
+drops an IP that makes about a hundred requests in a few minutes — at the TCP
+layer, so it reads as an outage rather than as a limit. See ASSET_PACE. A run
+prints each name as it goes and, however it stops, prints the command that
+carries on from there.
 
 IT MUST RUN ON PYTHON 3.9
 That is what the cPanel host has, and this is the only tool here that runs
@@ -70,9 +78,26 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
+
+# HOW LONG TO WAIT BETWEEN SENDING ONE PICTURE AND THE NEXT.
+#
+# The host's LiteSpeed/cPanel firewall drops an IP that makes roughly a hundred
+# requests in a few minutes, and it drops it at the TCP layer: connections open
+# and then hang, which reads as an outage rather than as a limit. Every picture
+# here is one signed POST whether the live site keeps it or answers 'held', so
+# a store that used to hold one pair per picture and now holds a ladder of
+# three is three times as many requests for the same artwork.
+#
+# Three seconds means a three-minute window holds sixty, which is comfortably
+# under. A full run over a few hundred files takes minutes rather than seconds,
+# and that is the right trade for a repair tool somebody starts by hand and
+# watches: the failure it replaces is an IP that cannot reach the site at all
+# for the next while, on the day content is already missing.
+ASSET_PACE = 3.0
 
 
 def locate_root(explicit: str | None) -> Path:
@@ -111,6 +136,12 @@ require_once 'lib/contact.php';
 require_once 'lib/company.php';
 require_once 'lib/about.php';
 require_once 'lib/home.php';
+require_once 'lib/services.php';
+require_once 'lib/certifications.php';
+require_once 'lib/branding.php';
+require_once 'lib/privacy.php';
+require_once 'lib/seo.php';
+require_once 'lib/chrome.php';
 
 /* A TABLE, AND NOT A TERNARY, for the reason contract_normalise() gives at
    length. What stood here was
@@ -122,12 +153,35 @@ require_once 'lib/home.php';
    it under the name 'company'. The one tool that exists to repair a host was
    able to overwrite a second document while doing it. The refusal has to be
    the default, not the fallthrough. */
+/* EVERY NAME IN CONTRACT_DOCUMENTS, and tools/test_reconcile.py asserts that
+   in both directions. It held five of eleven: services, certifications,
+   branding, privacy, seo and chrome each answered "No model here", so the one
+   tool that repairs a host after a failed publish could repair fewer than half
+   of what a host holds — and said so only to somebody who ran it and read the
+   line. The refusal above is still right; a table that quietly falls behind
+   the contract is not. */
 $models = [
-    'careers' => ['careers_load', 'careers_save'],
-    'contact' => ['contact_load', 'contact_save'],
-    'company' => ['company_load', 'company_save'],
-    'about'   => ['about_load',   'about_save'],
-    'home'    => ['home_load',    'home_save'],
+    'careers'        => ['careers_load',        'careers_save'],
+    'contact'        => ['contact_load',        'contact_save'],
+    'company'        => ['company_load',        'company_save'],
+    'about'          => ['about_load',          'about_save'],
+    'home'           => ['home_load',           'home_save'],
+    'services'       => ['services_load',       'services_save'],
+    'certifications' => ['certifications_load', 'certifications_save'],
+    'branding'       => ['branding_load',       'branding_save'],
+    'privacy'        => ['privacy_load',        'privacy_save'],
+
+    /* These two have no *_save(): their screens edit one band at a time, so
+       what they have is *_edit(), which takes the change rather than the
+       document. Only the never-published branch below calls the save half, and
+       an edit that changes nothing is exactly what a first publish is — write
+       the record with a revision on it and push it. The $data it is handed is
+       ignored on purpose: *_edit() re-reads inside store_edit(), which is the
+       copy that gets written. */
+    'seo'    => ['seo_load',
+                 static fn(array $_d): bool => seo_edit(static fn(array $h): array => $h)],
+    'chrome' => ['chrome_load',
+                 static fn(array $_d): bool => chrome_edit(static fn(array $h): array => $h)],
 ];
 
 $document = $argv[1];
@@ -238,29 +292,80 @@ def reconcile(document: str) -> bool:
 
 ASSET_PROBE = """
 /* Every stored file, whichever editor put it there — upload_held() is the
-   store, not one page's view of it. No per-document model is needed. */
+   store, not one page's view of it. No per-document model is needed. It comes
+   back sorted, which is what makes a name a resumable cursor. */
 require 'lib/upload.php';
 
-$sent = 0; $held = 0; $failed = [];
+/* AND THE THING THAT SENDS ONE. publish_asset() is in publish_client.php, and
+   upload.php requires publish.php — which holds publish_asset_TYPE() and
+   publish_asset_NAME() and not the sender. So this whole half fatalled on its
+   first picture, every time, from the day it was written: "Call to undefined
+   function publish_asset()". Nothing caught it because nothing ran it. */
+require 'lib/publish_client.php';
 
+$after = (string)getenv('T4T_ASSET_AFTER');
+$limit = (int)getenv('T4T_ASSET_LIMIT');
+$pause = (float)getenv('T4T_ASSET_PAUSE');
+
+$done = 0;
+$last = $after;
+
+/* ONE LINE PER PICTURE, AS IT GOES, rather than one answer at the end. A paced
+   run takes minutes, and a run that is interrupted — a dropped connection, an
+   impatient ^C — must still have said how far it got, or the operator has no
+   cursor to resume from and starts again from the beginning. */
 foreach (upload_held() as $name) {
-    $bytes = file_get_contents(UPLOAD_DIR . '/' . $name);
-    if ($bytes === false) { $failed[$name] = 'could not be read on this host'; continue; }
+    if ($after !== '' && strcmp($name, $after) <= 0) { continue; }
+
+    if ($limit > 0 && $done >= $limit) {
+        echo json_encode(['stop' => 'limit', 'after' => $last]), "\n";
+        exit;
+    }
+
+    /* Before the request, not after it, and not before the first: the pause is
+       there to space REQUESTS, and pausing after the last one only makes the
+       run longer. */
+    if ($done > 0 && $pause > 0) { usleep((int)round($pause * 1000000)); }
+
+    $bytes = @file_get_contents(UPLOAD_DIR . '/' . $name);
+
+    if ($bytes === false) {
+        echo json_encode(['name' => $name, 'state' => 'failed',
+                          'why' => 'could not be read on this host']), "\n";
+        flush();
+        exit;
+    }
 
     $kind = publish_asset_type($bytes);
-    if ($kind === null) { $failed[$name] = 'is not a picture this site publishes'; continue; }
+
+    if ($kind === null) {
+        echo json_encode(['name' => $name, 'state' => 'failed',
+                          'why' => 'is not a picture this site publishes']), "\n";
+        flush();
+        exit;
+    }
 
     $r = publish_asset($bytes, $kind[1]);
-    if (($r['ok'] ?? false) !== true) { $failed[$name] = (string)($r['error'] ?? 'refused'); continue; }
+    $done++;
+    $last = $name;
 
-    if ($r['held'] ?? false) { $held++; } else { $sent++; }
+    if (($r['ok'] ?? false) !== true) {
+        echo json_encode(['name' => $name, 'state' => 'failed',
+                          'why' => (string)($r['error'] ?? 'refused')]), "\n";
+        flush();
+        exit;
+    }
+
+    echo json_encode(['name' => $name,
+                      'state' => ($r['held'] ?? false) ? 'held' : 'sent']), "\n";
+    flush();
 }
 
-echo json_encode(['sent' => $sent, 'held' => $held, 'failed' => $failed]);
+echo json_encode(['stop' => 'done', 'after' => $last]), "\n";
 """
 
 
-def reconcile_assets() -> bool:
+def reconcile_assets(pace: float, limit: int, after: str) -> bool:
     """Send every stored picture the live site does not already hold.
 
     Content and pictures travel separately (ADR 0019), so they can go missing
@@ -271,21 +376,73 @@ def reconcile_assets() -> bool:
     Safe to run whenever. An asset is content-addressed, so re-sending one the
     live site already has is answered 'held' and writes nothing — there is no
     revision to roll back and nothing a replay could undo.
+
+    PACED, AND RESUMABLE, because a picture is now stored at several widths.
+    See ASSET_PACE for what the host does to an IP that hurries. Every way this
+    can stop — a limit, a refusal, a ^C, a dropped connection — prints the
+    command that continues from where it got to, because a repair tool that
+    can only start from the beginning is one nobody dares interrupt.
     """
-    out = subprocess.run(["php", "-r", ASSET_PROBE],
-                         cwd=str(ROOT), capture_output=True, text=True)
+    env = dict(os.environ,
+               T4T_ASSET_AFTER=after,
+               T4T_ASSET_LIMIT=str(limit),
+               T4T_ASSET_PAUSE=str(pace))
+
+    proc = subprocess.Popen(["php", "-r", ASSET_PROBE], cwd=str(ROOT), env=env,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            universal_newlines=True, bufsize=1)
+
+    sent = 0
+    held = 0
+    last = after
+    stopped = ""
+    failure = ""
+
     try:
-        answer = json.loads(out.stdout.strip())
-    except ValueError:
-        print("  FAIL  pictures: could not run the push\n"
-              "          " + (out.stderr or out.stdout)[:300].strip())
+        for line in proc.stdout:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+
+            if "stop" in row:
+                stopped = row["stop"]
+                last = row.get("after") or last
+                continue
+
+            if row.get("state") == "failed":
+                failure = row["name"] + ": " + row.get("why", "refused")
+                break
+
+            last = row["name"]
+            if row["state"] == "sent":
+                sent += 1
+                print("  sent  " + row["name"])
+            else:
+                held += 1
+    except KeyboardInterrupt:
+        proc.terminate()
+        stopped = "interrupted"
+
+    proc.wait()
+    tail = (proc.stderr.read() or "").strip()
+
+    if not stopped and not failure and proc.returncode != 0:
+        print("  FAIL  pictures: could not run the push\n          " + tail[:300])
         return False
 
-    sent, held, failed = answer["sent"], answer["held"], answer["failed"]
+    if failure:
+        print("  FAIL  " + failure)
+        resume(last)
+        return False
 
-    if failed:
-        for name, why in failed.items():
-            print("  FAIL  " + name + ": " + why)
+    if stopped in ("limit", "interrupted"):
+        print("  ..    pictures: stopped after " + str(sent + held)
+              + (" (the limit)" if stopped == "limit" else " (interrupted)"))
+        resume(last)
         return False
 
     if sent:
@@ -296,6 +453,23 @@ def reconcile_assets() -> bool:
     return True
 
 
+def resume(after: str) -> None:
+    """How to carry on from where a run stopped.
+
+    Both branches say something. "Nothing was sent" and "seven were sent" need
+    different next steps, and a run that stops with a failure and no advice
+    leaves somebody guessing whether starting again would send everything
+    twice. (It would not — a picture is content-addressed — but that is not
+    obvious at the moment it matters.)
+    """
+    if after:
+        print("          to carry on:  python3 " + sys.argv[0]
+              + " --assets-after " + after)
+    else:
+        print("          no picture had been sent yet — run it again once the "
+              "cause is fixed")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -303,6 +477,15 @@ def main() -> None:
                     help="the site root, where lib/ is. Needed when this file has "
                          "been uploaded rather than run from the repository")
     ap.add_argument("document", nargs="?", help="just this one")
+    ap.add_argument("--pace", type=float, default=ASSET_PACE, metavar="SECONDS",
+                    help="seconds between one picture and the next (default "
+                         + str(ASSET_PACE) + "). Lower it only against a host "
+                         "you know does not rate-limit")
+    ap.add_argument("--assets-limit", type=int, default=0, metavar="N",
+                    help="stop after N pictures and say how to carry on")
+    ap.add_argument("--assets-after", default="", metavar="NAME",
+                    help="carry on from after this picture, as a previous run "
+                         "printed it")
     args = ap.parse_args()
 
     # "reconcile.py careers" means the document, not a directory. Told apart by
@@ -328,7 +511,8 @@ def main() -> None:
     # Only on a full run: asking for one document is asking about that
     # document, and walking every picture would be a surprise.
     if not args.document:
-        ok = reconcile_assets() and ok
+        ok = reconcile_assets(args.pace, args.assets_limit,
+                              args.assets_after) and ok
 
     print("\nBoth halves agree." if ok else
           "\nSomething is out of step. Read the lines above before forcing anything.")

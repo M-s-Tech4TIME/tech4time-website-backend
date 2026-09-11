@@ -21,8 +21,8 @@ the sign-in, which is the half nobody has ever looked at.
 
 WHY ONE FILE AND NOT FOUR
 Over there, four files is right: sixteen public pages, and each tool carries a
-lot of crawl machinery for its own question. Here it is a dozen screens, which
-SIGNED_IN_SCREENS lists. Four copies of "start PHP, start geckodriver, sign in,
+lot of crawl machinery for its own question. Here it is the couple of dozen
+screens SIGNED_IN_SCREENS lists. Four copies of "start PHP, start geckodriver, sign in,
 walk the screens" would be four copies of the sign-in -- and the sign-in is the
 part most likely to need changing, because it is the part that depends on the
 login page's markup.
@@ -122,6 +122,15 @@ SIGNED_IN_SCREENS = ["/", "/?s=home", "/?s=careers", "/?s=contact", "/?s=company
                      # standing notice with a list inside it.
                      "/?s=chrome", "/?s=chrome&part=header",
                      "/?s=chrome&part=footer", "/?s=chrome&part=dock",
+                     # All five shapes the Settings editor takes. The colour
+                     # screen is the reason all five are listed rather than a
+                     # sample: twenty-eight colour inputs is more controls of
+                     # one kind than anything else in this panel, each needing
+                     # its own name, and a native colour picker is one of the
+                     # few inputs whose focus ring the browser draws itself.
+                     "/?s=settings", "/?s=settings&part=logo",
+                     "/?s=settings&part=icon", "/?s=settings&part=colour",
+                     "/?s=settings&part=mail",
                      "/?s=account"]
 
 MIN_TARGET = 24          # SC 2.5.8, CSS pixels

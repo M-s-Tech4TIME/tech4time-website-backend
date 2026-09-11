@@ -44,6 +44,7 @@ require_once __DIR__ . '/../lib/branding.php';
 require_once __DIR__ . '/../lib/privacy.php';
 require_once __DIR__ . '/../lib/chrome.php';
 require_once __DIR__ . '/../lib/seo.php';
+require_once __DIR__ . '/../lib/settings.php';
 
 /* THESE FOUR ARE PREFIXED overview_ AND NOT admin_, though they sit beside a
    screen full of admin_ helpers. Those belong to lib/admin.php and are shared
@@ -94,6 +95,7 @@ $branding       = branding_load();
 $privacy        = privacy_load();
 $chrome         = chrome_load();
 $seo            = seo_load();
+$settings       = settings_load();
 
 /** How many rows of a document's lists a visitor would actually see. */
 function overview_rows(array $data, array $lists, callable $shown): int
@@ -307,6 +309,24 @@ $facts = [
                    . ' thing' . (count($chrome_drift) === 1 ? '' : 's')
                    . ' the contact page does not. Not necessarily wrong — the '
                    . 'footer\'s contact rows are its own.',
+    ],
+    'settings' => [
+        'title' => 'The site\'s identity',
+        'lines' => [
+            settings_logo_is_uploaded($settings)
+                ? 'An uploaded logo' . (settings_logo_is_shared($settings)
+                    ? ', used in both light and dark mode'
+                    : ', with a separate dark version')
+                : 'The logo, tab icon and colours the site ships with',
+            'Enquiries go to ' . (string)($settings['contact']['mail_to'] ?? ''),
+        ],
+        'saved' => (string)($settings['updated'] ?? ''),
+        'file'  => 'content/settings.json',
+        'warn'  => settings_icon_is_stale($settings)
+                 ? 'The logo has been replaced and the tab icon has not. They are '
+                   . 'separate pictures on purpose — a wordmark is illegible at '
+                   . 'sixteen pixels — so the tab still shows the one that ships.'
+                 : '',
     ],
     'seo' => [
         'title' => 'SEO & metadata',

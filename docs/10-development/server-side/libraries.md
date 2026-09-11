@@ -28,6 +28,7 @@ store they read from is outside the document root entirely.
 | [`services.php`](#servicesphp) | what this side does with the services document | `contract`, `store`, `publish_client` |
 | [`seo.php`](#seophp) | what every page says about itself in its `<head>` — read from ten documents, written to whichever one owns the field | `contract`, `store`, `services`, `publish_client` |
 | [`chrome.php`](#chromephp) | the header, footer and dock every page of the public site carries | `contract`, `store`, `services`, `contact`, `publish_client` |
+| [`settings.php`](#settingsphp) | the site's identity: the mark, the icons, the colours, the address | `contract`, `store` |
 | [`upload.php`](#uploadphp) *(backend)* | a file somebody chose, turned into a picture this site will show | `publish` |
 | [`publish.php`](#publishphp) **shared** | how a document is signed and checked on the wire | `private`, `contract` |
 | [`publish_client.php`](#publish_clientphp) *(backend)* | sending one | `publish` |
@@ -126,6 +127,70 @@ Nothing edits them and nothing renders them, so both directions of
 `check_content_model.py` and the round trip in `test_careers_admin.py` exempt them, and all three
 read the one list. They did not, once: `revision` was added, the careers test treated it as a
 site-wide setting, posted it on its own, and blanked `cv_form_url` doing so.
+
+`CONTRACT_IMAGE_SLOTS` is the one place that knows how wide an uploaded picture is **drawn**, and it
+is here for the reason above: the uploader decides how many files to write from it and the renderer
+decides its `sizes=` attribute from it, so the two sides disagreeing would mean a browser choosing
+the wrong file for every picture on the site. `contract_slot_widths()` turns a row into a ladder —
+never upscaling, and never storing a rung nothing can draw from — and `contract_slot_sizes()` gives
+the attribute. `contract_srcset()` checks each candidate path the way `contract_safe_image_path()`
+checks a single one; it was `chrome_srcset()` while the header lockup was the only picture stored at
+more than one width.
+
+`SETTINGS_MAIL_FROM` is what enquiry mail is sent **as**, and it is deliberately **not** editable.
+A message has to come from an address at this site's own domain or it fails SPF — the DNS record
+saying which servers may send as `tech4time.bd` — and is filed as spam. That record lives with the
+domain and nothing in the editor can change it, so a field for it would let somebody make every
+enquiry disappear into a spam folder with nothing on the screen to say why. It is here rather than
+in the handler because **both halves need it**: the frontend sends with it, and the editor's screen
+has to be able to *say* what messages are sent as, or the one field somebody might look for is
+simply absent with no explanation.
+
+**The contrast pairs and the sums that judge them are here, and that is a correction.**
+`SETTINGS_CONTRAST_PAIRS` says which pairs have to be readable and at what ratio;
+`contract_contrast_ratio()` and `settings_contrast_faults()` do the arithmetic. `tools/check_contrast.py`
+held its own copy of both, under a note reading *"keep this in sync with assets/css/theme.css"* — fine
+while a colour could only be changed by editing a stylesheet, and not fine the moment a person can
+pick one from a screen and the editor has to judge it too.
+
+So the data lives once and **the arithmetic deliberately does not**: `check_contrast.py` reads the
+palette and the pairs from here and keeps its own Python sums, then compares all 38 answers against
+this file's. That is `publish_stub.py`'s rule applied to colour — each side checked against an
+independent implementation, never against its own counterpart. A shared list cannot drift; a shared
+bug could.
+
+`contract_ico_container()` writes a `.ico` by hand: a six-byte directory, a sixteen-byte entry per
+image, then the PNG payloads. **It is in the contract because it is assembled where it is served,
+not sent over the wire.** The asset channel carries what `getimagesizefromstring()` recognises — PNG,
+JPEG, WebP — and an `.ico` is none of them; widening that list so one file could travel would also
+widen what an editor can upload as page artwork. So the editor generates the PNGs and the public site
+builds the container from the three it already holds, which is why both halves need the same writer.
+Embedding PNG rather than the older BMP-with-mask has been valid since Windows Vista and is what the
+committed `favicon.ico` already contained — all three of its entries, checked before this was written.
+
+`contract_srcset_top()` answers the widest rung of a ladder, which is **not always the record's
+`src`.** For a picture the uploader stored it is — `upload_store()` names the top rung as `src`. For
+the logo the site *ships* with it is not: the header's `src` is the 360 px file and the ladder goes
+on to 540, because those files were built before the settings document existed and the seed
+reproduces them rather than tidying them. So the About page's big lockup, `Organization.logo` and
+every job posting's hiring-organisation logo ask for the largest rendition instead of assuming, and
+each still names the file it names today.
+
+`contract_image_paths()` answers the other half of the same question: **every** file a picture record
+names, srcset entries included. A ladder keeps most of its files inside `srcset` and nowhere else —
+only the top rung is also the `src` — so a caller reading `src` and `webp` alone sees two of six.
+The seven `*_images()` collectors all ask it rather than each carrying its own walk, which is what
+makes adding a field to a picture record one edit instead of seven.
+
+`contract_picture_ladder()` answers what a renderer should put in `srcset` and `sizes` for one
+picture in one slot — **and returns nothing at all when the slot declares no `sizes=`.** That is not
+caution. A `srcset` of widths with no `sizes=` beside it does not mean "choose freely": the browser
+is required to assume the picture fills the viewport, so it takes the *widest* rung on every screen
+— a phone downloading the 3× file for a flag drawn at 56 px, which is worse than the single file it
+would otherwise get. The rule has to be the same on five pages that each write their own markup, so
+it lives here once and what comes back is three strings and no markup, which is what keeps this file
+shareable with a repository that renders nothing.
+
 
 `contract_sanitise()` runs every rich field back through `html.php`, driven off
 `CAREERS_RICH_FIELDS` / `CONTACT_RICH_FIELDS` rather than a list of its own — so a rich field added
@@ -432,8 +497,9 @@ says so plainly and the byte-level refusals still hold without it; CI installs `
 
 **Backend only.** The frontend has no upload form and must never gain one.
 
-`upload_problem()` · `upload_accept()` · `upload_store()` · `upload_held()` ·
-`upload_in_use()` · `upload_unused()` · `upload_delete()`
+`upload_problem()` · `upload_accept()` · `upload_store()` · `upload_scale()` ·
+`upload_keep_alpha()` · `upload_srcset()` · `upload_held()` · `upload_in_use()` ·
+`upload_unused()` · `upload_delete()`
 
 The only code in either repository that takes a file from somebody's computer and puts it on a web
 server. **The rule it works to is that nothing the browser sent is ever written.** An upload is
@@ -455,14 +521,82 @@ instead, which is the same rule by a different route. Full reasoning in
 for something a visitor takes away, which today is only the branding page's downloads. The caller
 says which.
 
+**A picture is stored at the widths its slot is drawn at, not at the width that arrived.** Every
+`upload_accept()` call site names a key of `CONTRACT_IMAGE_SLOTS`, and `contract_slot_widths()`
+turns that into a ladder at 1×, 2× and 3× — never upscaling, never past the ceiling.
+`upload_store()` writes a WebP and a fallback for each rung and returns `srcset` / `webp_srcset`
+naming them, with `src` pointing at the top one.
+
+That second half is a fix, not an addition. The ceiling used to be the only number, so a flag
+arrived at 1600 px and *stayed* 1600 px however small it is drawn — **the site got worse the first
+time somebody used the editor as intended**, because `tech4time-website-frontend/tools/build_images.py` had deliberately built
+the committed pictures at 160–1200 per kind and an upload replaced one with a file ten times the
+size. A 1600 px flag now stores 56/112/168 and `src` names the 168.
+
+**A slot that does not ladder stores exactly what it stored before** — one width, the same two
+content-addressed names, byte for byte. `upload_scale()` hands the image back untouched when it is
+already that wide, so nothing is re-encoded and the files already on both hosts stay the files that
+are wanted. `test_upload.py` compares the names against the copy at `HEAD` rather than assuming it.
+
+`upload_keep_alpha()` exists because `imagescale()` returns an image with alpha saving **off**: a
+mark uploaded on transparency would come back on a black rectangle on every screen but the one
+taking the top rung. Every rung goes through it, and the test reads the corner pixel of each.
+
+**A misspelt slot is not an error anywhere at run time.** `contract_slot_widths()` answers with no
+ladder, the upload succeeds, and the picture is quietly stored at one width forever. So
+`test_upload.py` compares the two lists in both directions instead: every slot the contract declares
+is named by a screen, and every slot a screen names is one the contract declares.
+
 **`upload_in_use()` asks every document, not the one on screen — and that is a fix, not a
 nicety.** `public/uploads/` is one directory shared by every editor, but each editor used to pass
 only its own document's pictures to `upload_unused()`. So the about screen counted the home page's
 uploads as *"not used by any row"* and its sweep button offered to delete them: three editors, each
 able to delete the other two's artwork, and nothing anywhere said so. The set of pictures in use is
 a property of the site, so it is asked of the site. `contract_images()` is the per-document half,
-and a document it does not know answers with none — which is what stops a new document becoming a
-new way to lose files.
+and a document it does not know **throws** rather than answering with none: a silent empty answer is
+exactly how a new document becomes a new way to lose files, so the contract refuses to give one.
+
+**That guarantee only holds for a document listed in the right arm, and `contact` was not.** An
+office carries an uploaded photograph — a real file on the same signed asset channel as every other
+— but the dispatch had `contact` in the meta-only branch, so `contract_images('contact', …)`
+returned the share card and nothing else. Every other screen's sweep therefore counted an office
+photograph as unused and offered to delete a picture that was on the contact page: the failure this
+section describes, a second time, from listing a document in the wrong arm rather than from not
+listing it at all. `contact_images()` exists now, and `test_upload.py` asks **every** name in
+`CONTRACT_DOCUMENTS` for an answer rather than trusting that each was placed correctly.
+
+**The panel wears the company's mark too.** `admin_brand_logo()` draws the rail's lockup and the
+sign-in page's from `content/settings.json`, through `admin_preview_src()` — so an uploaded mark is
+served from *this* host, which holds the canonical copy, and shows without waiting for a publish to
+have succeeded. It was four committed files with their paths written out twice, once in each place,
+so a company that replaced its logo got a new website and an editor still wearing the old one.
+
+**A picture's record survives a save that uploaded nothing, and for a while it did not.** The
+record travels through its screen as hidden inputs and is rebuilt from them on every save.
+`admin_image_fields()` listed four field names there and four screens each had their own copy of the
+rebuild; then a picture record grew `srcset` and `webp_srcset`, and none of the five lists was
+changed. A picture stored at several widths kept them exactly until the next save of its screen —
+which rebuilt it without them, leaving the rungs belonging to nothing and the unused sweep offering
+to delete the widths every phone is served. The component now emits an input for every key
+`contract_image_defaults()` fills, and `admin_image_from_post()` is the one rebuild all of them use,
+so a field added to a picture is carried **by having been added**.
+
+**All of a picture goes to the live site, or the caller must not save.**
+`admin_send_picture()` reads every file `contract_image_paths()` names off disk *before* any of them
+leaves, so a file that is not where it had just been written is found while nothing has travelled.
+The network half cannot be made atomic — a refusal on the fifth of six has already sent four — but
+those four are content-addressed and unreferenced, which is what the unused sweep is for. What
+matters is that the caller gets a sentence and leaves the document alone: **no document ever names a
+file that did not arrive.**
+
+**A laddered picture is mostly files that only `srcset` names.** Six files for one photograph, of
+which the sweep's old walk — `src` and `webp` — could see two. The other four would have come back
+as unused, and the sweep would have offered to delete the widths every phone is served, leaving a
+`<source srcset>` naming files that are not there: a broken image for everybody whose browser
+prefers WebP, which is nearly everybody. Every collector now asks `contract_image_paths()`, and
+`test_upload.py` puts a ladder in each of the twelve seats a document can hold a picture in and
+checks that the rungs named nowhere else come back. `chrome_images()` keeps its own walk, because
+the chrome's logo record is a different shape — there `webp` is itself a list.
 
 `upload_unused()` never deletes anything on its own. A reference count taken from a document
 somebody is halfway through editing is not a fact — which is also why `upload_in_use()` takes the
@@ -492,6 +626,102 @@ The key is `publish.key` in the private store: 32 random bytes, **the same bytes
 never derived from `secret.key` (the two stores have different master keys, so anything derived
 would differ by construction). It is never created on demand — see
 [`make_publish_key.py`](../../40-reference/tools.md).
+
+### `settings.php`
+
+**Backend only** — the writing half. The renderer's half is
+`tech4time-website-frontend/lib/settings.php`.
+
+`settings_load()` · `settings_edit()` · `settings_validate()` ·
+`settings_icon_generate()` · `settings_icon_square()` · `settings_icon_render()`
+
+One document, `content/settings.json`, holding the four things every page depends on and no page
+owns: the logo, the square mark the favicons are made from, the colour tokens the site is drawn
+from, and the address the contact form sends to.
+
+**One mark, nine consumers, and now one document.** The logo is read from `content/settings.json` by
+the header, the footer, the About page's lockup, `Organization.logo`, every job posting's hiring
+organisation, the branding kit, the favicon set and the admin's own rail. It used to be typed into
+`content/chrome.json` as eleven text fields per part — twice, for the header and the footer — while
+the other seven named committed files nobody could reach from any editor at all. **The SEO screen
+already had a working logo upload that was completely disconnected from the header**, so changing
+one left the other showing the old mark with nothing comparing them.
+
+What stays in the chrome is the **alt text**, which is genuinely the chrome's: the header's and the
+footer's are different sentences about the same picture. `identity.logo` on the SEO screen stays as
+an **override** — empty means the site's mark, filled wins — because Google renders
+`Organization.logo` in a near-square slot and this lockup is nearly three to one.
+
+**Reading the identity is in [`contract.php`](#contractphp), not here, and that is a correction.**
+`settings_logo()` (which mark for which theme, falling back to the light one), `settings_logo_largest()`,
+`settings_logo_is_shared()`, `settings_logo_is_uploaded()`, `settings_logo_is_mismatched()`,
+`settings_icon_is_stale()`, `settings_share_is_stale()` and `settings_colours()` are pure
+functions of the document — none reads a file, emits markup or knows
+which host it is on — and **both halves render the mark**: the public site draws it in the header,
+the footer and the About row; the editor draws it in its own rail and on its sign-in page. Putting
+them on the renderer's side got `settings_logo_is_shared()` written out twice within the hour, which
+is the drift the shared file exists to prevent. What is left in each half is that half's own
+business: the file path and the read here, plus the save, the validation and the screens over there.
+
+**Four standing notices, and all four are notices rather than refusals**, because each is also
+what a correct half-finished edit looks like. `settings_logo_is_shared()` reports an empty dark
+half, which renders the light mark in both modes — an answer, not an omission.
+`settings_logo_is_mismatched()` reports the worse and quieter case: one half replaced and the other
+still holding the **previous** mark, so the site shows two different logos and whoever uploaded it
+is in one mode and will never see the other. It is symmetric, because replacing only the dark half
+is rarer and exactly as wrong. `settings_icon_is_stale()` and `settings_share_is_stale()` report
+the two pictures a new logo leaves behind — the tab icon, which is a separate square master because
+a wordmark becomes a smear at sixteen pixels, and the share card, which is uploaded because nothing
+here can set type. The share one takes the **seo** document as an argument rather than reading it,
+since the shared file lives in a repository whose `seo.json` is a replica.
+
+The one **refusal** on these screens is a colour pair below WCAG AA. See `settings_validate()`.
+
+`settings_edit()` is `chrome_edit()` line for line, and it locks for the same reason: each screen
+holds one **part** of this document — the colour screen never sees the logo — so a save merges the
+rest back from the file. A read-modify-write without a lock loses one of two concurrent edits to
+different parts, which here is the normal case rather than an edge one.
+
+`settings_icon_generate()` makes every favicon from one square master: seven PNGs, written
+through `upload_write()` so each lands under a content-addressed name and travels the same signed
+channel as an upload. **Two kinds, and the difference is not cosmetic.** The four browser sizes ship
+**transparent** — a tab draws its own background, pale in light mode and dark in dark, and a mark
+with a plate behind it would be a rectangle floating in it. The three app sizes are **tiles** on an
+opaque ground with room around them, because an iOS home screen or an app switcher puts them against
+a photograph nobody can predict. `settings_icon_square()` trims the master's empty edges and pads it
+back to a square first, which is what stops a wide margin becoming a tiny mark in the middle of every
+tile *and* stops the trim turning a round dial into an oval.
+
+It writes **no `favicon.ico`** — see `contract_ico_container()` for why that one is assembled where
+it is served — and it never writes a partial set: everything is encoded before anything is written,
+because a set with three of seven files on disk is a site with four `<link>` elements pointing at
+nothing.
+
+`settings_validate()` refuses **three** things, and none is a matter of taste. **An address that is
+not an address** — and that one is refused here while `settings_normalise()` quietly falls back on
+the same value, which is not an inconsistency. Normalising meets a document arriving over the wire,
+where the alternative to the shipped address is a contact form posting into nowhere. Validation
+meets somebody *typing*, where falling back silently would replace what they wrote with
+`info@tech4time.bd` and look exactly like a save that worked.
+
+Then the two that were here first, and neither is a matter of taste either. An empty light-mode
+logo — see below. And **a colour that would make something unreadable**: that is the one refusal in
+this editor, everything else being a standing notice, because everything else is a judgement only the
+operator can make. A contrast ratio is arithmetic; WCAG says what the bar is; text nobody can read is
+not an opinion. A notice can be dismissed, and an unreadable site cannot. The pairs and the sums come
+from the contract, which is also where `check_contrast.py` gets them, so what the editor refuses and
+what the build check refuses cannot come apart.
+
+On the logo half: **an empty light-mode logo.** That is the company's mark missing from the header and the footer of every page, and from
+the structured data a search engine reads. An empty *dark* half is the opposite — a legitimate
+answer for a single-colour mark — and is never refused; the screen says in words what it means.
+
+The three questions at the end exist so the screens can **say** something rather than refuse it.
+An empty dark logo half is a legitimate answer for a single-colour mark and indistinguishable, in
+the document, from somebody having meant to upload one; a replaced logo with the shipped tab icon
+still under it is exactly what happens, because the favicon is generated from its own square master
+and not from a wordmark that would be an illegible smear at sixteen pixels. Both are standing
+notices. Neither ever blocks a save.
 
 ### `chrome.php`
 

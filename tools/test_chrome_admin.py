@@ -204,9 +204,6 @@ def run(client, r, site):
         "do": "save",
         "header[brand_label]": f"{MARK}-brand",
         "header[logo][alt]":   f"{MARK}-alt",
-        "header[logo][sizes]": "(max-width: 40em) 100px, 200px",
-        "header[logo][width]": "300",
-        "header[logo][height]": "100",
         "nav[items][0][label]": f"{MARK}-navlabel",
     })
     status, headers, _ = client.post(header, fields)
@@ -216,9 +213,6 @@ def run(client, r, site):
     back = form_fields(html)
     for name, want in [("header[brand_label]", f"{MARK}-brand"),
                        ("header[logo][alt]", f"{MARK}-alt"),
-                       ("header[logo][sizes]", "(max-width: 40em) 100px, 200px"),
-                       ("header[logo][width]", "300"),
-                       ("header[logo][height]", "100"),
                        ("nav[items][0][label]", f"{MARK}-navlabel")]:
         r.check(f"  {name} came back", back.get(name) == want, repr(back.get(name)))
 
@@ -450,13 +444,25 @@ def refusals(client, r):
     r.check("an empty column heading is refused",
             status == 200 and "cannot be empty" in body, f"status {status}")
 
+    # THE PICTURE IS NOT TYPED HERE ANY MORE, so a path pointing at another
+    # site cannot be typed here either. This screen used to hold eleven text
+    # fields per part describing the mark — two paths, two srcset lists, a WebP
+    # list, a width, a height and a displayed size — and refused a foreign
+    # address among them. The mark is uploaded on ?s=settings now, where the
+    # same refusal lives beside the field somebody would have to fix, and
+    # tools/test_settings_admin.py asserts it.
     _, html = client.get(header)
-    fields = form_fields(html)
-    fields.update({"do": "save", "header[logo][light][src]": "https://evil.example/x.png"})
-    status, _, body = client.post(header, fields)
-    r.check("a logo pointing at another site is refused",
-            status == 200 and "another site" in body,
-            f"status {status}")
+    r.check("the logo's picture is not typed on this screen at all",
+            "header[logo][light][src]" not in html
+            and "header[logo][width]" not in html,
+            "a picture field is still here")
+    # Nor how wide it is DRAWN. That is a fact about the layout — a clamp() in
+    # layout.css — and what had been typed in this box said 140/180px for a
+    # lockup measured at 79-113. It is CONTRACT_IMAGE_SLOTS now.
+    r.check("nor how wide it is drawn",
+            "header[logo][sizes]" not in html, "the sizes field is still here")
+    r.check("and it says where the picture is instead",
+            "?s=settings&amp;part=logo" in html, "no pointer to the settings screen")
 
     r.section("what it deliberately does not refuse")
 

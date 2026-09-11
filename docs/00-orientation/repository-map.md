@@ -92,6 +92,7 @@ sections/
 ├── services.php        the services editor, and each service page beneath it
 │                                                → content/services.json
 ├── chrome.php          the header, footer and mobile dock every page carries
+├── settings.php        the logo, the tab icon, the brand colours, the enquiry address
 │                                                → content/chrome.json
 ├── seo.php             every page's search and share metadata, and the
 │                       site-wide graph          → content/seo.json AND the
@@ -185,6 +186,7 @@ Never reachable over HTTP: it is outside the document root.
 | `about.php` `home.php` `services.php` | likewise, one editable page each — services holds the index and every detail page |
 | `certifications.php` `branding.php` `privacy.php` | likewise |
 | `chrome.php` | the header, footer and dock: what may be edited, and what the footer's rows are compared against |
+| `settings.php` | the site's identity: the logo, the tab icon, the brand colours, and where enquiries go |
 | `seo.php` | every page's metadata, the Organization graph, robots and the manifest |
 | `upload.php` | a picture arriving: what is accepted, re-encoded and named |
 | `qr.php` | the enrolment code an authenticator app scans |

@@ -48,6 +48,7 @@ python3 tools/test_branding_admin.py    # the branding editor — logos and the 
 python3 tools/test_privacy_admin.py     # the privacy editor — three lists deep, and the anchor rule
 python3 tools/test_seo_admin.py         # the SEO editor — and that no other editor blanks a meta band
 python3 tools/test_chrome_admin.py      # the header, footer and dock editor — four screens
+python3 tools/test_settings_admin.py    # the site's identity — five screens, four notices, one refusal
 python3 tools/test_svg.py               # the SVG sanitiser, which is a security boundary
 python3 tools/test_store.py             # the JSON store itself
 python3 tools/test_qr.py                # the pairing code, against libqrencode
@@ -64,6 +65,31 @@ python3 tools/check_shared_lib.py --update    # re-record the digests
 # then copy the changed file AND tools/shared-lib.sha256 into tech4time-website-frontend,
 # and bump CONTRACT_VERSION if the SHAPE of a document changed
 ```
+
+## When you touched anything a picture travels through
+
+```bash
+python3 tools/test_upload.py            # what came OUT still carries what went in
+python3 tools/test_reconcile.py         # the tool that repairs a live site
+python3 tools/test_end_to_end.py        # both halves, two ports, nothing stubbed
+```
+
+The last one is the slowest thing in either repository and the only one that runs the two halves
+against each other. Everything it could prove cheaply is proved cheaply somewhere else; what is
+left is **files moving**. A logo is not a document — uploading one stores a ladder of renditions,
+sends each as its own signed POST, and only then writes the document that names them. A stub
+receiver cannot half-fail that way, so *a partial publish is a broken image* was the one risk in
+that work nothing could see.
+
+It publishes into the frontend's `content/` and writes into its `uploads/`, and puts both back. So
+it **refuses to start** when that `content/` has uncommitted changes: a run killed halfway leaves
+it dirty, the next run says so and stops, and the fix is the `git checkout` it names. `--clone`
+fetches a copy of its own instead, on the same branch, and never touches the checkout beside you —
+that is what CI runs.
+
+Expect it to be **red in the window where one half is merged and the other is not**, exactly as
+`check_shared_repos.py --clone` is. Merge the frontend, then re-run.
+[ci-cd.md](../20-deployment/ci-cd.md)
 
 ## When you touched the rich-text editor
 

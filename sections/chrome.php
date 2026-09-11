@@ -14,7 +14,7 @@
  * FOUR SCREENS, NOT ONE, AND THE SPLIT IS BY PART.
  *
  *   ?s=chrome                the index: the three parts, and what is in them
- *   ?s=chrome&part=header    the logo, the brand label, the nav rows
+ *   ?s=chrome&part=header    what the logo says, the brand label, the nav rows
  *   ?s=chrome&part=footer    the brand block, the four columns, the bottom bar
  *   ?s=chrome&part=dock      the panel rows and the four bar keys
  *
@@ -137,22 +137,12 @@ function chrome_link_rows_from_post(string $band): array
     return $rows;
 }
 
-/** One logo lockup, rebuilt from the form. */
+/** One logo lockup's words, rebuilt from the form. */
 function chrome_logo_from_post(string $part, array $current): array
 {
     $logo = $current;
 
-    $logo['alt']    = chrome_post_text($_POST[$part]['logo']['alt'] ?? '');
-    $logo['sizes']  = chrome_post_text($_POST[$part]['logo']['sizes'] ?? '');
-    $logo['width']  = (int)chrome_post_text($_POST[$part]['logo']['width'] ?? '0');
-    $logo['height'] = (int)chrome_post_text($_POST[$part]['logo']['height'] ?? '0');
-
-    foreach (['light', 'dark'] as $mode) {
-        foreach (['src', 'srcset', 'webp'] as $field) {
-            $logo[$mode][$field] = chrome_post_text(
-                $_POST[$part]['logo'][$mode][$field] ?? '');
-        }
-    }
+    $logo['alt'] = chrome_post_text($_POST[$part]['logo']['alt'] ?? '');
 
     return $logo;
 }
@@ -474,52 +464,48 @@ function chrome_icon_field(string $name, string $value): void
     <?php
 }
 
-/** One logo lockup's fields — the same three slots in the header and footer. */
-function chrome_logo_fields(string $part, array $logo, bool $responsive): void
+/**
+ * What this screen still says about the logo, which is the words and not the
+ * picture.
+ *
+ * IT USED TO BE ELEVEN TEXT FIELDS PER PART: two paths, two srcset lists, a
+ * WebP list, a width, a height and a displayed size, typed by hand, twice over
+ * for the header and the footer. So the same mark was described in two
+ * documents that nothing compared, and replacing it meant editing both --
+ * while the About page, the favicon set, the branding kit and two
+ * structured-data graphs went on naming committed files nobody could reach at
+ * all. The picture is uploaded once on ?s=settings and every one of them reads
+ * it.
+ *
+ * The alt text stays because it is genuinely this screen's: the header's and
+ * the footer's are different sentences about the same picture. How wide the
+ * lockup is DRAWN went with the picture: that is a fact about the layout, not
+ * something to be typed, and what had been typed in it was wrong by 60%.
+ */
+function chrome_logo_fields(string $part, array $logo): void
 {
     ?>
     <div class="admin__grid">
       <?php chrome_text_field($part . '[logo][alt]', 'Alt text', (string)$logo['alt'],
           'Read aloud where the picture cannot be seen. It describes the logo; '
           . 'where the link GOES is the description above.', false, true); ?>
-      <?php chrome_text_field($part . '[logo][width]', 'Width', (string)$logo['width'],
-          'The file\'s own pixel width. It reserves the space so the page does not jump.'); ?>
-      <?php chrome_text_field($part . '[logo][height]', 'Height', (string)$logo['height']); ?>
-<?php if ($responsive): ?>
-      <?php chrome_text_field($part . '[logo][sizes]', 'Displayed size',
-          (string)$logo['sizes'],
-          'How wide the lockup is drawn, per screen width — a CSS “sizes” list.', true); ?>
-<?php endif; ?>
     </div>
 
-<?php foreach (['light' => 'Light mode', 'dark' => 'Dark mode'] as $mode => $title): ?>
     <div class="admin-card">
       <div class="admin-card__head">
         <span class="admin-card__preview">
-          <strong><?= h($title) ?></strong>
-          <span class="admin-card__value"><?= h((string)$logo[$mode]['src']) ?></span>
+          <strong>The picture</strong>
+          <span class="admin-card__value">Uploaded on the Settings screen</span>
         </span>
+        <a class="btn btn--secondary"
+           href="<?= h(admin_url('settings', ['part' => 'logo'])) ?>">The logo</a>
       </div>
-      <div class="admin__grid">
-        <?php chrome_text_field($part . "[logo][$mode][src]", 'Picture',
-            (string)$logo[$mode]['src'],
-            'A path on the public site, like /assets/images/logo/logo-light-360.png. '
-            . 'Another site\'s address is refused.', true, true); ?>
-<?php if ($responsive): ?>
-        <?php chrome_text_field($part . "[logo][$mode][srcset]", 'Other widths',
-            (string)$logo[$mode]['srcset'],
-            'Comma-separated, each “path 360w”. Leave empty to draw one width.', true); ?>
-<?php endif; ?>
-        <?php chrome_text_field($part . "[logo][$mode][webp]", 'WebP',
-            (string)$logo[$mode]['webp'],
-            $responsive
-                ? 'The same widths as WebP files, in the same form. Browsers that can '
-                  . 'read them take these instead.'
-                : 'The same picture as a WebP file. Browsers that can read it take this '
-                  . 'instead.', true); ?>
-      </div>
+      <p class="admin__fineprint">
+        One mark, read by the header, the footer, the About page, this panel's own
+        rail and the structured data a search engine sees. Changing it there changes
+        all of them at once.
+      </p>
     </div>
-<?php endforeach; ?>
     <?php
 }
 
@@ -805,7 +791,7 @@ if ($screen === 'header') {
           . '— “Tech4TIME — home”, not just the company name.', true, true); ?>
     </div>
 
-    <?php chrome_logo_fields('header', $header['logo'], true); ?>
+    <?php chrome_logo_fields('header', $header['logo']); ?>
   </fieldset>
 
   <fieldset class="admin__block" id="band-nav">
@@ -891,7 +877,7 @@ if ($screen === 'footer') {
           . 'site repeats most often.'); ?>
     </div>
 
-    <?php chrome_logo_fields('footer', $footer['logo'], false); ?>
+    <?php chrome_logo_fields('footer', $footer['logo']); ?>
   </fieldset>
 
   <fieldset class="admin__block" id="band-links">

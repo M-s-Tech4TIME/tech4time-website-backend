@@ -131,14 +131,7 @@ function company_row_from_post(string $band, array $row): array
  */
 function company_image_from_post(mixed $image): array
 {
-    $image = is_array($image) ? $image : [];
-
-    return contract_image_defaults([
-        'src'    => contract_safe_image_path((string)($image['src'] ?? '')),
-        'webp'   => contract_safe_image_path((string)($image['webp'] ?? '')),
-        'width'  => (int)($image['width'] ?? 0),
-        'height' => (int)($image['height'] ?? 0),
-    ]);
+    return admin_image_from_post($image);
 }
 
 /* ---------------------------------------------------------------- actions */
@@ -228,12 +221,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
  */
 function company_take_uploads(array $data, array &$errors): array
 {
+    /* Which CONTRACT_IMAGE_SLOTS row each band's pictures fill. Three of the
+       six bands are missing on purpose: a milestone, a statistic and a
+       principle carry no picture. One arriving anyway stores a single file,
+       which is what every band did before slots existed. */
+    $slots = [
+        'journey'    => 'company.journey',
+        'clients'    => 'company.clients',
+        'technology' => 'company.technology',
+    ];
+
     foreach (admin_uploaded_files() as [$band, $index, $file]) {
         if (!isset(COMPANY_LISTS[$band]) || !isset($data[$band]['items'][$index])) {
             continue;
         }
 
-        $stored = upload_accept($file);
+        $stored = upload_accept($file, $slots[$band] ?? '');
 
         if (isset($stored['error'])) {
             $errors[] = 'Row ' . ($index + 1) . ' of '

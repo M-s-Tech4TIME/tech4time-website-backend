@@ -34,6 +34,7 @@ if (!defined('T4T_ADMIN')) {
 }
 
 require_once __DIR__ . '/../lib/contact.php';
+require_once __DIR__ . '/../lib/seo.php';   /* the opening-hours rows, read never written */
 
 /* ---------------------------------------------------------------- reading */
 
@@ -121,6 +122,11 @@ function contact_from_post(array $current): array
                 'region'      => trim((string)($row['schema']['region'] ?? '')),
                 'postal_code' => trim((string)($row['schema']['postal_code'] ?? '')),
                 'country'     => strtoupper(trim((string)($row['schema']['country'] ?? ''))),
+                /* Taken as typed and checked by the model, which is where
+                   contact_coordinate() lives -- so a document arriving off the
+                   wire meets the same rule as a person at a keyboard. */
+                'latitude'    => trim((string)($row['schema']['latitude'] ?? '')),
+                'longitude'   => trim((string)($row['schema']['longitude'] ?? '')),
             ],
         ]);
     }
@@ -269,7 +275,7 @@ function contact_take_uploads(array $data, array &$errors): array
             continue;
         }
 
-        $stored = upload_accept($file);
+        $stored = upload_accept($file, 'contact.offices');
 
         if (isset($stored['error'])) {
             $errors[] = 'Office ' . ($index + 1) . ': ' . $stored['error'];
@@ -316,6 +322,43 @@ admin_notices($errors);
 
 if (!$errors && $pending !== '') {
     echo '<p class="admin__notice admin__notice--ok">' . h($pending) . '</p>';
+}
+
+/* WHICH OFFICES A SEARCH ENGINE IS TOLD NOTHING ABOUT.
+ *
+ * An office's opening hours exist in two places on purpose: the line on this
+ * screen is prose a visitor reads, and can say "by appointment"; the rows at
+ * ?s=seo&site=crawl are machine data with days and times in them. They are
+ * joined by nothing but a label, which is what lets a fourth office be added
+ * without code -- and it is also how one ends up with neither.
+ *
+ * Belgium was in exactly that state and had been since the graph shipped: no
+ * hours on the page and no row matching it, so its LocalBusiness node carried
+ * no openingHoursSpecification and nothing anywhere said so. A gap you cannot
+ * see is a gap nobody fixes.
+ *
+ * A NOTICE, NOT A REFUSAL, like every other one in this editor: an office with
+ * genuinely no fixed hours is a real answer, and seo_hours_for_office() is the
+ * SAME function the public site matches with, so this cannot say covered while
+ * the site publishes nothing. */
+$hours_rows = seo_shown(seo_load(), 'hours');
+$no_hours   = [];
+
+foreach (contact_shown_offices($data) as $office) {
+    $name = trim((string)$office['name']);
+    if ($name !== '' && seo_hours_for_office($hours_rows, $name) === []) {
+        $no_hours[] = $name;
+    }
+}
+
+if ($no_hours !== []) {
+    admin_standing_notice(
+        'A search engine is told no opening hours for: ' . implode(', ', $no_hours)
+        . '. The hours on this screen are prose for the page; the ones a search '
+        . 'engine reads are rows on the SEO screen, matched to an office by '
+        . 'having its name in the label — so "' . $no_hours[0] . ' office" '
+        . 'reaches ' . $no_hours[0] . '. An office with no fixed hours is a '
+        . 'real answer and nothing here is blocked by this.');
 }
 ?>
 
@@ -660,6 +703,22 @@ if (!$errors && $pending !== '') {
             <input class="admin__input" type="text" name="offices[items][<?= $i ?>][schema][country]"
                    value="<?= h($office['schema']['country']) ?>" maxlength="2" placeholder="BD">
             <span class="admin__hint">Two letters: BD, MY, BE.</span>
+          </label>
+          <label class="admin__field">
+            <span class="admin__label">Latitude</span>
+            <input class="admin__input" type="text" name="offices[items][<?= $i ?>][schema][latitude]"
+                   value="<?= h($office['schema']['latitude']) ?>" placeholder="23.8103">
+            <span class="admin__hint">Optional. Both or neither.</span>
+          </label>
+          <label class="admin__field">
+            <span class="admin__label">Longitude</span>
+            <input class="admin__input" type="text" name="offices[items][<?= $i ?>][schema][longitude]"
+                   value="<?= h($office['schema']['longitude']) ?>" placeholder="90.4125">
+            <span class="admin__hint">
+              Right-click the office in Google Maps and the first item is the pair,
+              latitude first. Anything that is not a coordinate is dropped rather
+              than published.
+            </span>
           </label>
           <label class="admin__field">
             <span class="admin__label">Languages spoken</span>

@@ -54,7 +54,8 @@ const CONTRACT_VERSION = 1;
 
 /** Every document that is published, by name. The endpoint refuses any other. */
 const CONTRACT_DOCUMENTS = ['careers', 'contact', 'company', 'about', 'home', 'services',
-                            'certifications', 'branding', 'privacy', 'seo', 'chrome'];
+                            'certifications', 'branding', 'privacy', 'seo', 'chrome',
+                            'settings'];
 
 /**
  * Where a document's record lives, on either host.
@@ -543,7 +544,25 @@ function contact_office_defaults(array $office): array
         'region'      => '',
         'postal_code' => '',
         'country'     => '',
+        'latitude'    => '',
+        'longitude'   => '',
     ];
+
+    /* THE TWO THAT ARE NOT FREE TEXT. Every other field here is a line of an
+       address: whatever somebody types is what that place is called, and this
+       file is in no position to argue. A coordinate is different -- it is a
+       number with a range, it is never read by a person, and it goes into
+       structured data where a search engine acts on it. "near the airport" in
+       a latitude does not degrade to a vaguer pin; it is a broken property in
+       a graph that was otherwise fine.
+
+       So these are the one pair here that is CHECKED rather than trimmed, and
+       anything that is not a coordinate becomes empty -- which seo_offices()
+       reads as "no geo", the honest answer. */
+    $office['schema']['latitude']  =
+        contact_coordinate($office['schema']['latitude'] ?? '', 90.0);
+    $office['schema']['longitude'] =
+        contact_coordinate($office['schema']['longitude'] ?? '', 180.0);
 
     if ($office['id'] === '') {
         $office['id'] = contact_slug($office['name']);
@@ -561,6 +580,73 @@ function contact_office_defaults(array $office): array
  * Everything below the form is optional; the form is the page.
  */
 const CONTACT_BANDS = ['reach', 'offices'];
+
+/**
+ * A latitude or longitude as a canonical string, or '' when it is not one.
+ *
+ * Kept as a STRING rather than a float on purpose. It is stored in JSON and
+ * printed into JSON-LD, and a round trip through PHP's float would rewrite
+ * what somebody typed: 23.80 loses its trailing zero, and a coordinate given
+ * to six places is a claim about precision that this file has no business
+ * rounding. So it is validated as a number and stored as the digits.
+ *
+ * Refuses anything outside the range, anything with a stray character in it,
+ * and the empty string -- all of which come back as '', which every reader
+ * treats as "not given".
+ */
+function contact_coordinate(mixed $value, float $limit): string
+{
+    if (is_float($value) || is_int($value)) {
+        $value = (string)$value;
+    }
+    if (!is_string($value)) {
+        return '';
+    }
+
+    $value = trim($value);
+
+    /* Deliberately not is_numeric(): that accepts "1e5", "0x1A" and leading
+       whitespace, none of which is a coordinate anybody typed on purpose. */
+    if (!preg_match('/^[+-]?\d{1,3}(\.\d{1,15})?$/', $value)) {
+        return '';
+    }
+
+    return abs((float)$value) <= $limit ? $value : '';
+}
+
+/**
+ * The opening-hours rows that belong to one office, by the label somebody typed.
+ *
+ * The hours live in content/seo.json and the offices in content/contact.json,
+ * and nothing but a label joins them: a row called "Bangladesh office" against
+ * an office called "Bangladesh". That is loose, and it is the looseness that
+ * makes it editable -- a fourth office needs no code.
+ *
+ * HERE, IN THE SHARED FILE, BECAUSE TWO HALVES ASK IT. The public site asks in
+ * order to publish openingHoursSpecification on a LocalBusiness; the editor
+ * asks in order to say which office has no hours attached to it. Written twice
+ * they would drift, and the failure would be an editor reporting that an office
+ * is covered while the site publishes nothing for it -- which is the exact
+ * shape of defect the footer's contact rows already produced once.
+ *
+ * A row matching nothing is left off rather than attached to every office,
+ * because opening hours on the wrong continent are worse than none.
+ */
+function seo_hours_for_office(array $rows, string $name): array
+{
+    $name = trim($name);
+
+    if ($name === '') {
+        return [];
+    }
+
+    return array_values(array_filter(
+        $rows,
+        static fn(array $row): bool =>
+            ($row['days'] ?? []) !== []
+            && stripos((string)($row['label'] ?? ''), $name) !== false
+    ));
+}
 
 /** Trim a list of strings and drop the blanks, whatever shape it arrived in. */
 function contact_string_list(mixed $value): array
@@ -621,6 +707,35 @@ function contact_find_office(array $data, string $id): ?array
         }
     }
     return null;
+}
+
+/**
+ * Every picture the document points at, as web paths, without duplicates.
+ *
+ * THIS DID NOT EXIST, AND ITS ABSENCE WAS A BUG. contract_images() fell
+ * through to the meta-only branch for 'contact', so an office photograph --
+ * a real upload, arriving through the same signed asset channel as every
+ * other -- was invisible to upload_in_use(). The sweep on any OTHER screen
+ * counted it as unused and offered to delete a picture that was on the
+ * contact page. That is precisely the failure upload_in_use()'s own docblock
+ * records having already happened once, for the same reason: a question about
+ * a SHARED directory answered from ONE document.
+ *
+ * The flag SLUG is deliberately not here. It names a file that ships with the
+ * public site rather than one somebody uploaded, so it is not the sweep's
+ * business -- only 'image' is.
+ */
+function contact_images(array $data): array
+{
+    $seen = [];
+
+    foreach ($data['offices']['items'] ?? [] as $office) {
+        foreach (contract_image_paths($office['image'] ?? []) as $path) {
+            $seen[$path] = true;
+        }
+    }
+
+    return array_keys($seen);
 }
 
 /** A URL-safe id from a name, unique against the ids already in use. */
@@ -997,6 +1112,198 @@ function company_principle_defaults(array $row): array
    shape, checked one way, wherever it hangs. */
 const CONTRACT_IMAGE_ROOTS = ['/assets/images/', '/uploads/'];
 
+/**
+ * How wide each uploaded picture is actually DRAWN, and what to tell the
+ * browser about it.
+ *
+ * ONE NUMBER, TWO CONSUMERS, WHICH IS THE WHOLE POINT. The uploader builds a
+ * ladder of widths from 'width'; the renderer builds its sizes= attribute from
+ * 'sizes'. Keeping them in one row is what stops the two drifting into
+ * disagreeing about the same picture -- a ladder the browser cannot choose
+ * from correctly is worse than no ladder, because without sizes= a browser
+ * assumes the picture fills the viewport and picks the LARGEST rung.
+ *
+ * THESE NUMBERS WERE MEASURED, NOT ESTIMATED. Firefox, every page, ten
+ * viewports from 320 to 1920, each in an iframe of its own so the width asked
+ * for is the width tested -- the same technique and the same reason as
+ * tools/check_responsive.py. Two of them are not where anybody would guess:
+ *
+ *   - about.story is widest at 768 (693px), NOT on a desktop. One column up to
+ *     768 and two above it, so the last single-column width is the largest the
+ *     picture is ever drawn; at 1280 it is 534.
+ *   - company.clients is widest at 360 (249px), also not on a desktop. The
+ *     grid drops to one column, so a phone draws the biggest logo tile.
+ *
+ * Guessing either would have shipped a picture too small on the width that
+ * needed it most, and nothing in this repository would have said so.
+ *
+ * 'width' is the CSS width at the widest point. The uploader stores it at 1x,
+ * 2x and 3x for the screens that have those densities, never upscaling past
+ * what arrived and never past its own ceiling.
+ *
+ * A slot with width 0 DOES NOT LADDER, and each has a reason:
+ *   - branding.file is a deliverable somebody downloads, not something a page
+ *     draws. One file, at the download ceiling.
+ *   - seo.share is read by scrapers that do not implement srcset and want
+ *     exactly 1200x630. A ladder there is ignored at best.
+ *   - seo.logo is Organization.logo in the structured data: one image, named
+ *     once, by a consumer that picks nothing.
+ *
+ * To re-measure after a layout change, see "If you are measuring geometry"
+ * in tech4time-website-frontend/docs/10-development/testing.md -- named with
+ * the repository because this file is shared and the pages are over there.
+ */
+const CONTRACT_IMAGE_SLOTS = [
+    /* slot                    drawn at                          measured max */
+    'about.story'       => ['width' => 700,
+                            'sizes' => '(min-width: 769px) min(44vw, 534px), 90vw'],
+    'company.journey'   => ['width' => 480,
+                            'sizes' => '(min-width: 641px) 478px, 90vw'],
+    'home.destinations' => ['width' => 400,
+                            'sizes' => '(min-width: 415px) 400px, 90vw'],
+    'branding.asset'    => ['width' => 360,
+                            'sizes' => '(min-width: 415px) 360px, 90vw'],
+    'company.clients'   => ['width' => 250,
+                            'sizes' => '(max-width: 414px) 90vw, 132px'],
+    'company.technology'=> ['width' => 120,
+                            'sizes' => '(max-width: 414px) 33vw, 80px'],
+    'contact.offices'   => ['width' => 56,  'sizes' => '56px'],
+
+    /* The company mark, and the one picture on this site drawn at three
+       different sizes in three different places -- measured, at ten viewports,
+       the same way as the rest:
+
+           the header        79 -> 113px    height-driven by a clamp()
+           the footer       101px           fixed
+           the About row    274 -> 693px    widest at 768, like about.story
+
+       The ladder is cut from the HEADER's width, because that is the drawing
+       that is on all seventeen pages; the About row takes the widest rung it
+       finds rather than a rung of its own. 180 reproduces the 180/360/540 set
+       the site ships with, so an upload replaces those files like for like.
+
+       sizes= is the header's alone. The footer draws one file and says so by
+       having none, and the About row likewise -- see settings_logo_largest()
+       in tech4time-website-frontend/lib/settings.php, named with the
+       repository because this file is shared and the renderer is over there.
+
+       IT SAID '(max-width: 48em) 140px, 180px' AND THAT WAS NEVER TRUE. The
+       lockup's height is a clamp() and its width follows the 360x128 ratio, so
+       it is 79px at 320, 100px at 768 and 112.5px above about 1035 -- never
+       140, never 180. Declaring 180 does not make a picture bigger; it makes
+       the browser pick a file for a slot 60% wider than the one it is drawing
+       into, so a 3x phone took the 540px file (44 kB) where the 360 (27 kB)
+       is more than it can show. Both steps round UP from the measurement,
+       which is the safe direction: slightly more pixels than the screen can
+       draw, never fewer. */
+    'settings.logo'     => ['width' => 180,
+                            'sizes' => '(min-width: 48em) 113px, 100px'],
+
+    /* No ladder -- see the docblock above. */
+    'branding.file'     => ['width' => 0, 'sizes' => ''],
+    /* The square master the favicons are made from. It is a SOURCE and not
+       something a page draws: what the pages get is the set generated from it,
+       at the seven fixed sizes SETTINGS_ICON_SIZES declares. */
+    'settings.icon'     => ['width' => 0, 'sizes' => ''],
+    'seo.share'         => ['width' => 0, 'sizes' => ''],
+    'seo.logo'          => ['width' => 0, 'sizes' => ''],
+];
+
+/** The screen densities a stored ladder is built for. */
+const CONTRACT_IMAGE_DPR = [1, 2, 3];
+
+/**
+ * What to put in sizes= for a slot, or '' when it does not ladder.
+ *
+ * Asked by the renderer rather than typed beside the markup, so the attribute
+ * and the widths that were stored come from the same row.
+ */
+function contract_slot_sizes(string $slot): string
+{
+    return (string)(CONTRACT_IMAGE_SLOTS[$slot]['sizes'] ?? '');
+}
+
+/**
+ * What a picture's candidate lists and sizes= attribute should be, here.
+ *
+ * NO sizes=, NO LADDER, AND THAT IS NOT CAUTION. It is the difference between
+ * an improvement and a regression. A srcset of widths with no sizes= beside it
+ * does not mean "pick whichever you like": the browser is required to assume
+ * the picture fills the whole viewport, so it takes the WIDEST rung every
+ * time. A phone would end up downloading the 3x file for a flag drawn at 56
+ * pixels -- worse than the single file it gets today. So a slot that declares
+ * no sizes= gets no candidate list, whatever the document happens to hold.
+ *
+ * The renderers ask this rather than reading the two fields themselves,
+ * because that rule has to be the same on all five pages and there are five
+ * copies of the markup it applies to. What comes back is three strings and no
+ * markup: each page still writes its own tags, which is how this file stays
+ * shared with a repository that renders nothing.
+ *
+ * An empty 'srcset' means the picture was stored at one width -- most of them,
+ * and everything stored before ladders existed -- and the caller emits src
+ * alone, exactly as it always did.
+ */
+function contract_picture_ladder(mixed $image, string $slot): array
+{
+    $sizes = contract_slot_sizes($slot);
+
+    if ($sizes === '') {
+        return ['srcset' => '', 'webp_srcset' => '', 'sizes' => ''];
+    }
+
+    $image = is_array($image) ? $image : [];
+
+    return [
+        'srcset'      => trim((string)($image['srcset'] ?? '')),
+        'webp_srcset' => trim((string)($image['webp_srcset'] ?? '')),
+        'sizes'       => $sizes,
+    ];
+}
+
+/**
+ * The widths a slot's ladder should hold, given the picture that arrived.
+ *
+ * Never upscales, and never stores a rung nothing can use. Each density is
+ * capped at what actually arrived -- a 500px picture in a 700px slot yields
+ * 500 alone, because inventing pixels makes a bigger file that is no sharper
+ * -- and the ladder stops at 3x, because no screen asks for more. A 1600px
+ * flag in a 56px slot therefore stores 56/112/168 and NOT 1600: the largest
+ * rung any display can draw from is the last one, not the biggest file on
+ * hand.
+ *
+ * Capping each density is what handles both directions with one rule. Above
+ * 3x the extra pixels are dropped; below it the cap collapses the higher rungs
+ * onto the source width and array_unique() folds them together, so a 900px
+ * source in a 700px slot gives 700 and 900 rather than 700 three times.
+ *
+ * $ceiling is the caller's own bound. The uploader has one and the contract
+ * should not hold an opinion about the uploader's limits.
+ *
+ * Returns widths ascending and deduplicated, or [] for a slot that does not
+ * ladder.
+ */
+function contract_slot_widths(string $slot, int $source, int $ceiling): array
+{
+    $width = (int)(CONTRACT_IMAGE_SLOTS[$slot]['width'] ?? 0);
+
+    if ($width <= 0 || $source <= 0 || $ceiling <= 0) {
+        return [];
+    }
+
+    $top = min($source, $ceiling);
+    $out = [];
+
+    foreach (CONTRACT_IMAGE_DPR as $density) {
+        $out[] = min($width * $density, $top);
+    }
+
+    $out = array_values(array_unique($out));
+    sort($out);
+
+    return $out;
+}
+
 /* What a row is called before it is called anything. See company_identify(). */
 const COMPANY_ID_PLACEHOLDER = 'row';
 
@@ -1025,6 +1332,84 @@ function contract_safe_image_path(string $path): string
 }
 
 /**
+ * A srcset list with every path checked, or as much of one as survives.
+ *
+ * "url 180w, url 360w" and a bare "url" are both valid srcset syntax, which is
+ * why one field can carry the header's three widths and the footer's single
+ * file. An entry whose path is not under CONTRACT_IMAGE_ROOTS is dropped
+ * rather than escaped -- this ends up inside an attribute the browser fetches
+ * from, and there is no legitimate picture this rejects.
+ *
+ * HERE, AND NOT WITH THE CHROME, BECAUSE IT IS NO LONGER THE CHROME'S. It was
+ * written for the header lockup, which was for a long time the only picture on
+ * this site stored at more than one width. It is the same check every picture
+ * record needs the moment any of them carries a ladder of widths, so it sits
+ * beside contract_safe_image_path() -- the rule it applies to each entry --
+ * rather than being copied a second time further down this file.
+ */
+function contract_srcset(string $value): string
+{
+    $out = [];
+
+    foreach (explode(',', $value) as $entry) {
+        $entry = trim($entry);
+        if ($entry === '') {
+            continue;
+        }
+
+        $bits       = preg_split('/\s+/', $entry) ?: [];
+        $path       = contract_safe_image_path((string)array_shift($bits));
+        $descriptor = trim(implode(' ', $bits));
+
+        if ($path === '' || !preg_match('/^(\d+(\.\d+)?[wx])?$/', $descriptor)) {
+            continue;
+        }
+
+        $out[] = $descriptor === '' ? $path : $path . ' ' . $descriptor;
+    }
+
+    return implode(', ', $out);
+}
+
+/**
+ * The widest entry of a srcset: its path, and how wide it says it is.
+ *
+ * WHICH IS NOT ALWAYS THE RECORD'S src. For a picture the uploader stored it
+ * is -- upload_store() names the top rung as src. For the logo the site SHIPS
+ * with it is not: the header's src is the 360px file and the ladder goes on to
+ * 540, because those files were built before this document existed and the
+ * seed reproduces them exactly rather than tidying them.
+ *
+ * So a consumer that wants the largest rendition asks for it rather than
+ * assuming, which is what lets the About page's big lockup, Organization.logo
+ * and the job postings' hiring-organisation logo all read one document and
+ * still name the file each of them names today.
+ *
+ * Answers {src: '', width: 0} for a record with no ladder, which the caller
+ * reads as "src is already the largest there is".
+ */
+function contract_srcset_top(string $value): array
+{
+    $best = ['src' => '', 'width' => 0];
+
+    foreach (explode(',', $value) as $entry) {
+        $bits       = preg_split('/\s+/', trim($entry)) ?: [];
+        $path       = contract_safe_image_path((string)array_shift($bits));
+        $descriptor = trim(implode(' ', $bits));
+
+        if ($path === '' || !preg_match('/^(\d+)w$/', $descriptor, $found)) {
+            continue;
+        }
+
+        if ((int)$found[1] > $best['width']) {
+            $best = ['src' => $path, 'width' => (int)$found[1]];
+        }
+    }
+
+    return $best;
+}
+
+/**
  * Fill in a picture, whatever it arrived with.
  *
  * width and height are not decoration. They are what lets the browser reserve
@@ -1036,18 +1421,77 @@ function contract_safe_image_path(string $path): string
  * webp is optional and empty is meaningful: it says "there is no WebP sibling,
  * emit a bare <img> and no <picture> wrapper". That is how the SVG and AVIF
  * entries have always rendered.
+ *
+ * srcset and webp_srcset are the SAME PICTURE AT SEVERAL WIDTHS, and are
+ * likewise optional and likewise meaningful when empty: no ladder was stored,
+ * so the renderer emits src alone exactly as it always did. They are separate
+ * fields rather than a widened 'webp' because 'webp' here is ONE path -- the
+ * chrome's logo record uses that key for a list, and conflating the two would
+ * make a picture record mean different things in different documents.
+ *
+ * src and webp stay the single files they were, and stay REQUIRED in practice:
+ * they are what a browser too old for srcset is served, and what every scraper
+ * that reads an <img> without parsing a candidate list will take. A ladder is
+ * an addition to a working picture, never a replacement for one.
  */
 function contract_image_defaults(mixed $image): array
 {
     $image = is_array($image) ? $image : [];
-    $image += ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0];
+    $image += ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0,
+               'srcset' => '', 'webp_srcset' => ''];
 
-    $image['src']    = contract_safe_image_path((string)$image['src']);
-    $image['webp']   = contract_safe_image_path((string)$image['webp']);
-    $image['width']  = max(0, (int)$image['width']);
-    $image['height'] = max(0, (int)$image['height']);
+    $image['src']         = contract_safe_image_path((string)$image['src']);
+    $image['webp']        = contract_safe_image_path((string)$image['webp']);
+    $image['width']       = max(0, (int)$image['width']);
+    $image['height']      = max(0, (int)$image['height']);
+    $image['srcset']      = contract_srcset((string)$image['srcset']);
+    $image['webp_srcset'] = contract_srcset((string)$image['webp_srcset']);
 
     return $image;
+}
+
+/**
+ * Every web path a picture record names, without duplicates.
+ *
+ * THE SWEEP HAS TO SEE THE RUNGS. A ladder puts most of a picture's files
+ * inside srcset, named nowhere else: only the top one is also the src. A
+ * collector that read src and webp alone would report the other four as
+ * unused, and the sweep on any screen would offer to delete the widths every
+ * phone is served -- leaving a <source srcset> pointing at files that are not
+ * there, which is a broken image for everybody whose browser prefers WebP.
+ *
+ * chrome_images() has done this walk since the header lockup was the only
+ * laddered picture on the site. This is that walk, asked of the shape
+ * contract_image_defaults() fills, so the seven collectors below do not each
+ * carry their own copy of it -- and so that adding a field to a picture record
+ * is one edit here rather than seven edits nobody remembers to make.
+ *
+ * A path is returned exactly as stored, unvalidated: contract_safe_image_path()
+ * has already run on everything a normalised document holds, and the caller is
+ * comparing against a directory listing rather than emitting.
+ */
+function contract_image_paths(mixed $image): array
+{
+    $image = is_array($image) ? $image : [];
+    $seen  = [];
+
+    foreach ([$image['src'] ?? '', $image['webp'] ?? ''] as $path) {
+        $path = trim((string)$path);
+        if ($path !== '') {
+            $seen[$path] = true;
+        }
+    }
+
+    foreach ([$image['srcset'] ?? '', $image['webp_srcset'] ?? ''] as $list) {
+        foreach (explode(',', (string)$list) as $entry) {
+            $path = trim((string)(preg_split('/\s+/', trim((string)$entry))[0] ?? ''));
+            if ($path !== '') {
+                $seen[$path] = true;
+            }
+        }
+    }
+
+    return array_keys($seen);
 }
 
 /* ------------------------------------------------- rows, ids and bands
@@ -1303,16 +1747,8 @@ function contract_page_bands(array $text_fields): array
 function contract_meta_images(mixed $meta): array
 {
     $meta = is_array($meta) ? $meta : [];
-    $seen = [];
 
-    foreach ([$meta['share']['src'] ?? '', $meta['share']['webp'] ?? ''] as $path) {
-        $path = trim((string)$path);
-        if ($path !== '') {
-            $seen[$path] = true;
-        }
-    }
-
-    return array_keys($seen);
+    return contract_image_paths($meta['share'] ?? []);
 }
 
 /** Only the rows of a list a visitor should see. */
@@ -1346,11 +1782,8 @@ function company_images(array $data): array
 
     foreach (COMPANY_LISTS as $band => $_filler) {
         foreach ($data[$band]['items'] ?? [] as $row) {
-            foreach ([$row['image']['src'] ?? '', $row['image']['webp'] ?? ''] as $path) {
-                $path = trim((string)$path);
-                if ($path !== '') {
-                    $seen[$path] = true;
-                }
+            foreach (contract_image_paths($row['image'] ?? []) as $path) {
+                $seen[$path] = true;
             }
         }
     }
@@ -1402,16 +1835,20 @@ const ABOUT_ICONS = [
 /**
  * How a story row draws its picture.
  *
- * 'logo' draws a light/dark pair rather than one picture. The Tech4TIME
- * lockup that ships with the site is the fallback, so a row switched to this
- * layout works with nothing uploaded — but a new logo CAN be uploaded, per
- * row, because a company that changes its mark should not need a deploy to
- * show it.
+ * 'logo' draws a light/dark pair rather than one picture, and its fallback is
+ * THE SITE'S OWN MARK -- settings_logo_largest(), the largest rung of whatever
+ * content/settings.json holds. So a row switched to this layout shows the
+ * company's current logo with nothing uploaded to the row at all, and follows
+ * it when it changes. A row can still upload its own pair, which is how a
+ * story about some other organisation shows that organisation's mark.
  *
- * WHAT THIS DOES NOT CHANGE: the logo in the header, the footer, the browser
- * tab, the social share card and the Organization structured data. Those are
- * shared markup and build artefacts, not content — see
- * docs/40-reference/content-schemas.md.
+ * IT USED TO SAY that a logo uploaded here does not change the header, the
+ * footer, the browser tab, the share card or the Organization data, because
+ * those were "shared markup and build artefacts, not content". That was true
+ * and it was the defect: there was no way to change them at all. They are one
+ * document now, edited at ?s=settings, and this row reads it like the other
+ * eight consumers do. A picture uploaded to THIS ROW is still only this row's
+ * -- it is a story's illustration, not the company's identity.
  */
 const ABOUT_LAYOUTS = [
     'photograph' => 'A photograph',
@@ -1701,10 +2138,8 @@ function about_images(array $data): array
     $seen = [];
 
     foreach ($data['story']['items'] ?? [] as $row) {
-        foreach ([$row['image']['src'] ?? '',      $row['image']['webp'] ?? '',
-                  $row['image_dark']['src'] ?? '', $row['image_dark']['webp'] ?? ''] as $path) {
-            $path = trim((string)$path);
-            if ($path !== '') {
+        foreach (['image', 'image_dark'] as $half) {
+            foreach (contract_image_paths($row[$half] ?? []) as $path) {
                 $seen[$path] = true;
             }
         }
@@ -2172,10 +2607,8 @@ function home_images(array $data): array
     $seen = [];
 
     foreach ($data['destinations']['items'] ?? [] as $row) {
-        foreach ([$row['image']['src'] ?? '',      $row['image']['webp'] ?? '',
-                  $row['image_dark']['src'] ?? '', $row['image_dark']['webp'] ?? ''] as $path) {
-            $path = trim((string)$path);
-            if ($path !== '') {
+        foreach (['image', 'image_dark'] as $half) {
+            foreach (contract_image_paths($row[$half] ?? []) as $path) {
                 $seen[$path] = true;
             }
         }
@@ -3879,16 +4312,14 @@ function branding_images(array $data): array
     $seen = [];
 
     foreach ($data['assets']['items'] ?? [] as $asset) {
-        $paths = [$asset['image']['src'] ?? '', $asset['image']['webp'] ?? ''];
+        $pictures = [$asset['image'] ?? []];
 
         foreach ($asset['files'] ?? [] as $file) {
-            $paths[] = $file['file']['src'] ?? '';
-            $paths[] = $file['file']['webp'] ?? '';
+            $pictures[] = $file['file'] ?? [];
         }
 
-        foreach ($paths as $path) {
-            $path = trim((string)$path);
-            if ($path !== '') {
+        foreach ($pictures as $picture) {
+            foreach (contract_image_paths($picture) as $path) {
                 $seen[$path] = true;
             }
         }
@@ -5133,11 +5564,8 @@ function seo_images(array $data): array
     $seen = [];
 
     foreach ([$data['site']['share'] ?? [], $data['identity']['logo'] ?? []] as $image) {
-        foreach ([$image['src'] ?? '', $image['webp'] ?? ''] as $path) {
-            $path = trim((string)$path);
-            if ($path !== '') {
-                $seen[$path] = true;
-            }
+        foreach (contract_image_paths($image) as $path) {
+            $seen[$path] = true;
         }
     }
 
@@ -5400,24 +5828,17 @@ function chrome_defaults(): array
             /* The accessible name of the logo link. It is not the alt text:
                the picture says "Tech4TIME" and the link says where it goes. */
             'brand_label' => 'Tech4TIME — home',
-            'logo' => [
-                'alt'    => 'Tech4TIME',
-                /* Three widths behind one displayed size. The header shows the
-                   lockup at 140px on a phone and 180px above 48em. */
-                'sizes'  => '(max-width: 48em) 140px, 180px',
-                'width'  => 360,
-                'height' => 128,
-                'light'  => [
-                    'src'    => '/assets/images/logo/logo-light-360.png',
-                    'srcset' => '/assets/images/logo/logo-light-180.png 180w, /assets/images/logo/logo-light-360.png 360w, /assets/images/logo/logo-light-540.png 540w',
-                    'webp'   => '/assets/images/logo/logo-light-180.webp 180w, /assets/images/logo/logo-light-360.webp 360w, /assets/images/logo/logo-light-540.webp 540w',
-                ],
-                'dark'   => [
-                    'src'    => '/assets/images/logo/logo-dark-360.png',
-                    'srcset' => '/assets/images/logo/logo-dark-180.png 180w, /assets/images/logo/logo-dark-360.png 360w, /assets/images/logo/logo-dark-540.png 540w',
-                    'webp'   => '/assets/images/logo/logo-dark-180.webp 180w, /assets/images/logo/logo-dark-360.webp 360w, /assets/images/logo/logo-dark-540.webp 540w',
-                ],
-            ],
+            /* THE PICTURE IS NOT HERE ANY MORE, and the alt text still is.
+               The mark is one thing drawn in nine places -- this header, the
+               footer, the About page, the admin's own rail, the favicon set,
+               the branding kit and two structured-data graphs -- so it lives in
+               content/settings.json and every one of them reads it.
+
+               What stays is what the CHROME owns: the words a screen reader
+               announces this link as. The header's and the footer's are
+               legitimately different sentences about the same picture, which is
+               exactly why they are not one field somewhere else. */
+            'logo' => ['alt' => 'Tech4TIME'],
             'nav' => ['items' => [
                 ['id' => 'home',     'target' => 'home',     'label' => '', 'status' => 'shown'],
                 ['id' => 'about',    'target' => 'about',    'label' => '', 'status' => 'shown'],
@@ -5430,25 +5851,9 @@ function chrome_defaults(): array
 
         'footer' => [
             'brand_label' => 'Tech4TIME — home',
-            'logo' => [
-                'alt'    => 'Tech4TIME',
-                /* No sizes and no srcset: the footer draws one width and
-                   always has. An empty srcset is not a missing value, it says
-                   "emit no srcset attribute". */
-                'sizes'  => '',
-                'width'  => 360,
-                'height' => 128,
-                'light'  => [
-                    'src'    => '/assets/images/logo/logo-light-360.png',
-                    'srcset' => '',
-                    'webp'   => '/assets/images/logo/logo-light-360.webp',
-                ],
-                'dark'   => [
-                    'src'    => '/assets/images/logo/logo-dark-360.png',
-                    'srcset' => '',
-                    'webp'   => '/assets/images/logo/logo-dark-360.webp',
-                ],
-            ],
+            /* Likewise -- see the header's. The footer says nothing about
+               the picture except how it should be announced. */
+            'logo' => ['alt' => 'Tech4TIME'],
             'tagline'     => 'Orchestrating Technology with Time',
             'description' => 'Open-Source & Enterprise-grade cybersecurity, software '
                            . 'development, and IT solutions. Orchestrate, build, maintain '
@@ -5679,58 +6084,7 @@ function chrome_logo_defaults(mixed $logo, array $fallback): array
     $logo = is_array($logo) ? $logo : [];
     $logo += $fallback;
 
-    $out = [
-        'alt'    => trim((string)$logo['alt']),
-        'sizes'  => trim((string)$logo['sizes']),
-        'width'  => max(0, (int)$logo['width']),
-        'height' => max(0, (int)$logo['height']),
-    ];
-
-    foreach (['light', 'dark'] as $mode) {
-        $image = is_array($logo[$mode] ?? null) ? $logo[$mode] : [];
-        $image += ['src' => '', 'srcset' => '', 'webp' => ''];
-
-        $out[$mode] = [
-            'src'    => contract_safe_image_path((string)$image['src']),
-            'srcset' => chrome_srcset((string)$image['srcset']),
-            'webp'   => chrome_srcset((string)$image['webp']),
-        ];
-    }
-
-    return $out;
-}
-
-/**
- * A srcset list with every path checked, or as much of one as survives.
- *
- * "url 180w, url 360w" and a bare "url" are both valid srcset syntax, which is
- * why one field carries the header's three widths and the footer's single
- * file. An entry whose path is not under CONTRACT_IMAGE_ROOTS is dropped
- * rather than escaped -- this ends up inside an attribute the browser fetches
- * from, and there is no legitimate logo this rejects.
- */
-function chrome_srcset(string $value): string
-{
-    $out = [];
-
-    foreach (explode(',', $value) as $entry) {
-        $entry = trim($entry);
-        if ($entry === '') {
-            continue;
-        }
-
-        $bits       = preg_split('/\s+/', $entry) ?: [];
-        $path       = contract_safe_image_path((string)array_shift($bits));
-        $descriptor = trim(implode(' ', $bits));
-
-        if ($path === '' || !preg_match('/^(\d+(\.\d+)?[wx])?$/', $descriptor)) {
-            continue;
-        }
-
-        $out[] = $descriptor === '' ? $path : $path . ' ' . $descriptor;
-    }
-
-    return implode(', ', $out);
+    return ['alt' => trim((string)$logo['alt'])];
 }
 
 /* ------------------------------------------------------ normalising */
@@ -5938,37 +6292,17 @@ function chrome_rows_shown(mixed $rows): array
 /**
  * Every picture the chrome points at, as web paths, without duplicates.
  *
- * Both logos, both modes, and every entry of every srcset -- the 540px file is
- * only ever named inside a srcset, and a sweep that counted the <img src>
- * alone would offer to delete it.
+ * NONE, NOW, AND THE ARM STILL HAS TO BE HERE. The chrome held the two logo
+ * lockups; the mark moved to content/settings.json, which is read by the nine
+ * places that draw it, and what is left here is alt text. contract_images()
+ * throws on a document it has no arm for, so removing this one would turn "the
+ * chrome has no pictures" into "the chrome is not a document" -- and a
+ * document that cannot answer is how a new one becomes a new way to lose
+ * files. It answers with none, which is the truth.
  */
 function chrome_images(array $data): array
 {
-    $seen = [];
-
-    foreach (['header', 'footer'] as $part) {
-        foreach (['light', 'dark'] as $mode) {
-            $image = $data[$part]['logo'][$mode] ?? [];
-
-            foreach ([$image['src'] ?? ''] as $path) {
-                $path = trim((string)$path);
-                if ($path !== '') {
-                    $seen[$path] = true;
-                }
-            }
-
-            foreach ([$image['srcset'] ?? '', $image['webp'] ?? ''] as $list) {
-                foreach (explode(',', (string)$list) as $entry) {
-                    $path = trim((string)(preg_split('/\s+/', trim($entry))[0] ?? ''));
-                    if ($path !== '') {
-                        $seen[$path] = true;
-                    }
-                }
-            }
-        }
-    }
-
-    return array_keys($seen);
+    return [];
 }
 
 /* ------------------------------------------------------- the drift notice
@@ -6101,7 +6435,740 @@ function chrome_drift_key(string $kind, string $value): string
 }
 
 /* ==========================================================================
-   12. Revisions
+   12. Settings — the identity: the mark, the icons, the colours, the address
+   ========================================================================== */
+
+/*
+   WHAT THIS DOCUMENT IS FOR, AND WHY IT IS NOT PART OF ANY OTHER.
+
+   The editor owns almost every word on the site. It owned none of the
+   IDENTITY: the logo, the favicon, the colours and where the contact form's
+   mail goes were files in a repository, changeable only by a developer running
+   a script and shipping a deploy.
+
+   None of it belongs to a page. The logo is in the header, the footer, the
+   About page, the admin's own rail, Organization.logo, JobPosting's hiring
+   organisation, the favicon set, the branding kit and the share card -- nine
+   places across five documents and two repositories. Putting it in any one of
+   them would make the other eight read from a document about something else.
+   So it is its own document, and everything that draws a mark reads it.
+
+   IT IS NOT A PAGE, so it has no meta band. Chrome is the same and for the
+   same reason: a document with no <head> of its own has nothing to put in one.
+
+   THE DEFAULTS ARE WHAT SHIPS, NOT WHAT SOMEBODY TYPED. Every value below was
+   read off the files it replaces -- the logo record out of content/chrome.json,
+   the colours out of assets/css/theme.css, the address out of the contact
+   handler's own constant. A fresh install therefore renders byte for byte what
+   the site renders today, and tools/test_settings.py asserts exactly that.
+*/
+
+/**
+ * The colour tokens the editor may change.
+ *
+ * EXACTLY THE ONES tools/check_contrast.py CAN JUDGE, which is what makes the
+ * refusal in settings_validate() possible at all. That check knows the WCAG AA
+ * pairs for these fourteen: which is text on which surface, which is a control
+ * boundary, which is the ink on a filled button. A token it has no pair for is
+ * a token nothing could say is safe -- so exposing one would mean offering a
+ * picker whose only honest answer is "I do not know".
+ *
+ * Three tokens in theme.css are deliberately NOT here, and the same rule
+ * explains all three. --artwork-plate and --artwork-plate-dark are the ground
+ * another company's logo is drawn on, and their docblocks record that NOT
+ * flipping them with the theme is the bug they exist to prevent.
+ * --contrast-max is the forced-colours fallback. None is a pair check_contrast
+ * knows, and none is a brand decision.
+ *
+ * Read out of theme.css rather than typed: the two agreed on all twenty-eight
+ * values when this was written, and the way to keep that true is to have taken
+ * them from there.
+ */
+const SETTINGS_COLOURS = [
+    'light' => [
+        'bg-base'             => '#fafafa',
+        'bg-surface'          => '#f1f1f2',
+        'bg-elevated'         => '#ffffff',
+        'text-primary'        => '#111113',
+        'text-secondary'      => '#4a4a4e',
+        'text-muted'          => '#6a6a6e',
+        'border-subtle'       => '#e1e1e3',
+        'border-strong'       => '#8a8a8e',
+        'silver-accent-start' => '#c7c9cc',
+        'silver-accent-mid'   => '#9ea1a6',
+        'silver-accent-end'   => '#6e7075',
+        'accent-text'         => '#6a6c71',
+        'focus-ring'          => '#6a6c71',
+        'on-accent'           => '#111113',
+    ],
+    'dark' => [
+        'bg-base'             => '#0b0b0c',
+        'bg-surface'          => '#151517',
+        'bg-elevated'         => '#1d1d20',
+        'text-primary'        => '#f5f5f6',
+        'text-secondary'      => '#b4b4b8',
+        'text-muted'          => '#8a8a8e',
+        'border-subtle'       => '#2a2a2d',
+        'border-strong'       => '#6a6a6e',
+        'silver-accent-start' => '#e8e9eb',
+        'silver-accent-mid'   => '#b8babe',
+        'silver-accent-end'   => '#7c7e83',
+        'accent-text'         => '#b8babe',
+        'focus-ring'          => '#b8babe',
+        'on-accent'           => '#111113',
+    ],
+];
+
+/**
+ * What the square master is rendered into, and how.
+ *
+ * TWO KINDS, AND THE DIFFERENCE IS NOT COSMETIC. A browser favicon ships
+ * TRANSPARENT: it is drawn against the browser's own chrome, which is pale in
+ * light mode and dark in dark mode, and a mark with a backing plate would be a
+ * rectangle floating in a tab. An APP icon is composited onto an opaque ground
+ * with room around it: an iOS home screen or an app switcher puts it against a
+ * photograph nobody can predict, and a transparent one there is a mark on
+ * somebody's wallpaper. iOS also masks its own corners, which is why the apple
+ * tile gets more breathing room than the two PWA ones.
+ *
+ * These are the sizes and the paddings tech4time-website-frontend's
+ * tools/build_favicons.py already produces, read off it rather than chosen
+ * again, so a generated set replaces the committed one like for like.
+ */
+const SETTINGS_ICON_SIZES = [
+    /*  name        pixels  padding, as a fraction of the tile          */
+    'png16'  => ['size' => 16,  'pad' => 0.0],
+    'png32'  => ['size' => 32,  'pad' => 0.0],
+    'png48'  => ['size' => 48,  'pad' => 0.0],
+    'png96'  => ['size' => 96,  'pad' => 0.0],
+    'apple'  => ['size' => 180, 'pad' => 0.14],
+    'png192' => ['size' => 192, 'pad' => 0.10],
+    'png512' => ['size' => 512, 'pad' => 0.10],
+];
+
+/* ------------------------------------------------ what a colour pair must be
+
+   WCAG 2.1 AA, AND THE SAME ARITHMETIC IN BOTH PLACES THAT NEED IT.
+   tools/check_contrast.py has judged this palette since before any of it was
+   editable; it held its own copy of the values AND its own copy of the pairs,
+   under a comment reading "Keep this in sync with assets/css/theme.css". Now
+   that a person can change a colour from a screen, the editor has to judge one
+   too -- and two implementations of "is this readable" is one more than the
+   number that can be right.
+
+   So the pairs and the arithmetic are here, beside the tokens they are about,
+   and check_contrast.py asks for them. What it checks is the palette this site
+   SHIPS with; what settings_validate() checks is the palette somebody is
+   trying to save. Same question, same answer, one definition.
+*/
+
+/** Normal text. WCAG 2.1 SC 1.4.3. */
+const SETTINGS_CONTRAST_AA_TEXT = 4.5;
+
+/**
+ * Large text, and non-text UI components: boundaries and focus indicators.
+ * WCAG 2.1 SC 1.4.11 and 2.4.11.
+ */
+const SETTINGS_CONTRAST_AA_LARGE = 3.0;
+
+/** The three grounds anything can be drawn on. */
+const SETTINGS_CONTRAST_SURFACES = ['bg-base', 'bg-surface', 'bg-elevated'];
+
+/**
+ * Every pair that has to be readable, and what it is used for.
+ *
+ * The WORST of each row's grounds is what decides it: a colour that is legible
+ * on two surfaces and not on the third is a colour that is illegible somewhere
+ * on the site, and which surface a given card sits on is a layout decision
+ * nobody should have to hold in their head while picking a colour.
+ */
+const SETTINGS_CONTRAST_PAIRS = [
+    ['fg' => 'text-primary',   'on' => SETTINGS_CONTRAST_SURFACES,
+     'role' => 'body text and headings',            'ratio' => SETTINGS_CONTRAST_AA_TEXT],
+    ['fg' => 'text-secondary', 'on' => SETTINGS_CONTRAST_SURFACES,
+     'role' => 'subtext',                           'ratio' => SETTINGS_CONTRAST_AA_TEXT],
+    ['fg' => 'text-muted',     'on' => SETTINGS_CONTRAST_SURFACES,
+     'role' => 'captions and placeholders',         'ratio' => SETTINGS_CONTRAST_AA_TEXT],
+    ['fg' => 'accent-text',    'on' => ['bg-base', 'bg-surface'],
+     'role' => 'links, accent text and icon strokes', 'ratio' => SETTINGS_CONTRAST_AA_TEXT],
+    ['fg' => 'focus-ring',     'on' => SETTINGS_CONTRAST_SURFACES,
+     'role' => 'the keyboard focus ring',           'ratio' => SETTINGS_CONTRAST_AA_LARGE],
+    ['fg' => 'border-strong',  'on' => SETTINGS_CONTRAST_SURFACES,
+     'role' => 'form and control boundaries',       'ratio' => SETTINGS_CONTRAST_AA_LARGE],
+    /* A primary button is filled with the silver gradient's start-to-mid range
+       and takes dark ink. The mid stop is the worst case under that ink. */
+    ['fg' => 'on-accent',      'on' => ['silver-accent-start', 'silver-accent-mid'],
+     'role' => 'a button label on the silver fill', 'ratio' => SETTINGS_CONTRAST_AA_TEXT],
+];
+
+/**
+ * Pairs with no contrast requirement, reported so a regression stays visible.
+ *
+ * A hairline between two blocks that are already distinguishable, and a
+ * gradient stop that never sits under text. WCAG asks nothing of either, and
+ * asking anyway would refuse a palette that is perfectly legible.
+ */
+const SETTINGS_CONTRAST_DECORATIVE = [
+    ['fg' => 'border-subtle',     'on' => SETTINGS_CONTRAST_SURFACES,
+     'role' => 'hairline dividers and card edges'],
+    ['fg' => 'silver-accent-end', 'on' => ['bg-base'],
+     'role' => 'the gradient end stop, in fills and sweeps only'],
+];
+
+/**
+ * How light a colour is, 0 to 1, the way WCAG defines it.
+ *
+ * Not the average of the channels and not what the eye would guess: each
+ * channel is taken out of sRGB's gamma curve first, then weighted for how much
+ * the eye actually gets from it -- green nearly three quarters of it, blue
+ * under a tenth. That is why #0000FF on #000000 fails and #FFFF00 on #FFFFFF
+ * fails, which is not obvious from the numbers.
+ */
+function contract_relative_luminance(string $hex): float
+{
+    $hex = ltrim(trim($hex), '#');
+
+    if (strlen($hex) !== 6 || !ctype_xdigit($hex)) {
+        return 0.0;
+    }
+
+    $channel = static function (int $value): float {
+        $c = $value / 255;
+
+        return $c <= 0.04045 ? $c / 12.92 : (($c + 0.055) / 1.055) ** 2.4;
+    };
+
+    return 0.2126 * $channel((int)hexdec(substr($hex, 0, 2)))
+         + 0.7152 * $channel((int)hexdec(substr($hex, 2, 2)))
+         + 0.0722 * $channel((int)hexdec(substr($hex, 4, 2)));
+}
+
+/** The contrast ratio between two colours, 1.0 to 21.0. Order does not matter. */
+function contract_contrast_ratio(string $a, string $b): float
+{
+    $one = contract_relative_luminance($a);
+    $two = contract_relative_luminance($b);
+
+    $lighter = max($one, $two);
+    $darker  = min($one, $two);
+
+    return ($lighter + 0.05) / ($darker + 0.05);
+}
+
+/**
+ * Every functional pair in one palette that falls below its threshold.
+ *
+ * Returns a sentence per fault, naming the pair, what it is used for, what it
+ * measures and what it needs -- because "this colour is not readable" is not
+ * something a person can act on and "text-muted on bg-surface is 3.1:1 and
+ * needs 4.5" is.
+ */
+function settings_contrast_faults(array $colours, string $mode): array
+{
+    $faults = [];
+    $where  = $mode === 'dark' ? 'Dark mode' : 'Light mode';
+
+    foreach (SETTINGS_CONTRAST_PAIRS as $pair) {
+        foreach ($pair['on'] as $ground) {
+            $ink  = (string)($colours[$pair['fg']] ?? '');
+            $back = (string)($colours[$ground] ?? '');
+
+            if ($ink === '' || $back === '') {
+                continue;
+            }
+
+            $ratio = contract_contrast_ratio($ink, $back);
+
+            if ($ratio + 0.005 < $pair['ratio']) {
+                $faults[] = $where . ': ' . $pair['fg'] . ' on ' . $ground
+                          . ' (' . $pair['role'] . ') is '
+                          . number_format($ratio, 2) . ':1, and needs '
+                          . number_format($pair['ratio'], 1) . ':1.';
+            }
+        }
+    }
+
+    return $faults;
+}
+
+/**
+ * Which sizes go inside favicon.ico.
+ *
+ * Three, not the whole set: a browser picks the one it needs out of the
+ * container, and every extra size is bytes on a file some browsers still
+ * request on every page load. The 512px master is 136 kB; these three together
+ * are under nine.
+ */
+const SETTINGS_ICON_ICO = [16, 32, 48];
+
+/**
+ * What enquiry mail is sent AS, which is not the same question as where it goes.
+ *
+ * NOT EDITABLE, AND IT MUST NOT BECOME SO. A message has to be sent from an
+ * address at this site's own domain or it fails SPF -- the DNS record saying
+ * which servers may send as tech4time.bd -- and is filed as spam. That record
+ * lives with the domain and nothing in this editor can change it, so a field
+ * for this would let somebody make every enquiry disappear into a spam folder
+ * with nothing on the screen to say why. The sender's own address goes on
+ * Reply-To, so answering still reaches them.
+ *
+ * HERE RATHER THAN IN THE HANDLER because both halves need it: the frontend
+ * sends with it and the editor's screen has to be able to SAY what messages
+ * are sent as, or the one field somebody might look for is simply absent with
+ * no explanation. tech4time-website-frontend/contact-handler.php keeps a
+ * constant of its own as the answer when nothing can be loaded at all, and
+ * its test asserts the two agree.
+ */
+const SETTINGS_MAIL_FROM = 'no-reply@tech4time.bd';
+
+/**
+ * The ground an app icon is composited onto.
+ *
+ * A CONSTANT, AND NOT settings_colours()['bg-base']. It is the same value
+ * today and the temptation to derive it is obvious, but the two are answers to
+ * different questions: bg-base is what the SITE is painted on, and this is
+ * what an icon needs behind it to be legible on somebody's home screen. Wire
+ * them together and a company that picks a pale dark-mode background gets a
+ * pale tile with a light mark on it, invisible -- and would have to regenerate
+ * every icon to find out. A dark neutral ground is always safe.
+ */
+const SETTINGS_ICON_GROUND = [11, 11, 12];
+
+/**
+ * A .ico file, written by hand, around PNG payloads.
+ *
+ * IT IS ASSEMBLED WHERE IT IS SERVED, not sent over the wire. The asset
+ * channel carries what getimagesizefromstring() recognises -- PNG, JPEG,
+ * WebP -- and an .ico is none of them; widening that list to carry one
+ * file would also widen what an editor can upload as page artwork. The
+ * public site holds the three PNGs already, so it builds the container from
+ * them on request, exactly as sitemap.php and manifest.php are built.
+ *
+ * GD HAS NO ICO WRITER AND NEITHER HALF NEEDS ONE TO BE A RENDERER:
+ * this is the container: a six-byte ICONDIR, then one
+ * sixteen-byte ICONDIRENTRY per image, then the images themselves. Embedding
+ * PNG rather than the older BMP-with-mask has been valid since Windows Vista
+ * and is what the committed favicon.ico already holds -- all three of its
+ * entries are PNG, which is how I know the format this writes is the format
+ * that has been serving this site.
+ *
+ * A width or height byte of 0 means 256. Nothing here is ever that big, but
+ * the field is one byte and saying so is cheaper than somebody rediscovering
+ * it.
+ */
+function contract_ico_container(array $images): string
+{
+    $count = count($images);
+    $offset = 6 + 16 * $count;
+
+    $directory = pack('vvv', 0, 1, $count);
+    $payloads = '';
+
+    foreach ($images as $size => $png) {
+        $directory .= pack(
+            'CCCCvvVV',
+            $size >= 256 ? 0 : $size,     /* width  */
+            $size >= 256 ? 0 : $size,     /* height */
+            0,                            /* palette entries: not a palette */
+            0,                            /* reserved */
+            1,                            /* colour planes */
+            32,                           /* bits per pixel */
+            strlen($png),
+            $offset
+        );
+
+        $payloads .= $png;
+        $offset += strlen($png);
+    }
+
+    return $directory . $payloads;
+}
+
+/**
+ * The site as it ships, and the fallback for anything missing from the file.
+ *
+ * EVERY VALUE HERE IS ALREADY TRUE OF THE SITE. The logo record is
+ * content/chrome.json's header lockup in the shape contract_image_defaults()
+ * fills -- the same six files, the same three widths, the same 360px fallback
+ * -- so a host with no settings document renders what it renders now.
+ */
+function settings_defaults(): array
+{
+    return [
+        'updated'  => '',
+        'revision' => 0,
+
+        /* The wordmark. Two halves because a mark drawn for a light ground can
+           be invisible on a dark one; the dark half is optional everywhere it
+           is read, and falls back to the light one. */
+        'logo' => [
+            'light' => contract_image_defaults([
+                'src'         => '/assets/images/logo/logo-light-360.png',
+                'webp'        => '/assets/images/logo/logo-light-360.webp',
+                'width'       => 360,
+                'height'      => 128,
+                'srcset'      => '/assets/images/logo/logo-light-180.png 180w, '
+                               . '/assets/images/logo/logo-light-360.png 360w, '
+                               . '/assets/images/logo/logo-light-540.png 540w',
+                'webp_srcset' => '/assets/images/logo/logo-light-180.webp 180w, '
+                               . '/assets/images/logo/logo-light-360.webp 360w, '
+                               . '/assets/images/logo/logo-light-540.webp 540w',
+            ]),
+            'dark' => contract_image_defaults([
+                'src'         => '/assets/images/logo/logo-dark-360.png',
+                'webp'        => '/assets/images/logo/logo-dark-360.webp',
+                'width'       => 360,
+                'height'      => 128,
+                'srcset'      => '/assets/images/logo/logo-dark-180.png 180w, '
+                               . '/assets/images/logo/logo-dark-360.png 360w, '
+                               . '/assets/images/logo/logo-dark-540.png 540w',
+                'webp_srcset' => '/assets/images/logo/logo-dark-180.webp 180w, '
+                               . '/assets/images/logo/logo-dark-360.webp 360w, '
+                               . '/assets/images/logo/logo-dark-540.webp 540w',
+            ]),
+        ],
+
+        /* The favicon. A DIFFERENT PICTURE FROM THE LOGO, and that is not an
+           oversight: the logo is a wordmark about three times as wide as it is
+           tall, and a favicon is a 16px square. Squeezing one into the other
+           gives an illegible smear, which is why the site ships a separate
+           square mark and why this is a separate upload.
+
+           'master' is what somebody uploads; 'generated' is what the server
+           makes of it. Empty here because nothing that ships came from an
+           upload -- the files below are committed, and HEAD_ICONS names them
+           directly until something replaces them. */
+        'icon' => [
+            'master'    => contract_image_defaults([]),
+            /* No 'ico' among them: /favicon.ico is assembled from three of
+               these where it is served. See contract_ico_container(). */
+            'generated' => array_map(
+                static fn(array $_spec): string => '',
+                SETTINGS_ICON_SIZES),
+        ],
+
+        'colours' => [
+            'light' => SETTINGS_COLOURS['light'],
+            'dark'  => SETTINGS_COLOURS['dark'],
+        ],
+
+        /* Where the enquiry form's mail goes. MAIL_FROM is deliberately NOT
+           here: it is what the site sends AS, and the domain's SPF record says
+           which server may do that -- a field somebody could change would let
+           the site start sending as an address it is not allowed to send as,
+           and every message would go to spam with nothing here to say why. */
+        'contact' => [
+            'mail_to'      => 'info@tech4time.bd',
+            'mail_subject' => 'Website enquiry',
+        ],
+    ];
+}
+
+/**
+ * Bring the settings to the current shape, whatever they arrived as.
+ *
+ * Explicit rather than a recursive merge, for the reason chrome_normalise()
+ * gives: filling entry by entry from the defaults would put back a value
+ * somebody deliberately cleared.
+ *
+ * AN EMPTY LOGO HALF IS MEANINGFUL AND IS KEPT. 'dark' cleared means "this
+ * mark reads on both grounds, use the light one" -- a real answer, and the
+ * common one for a single-colour mark. Filling it back in from the defaults
+ * would put the shipped Tech4TIME lockup underneath somebody else's logo.
+ */
+function settings_normalise(array $data): array
+{
+    $defaults = settings_defaults();
+
+    $out = [
+        'updated'  => trim((string)($data['updated'] ?? $defaults['updated'])),
+        'revision' => max(0, (int)($data['revision'] ?? 0)),
+    ];
+
+    /* A logo half that ARRIVED is kept as it arrived, empty or not; one that
+       did not arrive at all -- a document from before this field, or one
+       damaged in transit -- falls back to what ships. */
+    $logo = is_array($data['logo'] ?? null) ? $data['logo'] : [];
+
+    foreach (['light', 'dark'] as $mode) {
+        $out['logo'][$mode] = contract_image_defaults(
+            array_key_exists($mode, $logo) ? $logo[$mode] : $defaults['logo'][$mode]
+        );
+    }
+
+    $icon = is_array($data['icon'] ?? null) ? $data['icon'] : [];
+    $held = is_array($icon['generated'] ?? null) ? $icon['generated'] : [];
+
+    $out['icon'] = [
+        'master'    => contract_image_defaults($icon['master'] ?? []),
+        'generated' => [],
+    ];
+
+    foreach ($defaults['icon']['generated'] as $name => $_empty) {
+        $out['icon']['generated'][$name] =
+            contract_safe_image_path((string)($held[$name] ?? ''));
+    }
+
+    /* A colour is six hex digits or it is the shipped one. Nothing else is
+       let through: this string ends up inside a generated stylesheet, and
+       'red; } body { display: none' is a valid CSS value right up until it
+       is not. */
+    foreach (['light', 'dark'] as $mode) {
+        $held = is_array($data['colours'][$mode] ?? null) ? $data['colours'][$mode] : [];
+
+        foreach (SETTINGS_COLOURS[$mode] as $token => $shipped) {
+            $value = strtolower(trim((string)($held[$token] ?? '')));
+            $out['colours'][$mode][$token] =
+                preg_match('/^#[0-9a-f]{6}$/', $value) ? $value : $shipped;
+        }
+    }
+
+    $contact = is_array($data['contact'] ?? null) ? $data['contact'] : [];
+
+    /* An address that is not one is the shipped address, not an empty string:
+       a contact form that posts into nowhere loses enquiries silently, which
+       is the worst way for this field to be wrong. */
+    $to = trim((string)($contact['mail_to'] ?? ''));
+
+    $out['contact'] = [
+        'mail_to'      => filter_var($to, FILTER_VALIDATE_EMAIL)
+                            ? $to : $defaults['contact']['mail_to'],
+        /* Trimmed and nothing more, the way every other text field in this
+           file is. What a subject line may be LIKE -- how long, whether it is
+           empty -- is a validation question, and validation is the editing
+           side's: this half has to accept whatever a published document holds
+           or the two hosts would disagree about the same bytes. */
+        'mail_subject' => trim((string)($contact['mail_subject'] ?? ''))
+                            ?: $defaults['contact']['mail_subject'],
+    ];
+
+    return $out;
+}
+
+/* -------------------------------------------------- reading the identity
+
+   THESE ARE IN THE CONTRACT AND NOT IN EITHER HALF'S lib/settings.php, and the
+   reason is that BOTH halves render the mark. The public site draws it in the
+   header, the footer and the About row; the editor draws it in its own rail
+   and on its sign-in page, and asks which state it is in so that its screens
+   can say so. The first version of this work put them on the renderer's side,
+   and settings_logo_is_shared() was immediately written out twice -- which is
+   the drift this file exists to prevent.
+
+   Every one of them is a pure function of the document. Nothing here reads a
+   file, emits markup or knows which host it is on. */
+
+/** Where a path that came from an upload starts, rather than shipping. */
+const SETTINGS_UPLOAD_ROOT = '/uploads/';
+
+/**
+ * The mark for one theme, falling back to the light one.
+ *
+ * AN EMPTY DARK HALF IS AN ANSWER, NOT AN OMISSION. Plenty of marks are a
+ * single colour and read on both grounds, so requiring two uploads would be
+ * friction for no gain. What must not happen is the other failure: an empty
+ * dark half rendering as NOTHING, which would put a hole in the header of
+ * every page in dark mode. So absent means "use the light one", and the
+ * editor carries a standing notice saying so in words -- because a light-ink
+ * mark on a dark ground is invisible, and only the person who drew it knows
+ * whether theirs is.
+ *
+ * $mode is anything but 'dark' meaning light, rather than being validated,
+ * because every caller passes a literal and the fallback is the safe half.
+ */
+function settings_logo(array $settings, string $mode = 'light'): array
+{
+    $light = $settings['logo']['light'] ?? [];
+
+    if ($mode !== 'dark') {
+        return contract_image_defaults($light);
+    }
+
+    $dark = $settings['logo']['dark'] ?? [];
+
+    return contract_image_defaults(
+        trim((string)($dark['src'] ?? '')) === '' ? $light : $dark
+    );
+}
+
+/** True when dark mode is showing the light mark because nothing else was set. */
+function settings_logo_is_shared(array $settings): bool
+{
+    return trim((string)($settings['logo']['dark']['src'] ?? '')) === '';
+}
+
+/**
+ * The largest rendition of the mark: what the About page's lockup, the
+ * Organization graph and every job posting name.
+ *
+ * THREE PLACES DRAW THIS MARK BIG AND ONE DRAWS IT SMALL. The header wants the
+ * rung its 113px slot can use; the About row draws it at up to 693px, and the
+ * two structured-data graphs want one absolute URL for a consumer that picks
+ * nothing. So the largest rung is asked for rather than assumed — the record's
+ * src is the 360px file, and the ladder goes on to 540.
+ *
+ * The returned record carries no ladder of its own: everything that asks for
+ * this wants ONE file. Its height is scaled from the record's, which is exact
+ * rather than approximate — every rung of a ladder is the same picture, so the
+ * ratio is the same, and 128 × 540 ÷ 360 is 192 on the nose.
+ */
+function settings_logo_largest(array $settings, string $mode = 'light'): array
+{
+    $image = settings_logo($settings, $mode);
+    $top   = contract_srcset_top((string)$image['srcset']);
+
+    if ($top['src'] === '' || (int)$image['width'] <= 0
+            || $top['width'] <= (int)$image['width']) {
+        /* No ladder, or none of it wider than src: src IS the largest there
+           is. That is the case for every uploaded mark, because upload_store()
+           names the top rung as src. */
+        return ['src' => $image['src'], 'webp' => $image['webp'],
+                'width' => $image['width'], 'height' => $image['height'],
+                'srcset' => '', 'webp_srcset' => ''];
+    }
+
+    $webp = contract_srcset_top((string)$image['webp_srcset']);
+
+    return [
+        'src'    => $top['src'],
+        'webp'   => $webp['width'] === $top['width'] ? $webp['src'] : '',
+        'width'  => $top['width'],
+        'height' => (int)round((int)$image['height'] * $top['width'] / (int)$image['width']),
+        'srcset' => '',
+        'webp_srcset' => '',
+    ];
+}
+
+/**
+ * The colour tokens for one theme, as name => '#rrggbb'.
+ *
+ * Always the full set: settings_normalise() fills any token a document is
+ * missing from the shipped value, so a caller writing a stylesheet never has
+ * to decide what to do about a gap.
+ */
+function settings_colours(array $settings, string $mode = 'light'): array
+{
+    $mode = $mode === 'dark' ? 'dark' : 'light';
+
+    return is_array($settings['colours'][$mode] ?? null)
+        ? $settings['colours'][$mode]
+        : SETTINGS_COLOURS[$mode];
+}
+
+/**
+ * True when the logo has been replaced but the icons have not.
+ *
+ * The favicon is generated from its own square master and NOT from the logo,
+ * because a wordmark three times as wide as it is tall becomes an illegible
+ * smear at sixteen pixels. So changing the logo cannot change the tab icon,
+ * and somebody who has just replaced their mark will expect it to have. The
+ * screen says which is which rather than leaving them to notice.
+ */
+function settings_icon_is_stale(array $settings): bool
+{
+    return settings_logo_is_uploaded($settings)
+        && trim((string)($settings['icon']['master']['src'] ?? '')) === '';
+}
+
+/**
+ * True when the logo has been replaced but the share card still has not.
+ *
+ * The card a link preview shows is 1200x630 with the mark drawn into it and
+ * type set beside it. Nothing here draws it: generating it would mean
+ * reimplementing typography against a font stack the server does not have, and
+ * a card with the wrong kerning is worse than one made by the person who owns
+ * the brand. So it stays its own upload at ?s=seo&site=share.
+ *
+ * Which leaves exactly one failure, and this reports it: the logo changes, the
+ * card does not, and every link shared from the site keeps showing the previous
+ * mark. Nobody sees that on the site itself -- it is only visible in somebody
+ * else's chat window, which is the last place anyone looks.
+ *
+ * Takes the seo document rather than reading it, because this file is shared
+ * with a repository whose copy of seo.json is a replica and whose copy of this
+ * function is never called.
+ */
+function settings_share_is_stale(array $settings, array $seo): bool
+{
+    return settings_logo_is_uploaded($settings)
+        && !str_starts_with(
+            trim((string)($seo['site']['share']['src'] ?? '')),
+            SETTINGS_UPLOAD_ROOT
+        );
+}
+
+/**
+ * True when one half of the pair was replaced and the other was not.
+ *
+ * THE WORSE OF THE TWO WAYS A PAIR CAN BE WRONG, and the quiet one. An empty
+ * dark half at least renders the light mark, so the two modes agree about what
+ * the company's logo is. A half that still holds the PREVIOUS mark renders that
+ * one -- so the site shows the new logo in light mode and the old logo in dark
+ * mode, and nothing on the site itself says so. The person who uploaded it is
+ * almost certainly in one mode and will never see the other.
+ *
+ * Symmetric on purpose. Replacing only the dark half is the rarer order and
+ * exactly as wrong, and a check that only looked one way would be a notice
+ * that fires for one operator's habits and not another's.
+ *
+ * Not a refusal: replacing a pair is two uploads and there is a moment between
+ * them when this is true and nothing is wrong. It is a notice for the same
+ * reason every other one on that screen is.
+ */
+function settings_logo_is_mismatched(array $settings): bool
+{
+    $light = trim((string)($settings['logo']['light']['src'] ?? ''));
+    $dark  = trim((string)($settings['logo']['dark']['src'] ?? ''));
+
+    /* An empty dark half is the OTHER condition, reported by
+       settings_logo_is_shared(). Two notices about one field would be noise. */
+    if ($light === '' || $dark === '') {
+        return false;
+    }
+
+    return str_starts_with($light, SETTINGS_UPLOAD_ROOT)
+        !== str_starts_with($dark, SETTINGS_UPLOAD_ROOT);
+}
+
+/** True when the light mark is an upload rather than the one that ships. */
+function settings_logo_is_uploaded(array $settings): bool
+{
+    return str_starts_with(
+        trim((string)($settings['logo']['light']['src'] ?? '')),
+        SETTINGS_UPLOAD_ROOT
+    );
+}
+
+/** Every picture this document points at, as web paths, without duplicates. */
+function settings_images(array $data): array
+{
+    $seen = [];
+
+    foreach (['light', 'dark'] as $mode) {
+        foreach (contract_image_paths($data['logo'][$mode] ?? []) as $path) {
+            $seen[$path] = true;
+        }
+    }
+
+    foreach (contract_image_paths($data['icon']['master'] ?? []) as $path) {
+        $seen[$path] = true;
+    }
+
+    /* The generated icons too. They are files on both hosts like any other,
+       they are named nowhere else, and a sweep that missed them would offer
+       to delete the site's favicon. */
+    foreach ($data['icon']['generated'] ?? [] as $path) {
+        $path = trim((string)$path);
+        if ($path !== '') {
+            $seen[$path] = true;
+        }
+    }
+
+    return array_keys($seen);
+}
+
+/* ==========================================================================
+   13. Revisions
    ========================================================================== */
 
 /**
@@ -6124,7 +7191,7 @@ function contract_next_revision(array $data): int
 }
 
 /* ==========================================================================
-   13. Normalising and re-sanitising on receipt
+   14. Normalising and re-sanitising on receipt
    ========================================================================== */
 
 /**
@@ -6156,6 +7223,7 @@ function contract_normalise(string $document, array $data): array
         'privacy'  => privacy_normalise($data),
         'seo'      => seo_normalise($data),
         'chrome'   => chrome_normalise($data),
+        'settings' => settings_normalise($data),
         default    => throw new RuntimeException('Unknown document: ' . $document),
     };
 }
@@ -6192,11 +7260,16 @@ function contract_images(string $document, array $data): array
         'home'     => array_values(array_unique([...home_images($data), ...$meta])),
         'branding' => array_values(array_unique([...branding_images($data), ...$meta])),
         'services' => array_values(array_unique([...services_images($data), ...$meta])),
-        'careers', 'contact', 'certifications', 'privacy' => $meta,
+        'contact'  => array_values(array_unique([...contact_images($data), ...$meta])),
+        'careers', 'certifications', 'privacy' => $meta,
         'seo'      => seo_images($data),
         /* No meta band: the chrome is not a page and has no <head> of its own.
            Its pictures are the two logo lockups, srcsets included. */
         'chrome'   => chrome_images($data),
+        /* No meta band either, and the same reason: the settings are not a
+           page. Their pictures are the two logo halves, the icon master and
+           every icon generated from it. */
+        'settings' => settings_images($data),
         default    => throw new RuntimeException('Unknown document: ' . $document),
     };
 }
@@ -6346,6 +7419,15 @@ function contract_sanitise(string $document, array $data): array
        seo's is: "nothing to sanitise" must not arrive at the same line as
        "document I do not know". */
     if ($document === 'chrome') {
+        return $data;
+    }
+
+    /* The settings hold no text a person writes at all -- a mail address, a
+       subject line, six hex digits and a set of picture paths, every one of
+       them already validated to a fixed shape by settings_normalise(). The
+       branch is explicit for the reason seo's and chrome's are: "nothing to
+       sanitise" must not arrive at the same line as "document I do not know". */
+    if ($document === 'settings') {
         return $data;
     }
 

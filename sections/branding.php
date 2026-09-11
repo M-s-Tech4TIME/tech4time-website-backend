@@ -161,14 +161,7 @@ function branding_asset_from_post(array $asset): array
  */
 function branding_image_from_post(mixed $image): array
 {
-    $image = is_array($image) ? $image : [];
-
-    return contract_image_defaults([
-        'src'    => contract_safe_image_path((string)($image['src'] ?? '')),
-        'webp'   => contract_safe_image_path((string)($image['webp'] ?? '')),
-        'width'  => (int)($image['width'] ?? 0),
-        'height' => (int)($image['height'] ?? 0),
-    ]);
+    return admin_image_from_post($image);
 }
 
 /* ---------------------------------------------------------------- actions */
@@ -254,14 +247,20 @@ function branding_take_uploads(array $data, array &$errors): array
             $a = $index;
             $f = null;
             $where = 'Logo ' . ($a + 1) . ' preview';
+            $slot  = 'branding.asset';
             $max   = UPLOAD_MAX_DIMENSION;
         } elseif (preg_match('/^file-(\d+)$/', $band, $m)) {
             $a = (int)$m[1];
             $f = $index;
             $where = 'Logo ' . ($a + 1) . ', download ' . ($f + 1);
             /* The one difference between the two slots: a preview is drawn on
-               the page and a download is the thing somebody came for. */
-            $max = UPLOAD_MAX_DOWNLOAD_DIMENSION;
+               the page and a download is the thing somebody came for. So the
+               preview is stored at the widths it is drawn at, and the download
+               is stored once, whole, at the larger ceiling -- a ladder would be
+               three files nobody can choose between when the file IS the
+               deliverable. */
+            $slot = 'branding.file';
+            $max  = UPLOAD_MAX_DOWNLOAD_DIMENSION;
         } else {
             continue;
         }
@@ -274,7 +273,7 @@ function branding_take_uploads(array $data, array &$errors): array
             continue;
         }
 
-        $stored = upload_accept($file, $max);
+        $stored = upload_accept($file, $slot, $max);
 
         if (isset($stored['error'])) {
             $errors[] = $where . ': ' . $stored['error'];

@@ -30,12 +30,22 @@ breath**.
 | Anything the privacy policy says — a clause, the retention table, the effective date | `/?s=privacy` |
 | A navigation link, on the site or in the footer or the mobile dock | `/?s=chrome` |
 | The footer's tagline, its contact rows, the copyright line | `/?s=chrome` |
-| The logo lockup at the top or the bottom of every page | `/?s=chrome` |
+| What the logo link says out loud, at the top or the bottom | `/?s=chrome` |
+| The logo itself — the picture, light and dark | `/?s=settings&part=logo` |
+| The icon a browser tab and a phone's home screen show | `/?s=settings&part=icon` |
+| A brand colour, in light mode or dark | `/?s=settings&part=colour` |
+| Where the enquiry form's mail goes | `/?s=settings&part=mail` |
 
 Saving writes `content/careers.json` or `content/contact.json` here — **the system of record** —
 and then pushes a signed copy to the public site, which verifies it, re-sanitises it and writes its
 replica. If that push fails the editor says so, in words, with a **Publish again** control.
 [publish-api.md](server-side/publish-api.md)
+
+> **The logo is in two screens and they do not overlap.** The *picture* is on the **Settings**
+> screen — `/?s=settings&part=logo` — because it is drawn in the header, the footer, the About page
+> and this panel's own rail, and named in the structured data, the favicon set and the branding kit.
+> The *words a screen reader announces the logo link as* stay on the Header & Footer screen, because
+> the header's and the footer's are legitimately different sentences.
 
 > **The footer's contact details are separate, deliberately.** They are the footer's own rows, on
 > the **Header & Footer** screen — `/?s=chrome` — and not a copy of this page's. The contact page

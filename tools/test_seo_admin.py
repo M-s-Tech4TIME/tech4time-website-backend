@@ -207,6 +207,47 @@ def stored(name) -> dict:
     return json.loads((ROOT / "content" / f"{name}.json").read_text())
 
 
+def still_holds(before, after, where="") -> str:
+    """'' if everything `before` held is still in `after`, or what changed.
+
+    NOT equality, and the difference is the whole point of the function. A save
+    re-normalises the document it writes, so one stored before the contract
+    grew a field comes back with that field filled in — content/about.json has
+    carried image records with no srcset since before a picture could be stored
+    at several widths, and content/*.json is a seed rather than a living copy.
+    That is the shape catching up, and it says nothing about this screen.
+
+    What this screen could do wrong is lose a row, empty a heading, or rewrite
+    a band it does not own — and every one of those changes a value that WAS
+    there rather than adding one that was not. So a value present before must
+    be present after and equal, a list must still have the same number of
+    entries, and a filled-in default is allowed to appear.
+    """
+    if isinstance(before, dict):
+        if not isinstance(after, dict):
+            return f"{where}: was an object, is now {type(after).__name__}"
+        for key, held in before.items():
+            if key not in after:
+                return f"{where}.{key} is gone"
+            bad = still_holds(held, after[key], f"{where}.{key}")
+            if bad:
+                return bad
+        return ""
+
+    if isinstance(before, list):
+        if not isinstance(after, list):
+            return f"{where}: was a list, is now {type(after).__name__}"
+        if len(before) != len(after):
+            return f"{where}: held {len(before)} entries, now holds {len(after)}"
+        for i, held in enumerate(before):
+            bad = still_holds(held, after[i], f"{where}[{i}]")
+            if bad:
+                return bad
+        return ""
+
+    return "" if before == after else f"{where}: {before!r} became {after!r}"
+
+
 def save(client, path, fields):
     return client.post(path, {**fields, "do": "save"})
 
@@ -298,10 +339,11 @@ def run(client, r, site):
     r.check("and only the about document was published",
             set(site.documents) == {"about"}, str(sorted(site.documents)))
 
-    r.check("EVERY OTHER BAND OF THE DOCUMENT IS UNTOUCHED",
-            {k: v for k, v in about_before.items() if k not in ("meta", "updated", "revision")}
-            == {k: v for k, v in after.items() if k not in ("meta", "updated", "revision")},
-            "the screen held one band and rebuilt the whole document")
+    drift = still_holds(
+        {k: v for k, v in about_before.items() if k not in ("meta", "updated", "revision")},
+        {k: v for k, v in after.items() if k not in ("meta", "updated", "revision")})
+    r.check("EVERY OTHER BAND OF THE DOCUMENT IS UNTOUCHED", drift == "",
+            f"the screen held one band and rebuilt the whole document — {drift}")
     r.check("and the revision moved, so the live site knows it is newer",
             after["revision"] == about_before["revision"] + 1)
 

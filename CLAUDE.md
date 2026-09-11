@@ -1,6 +1,6 @@
 # Tech4TIME — backend
 
-The editor at **`admin.tech4time.bd`**: a sign-in of its own, thirteen screens, and the content of
+The editor at **`admin.tech4time.bd`**: a sign-in of its own, fourteen screens, and the content of
 record for **every page of the public site** — including what each of them tells a search engine. No
 build step, no framework — the files here are the files that run on the server.
 
@@ -55,7 +55,7 @@ its record before acting.
 | | |
 |---|---|
 | `public/` | **the document root** — six entry points, `robots.txt`, `.htaccess`, and the assets a browser fetches |
-| `sections/` | the thirteen screens, included by `public/index.php` |
+| `sections/` | the fourteen screens, included by `public/index.php` |
 | `lib/` | the sign-in, the contract, the publish client, the store |
 | `content/` | the JSON the editors write — **the system of record** |
 | `tools/` | build, audit and test scripts — never deployed |
@@ -80,6 +80,8 @@ Full table: [docs/10-development/where-to-change-things.md](docs/10-development/
 | Add an editor | [adding-an-editor.md](docs/10-development/server-side/adding-an-editor.md) |
 | **A page's title, description, share card or crawl setting** | `sections/seo.php` — and **not** that page's own editor, which no longer renders those fields |
 | What a search engine is told about the company | `sections/seo.php`, `lib/seo.php` — [seo.md](docs/40-reference/seo.md) |
+| **The logo, the tab icon, the brand colours, where the enquiry form sends** | `sections/settings.php`, `lib/settings.php` — one document, nine consumers, [ADR 0024](docs/90-decisions/0024-one-mark-many-renditions.md). The logo's **alt text** is not here: it is `?s=chrome`, because the header's and the footer's are different sentences |
+| How wide an uploaded picture is stored, and the `sizes=` beside it | `CONTRACT_IMAGE_SLOTS` in `lib/contract.php` — one number feeds both, and each is **measured, not estimated** |
 | The editor's appearance | `public/assets/css/admin.css` |
 | The shell — rail, bar, account menu, Save | `admin_head()` in `lib/admin.php` |
 | Which sections the rail shows, and in what order | `ADMIN_RAIL_SECTIONS` in `lib/admin.php` — **not** registry order, and `account` is deliberately not in it |
@@ -131,7 +133,18 @@ python3 tools/check_form_dom.py
 
 Touched the admin, auth or an editor? Also `test_admin_auth.py`, `test_careers_admin.py`,
 `test_contact_admin.py`, `test_company_admin.py`, `test_about_admin.py`,
-`test_home_admin.py`, `test_chrome_admin.py`, `test_publish_client.py`.
+`test_home_admin.py`, `test_chrome_admin.py`, `test_settings_admin.py`, `test_publish_client.py`.
+
+Touched the logo, the icons, the colours or the mail address — `sections/settings.php`,
+`lib/settings.php`, or the settings half of `lib/contract.php`? Also
+**`python3 tools/test_settings_admin.py`**, and **`python3 tools/test_end_to_end.py`**, which is the
+only thing that runs this repository against the real public site. A picture is a ladder of
+renditions, each its own signed POST, and *a partial publish is a broken image* is a failure no
+stub receiver here can produce. It refuses to start if the frontend's `content/` is dirty; `--clone`
+fetches a copy instead.
+
+**Added a suite? Add it to `.github/workflows/test.yml` in the same commit.** Nothing checks this,
+and three suites had been sitting on disk unrun — 230 checks asserted nowhere.
 
 Touched `lib/upload.php` or anything a picture passes through? Also `test_upload.py` — it needs
 PHP's GD extension (`sudo apt install php-gd`) and skips the re-encoding cases with a notice
@@ -151,7 +164,7 @@ proves all of it is still only an enhancement. Same browser requirements.
 
 Touched CSS, an admin screen or anything a keyboard reaches? Also
 `python3 tools/check_admin_a11y.py` — the focus ring, 320px, dark mode and hover across all
-twenty-one screens, signed in. Same Firefox and geckodriver, same clean-up.
+twenty-six screens, signed in. Same Firefox and geckodriver, same clean-up.
 
 Touched `lib/contract.php`, `lib/publish.php`, `lib/html.php` or the sprite? Also
 **`check_shared_lib.py --update`, and copy the changed file and the manifest to the frontend.**

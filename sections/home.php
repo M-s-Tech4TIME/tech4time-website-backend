@@ -159,14 +159,7 @@ function home_row_from_post(string $band, array $row): array
  */
 function home_image_from_post(mixed $image): array
 {
-    $image = is_array($image) ? $image : [];
-
-    return contract_image_defaults([
-        'src'    => contract_safe_image_path((string)($image['src'] ?? '')),
-        'webp'   => contract_safe_image_path((string)($image['webp'] ?? '')),
-        'width'  => (int)($image['width'] ?? 0),
-        'height' => (int)($image['height'] ?? 0),
-    ]);
+    return admin_image_from_post($image);
 }
 
 /* ---------------------------------------------------------------- actions */
@@ -266,7 +259,7 @@ function home_take_uploads(array $data, array &$errors): array
         $where = 'Card ' . ($index + 1)
                . ($band === 'destinations_dark' ? ' (dark mode)' : '');
 
-        $stored = upload_accept($file);
+        $stored = upload_accept($file, 'home.destinations');
 
         if (isset($stored['error'])) {
             $errors[] = $where . ': ' . $stored['error'];

@@ -114,7 +114,14 @@ anybody meant to publish.
 | `hours` | opening hours |
 | `languages` | array of strings |
 | `status` | `shown` or hidden — `contact_shown_offices()` filters on it |
-| `schema` | `street`, `locality`, `region`, `postal_code`, `country` — for `PostalAddress` structured data |
+| `schema` | `street`, `locality`, `region`, `postal_code`, `country` — for `PostalAddress` structured data — plus `latitude` and `longitude`, which are the only pair in this document **checked** rather than trimmed: `contact_coordinate()` refuses anything outside ±90 / ±180, anything with a stray character, and scientific notation, and both halves are needed or no `geo` is emitted. Stored as strings so `23.80` keeps its trailing zero |
+
+**`contact_images()` counts an office picture when the unused-upload sweep asks what is in use** —
+and it did not exist until it had to. `contract_images()` put `contact` in the arm that returns the
+`meta` band alone, so an office photograph was claimed by nothing: every other screen's sweep
+counted it unused and offered to delete a picture that was on this page. The `flag` slug is
+deliberately not counted, because it names a file that ships with the site rather than one anybody
+uploaded.
 
 `contact_page_schema()` emits `ContactPage` and `PostalAddress` from these, and so does the
 `Organization` graph at the top of `tech4time-website-frontend/pages/contact/index.php` — `contact_addresses()` and
@@ -405,6 +412,47 @@ holds both halves down: every page renders with no document at all, and a nav em
 stays empty while the other bands keep their rows.
 
 ---
+
+## Which pictures are stored at several widths, and which are not
+
+Every uploaded picture record is `{ src, webp, width, height, srcset, webp_srcset }`.
+
+`src` and `webp` are the single files they have always been, and stay the ones a browser without
+`srcset` support is served — and the ones every scraper that reads an `<img>` without parsing a
+candidate list will take. **A ladder is an addition to a working picture, never a replacement for
+one.** `srcset` and `webp_srcset` hold the same picture at several widths; empty means no ladder was
+stored and the public site emits `src` alone, exactly as it always did.
+
+Which widths comes from `CONTRACT_IMAGE_SLOTS`, one row per upload slot, holding the width the
+picture is **drawn** at and the `sizes=` attribute that describes it. One row, two consumers:
+`upload_accept()` builds the ladder from `width`, the public site builds `sizes=` from `sizes`. They
+are kept together because a ladder the browser cannot choose from correctly is **worse than no
+ladder** — with no `sizes=` a browser assumes the picture fills the viewport and takes the widest
+rung, so every phone would download the 3× file.
+
+| Slot | Screen | Drawn at | Ladders |
+|---|---|---|---|
+| `about.story` | `?s=about` | 700 | yes — 1×, 2×, 3× |
+| `company.journey` | `?s=company` | 480 | yes |
+| `home.destinations` | `?s=home` | 400 | yes |
+| `branding.asset` | `?s=branding` | 360 | yes |
+| `company.clients` | `?s=company` | 250 | yes |
+| `company.technology` | `?s=company` | 120 | yes |
+| `contact.offices` | `?s=contact` | 56 | yes |
+| `branding.file` | `?s=branding` | — | **no**: a deliverable somebody downloads, not something a page draws |
+| `seo.share` | `?s=seo` | — | **no**: read by scrapers that do not implement `srcset` and want exactly 1200×630 |
+| `seo.logo` | `?s=seo` | — | **no**: `Organization.logo` is one image, named once, to a consumer that picks nothing |
+
+`contract_slot_widths()` never upscales and never stores a rung nothing can draw from. Each density
+is capped at what actually arrived, which handles both directions with one rule: a 4000px
+photograph in the 700 slot stores 700/1400/1600, a 500px one stores 500 alone, and a 1600px flag in
+the 56 slot stores 56/112/168 rather than carrying a 1600px file to every phone that asks.
+
+**The widths were measured in a browser, not estimated**, against the public site's own pages — and
+two of them are not where anybody would guess. `about.story` is widest at a 768px viewport, not on a
+desktop, because that is the last width before the two-column breakpoint; `company.clients` is
+widest at 360. See "If you are measuring geometry" in
+`tech4time-website-frontend/docs/10-development/testing.md`.
 
 ## Rules that apply to both
 

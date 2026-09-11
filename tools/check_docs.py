@@ -278,8 +278,17 @@ def check_assets() -> None:
         # assets/css/pages/home.css, for instance.
         elsewhere = {p.name for p in directory.rglob(f"*.{sub}")} - on_disk
 
+        # NOR IS ONE THAT IS GENERATED. assets/css/brand.css is a real address
+        # every page loads and there is no file at it: .htaccess rewrites it to
+        # brand.css.php, which builds the brand colours out of
+        # content/settings.json. Same arrangement as /sitemap.xml and
+        # /robots.txt, which are sitemap.php and robots.php. The .php has to be
+        # ON DISK for the name to count, so this cannot keep a dead name alive.
+        generated = {p.name[:-4] for p in directory.glob(f"*.{sub}.php")}
+
         ghosts = sorted(n for n in named
-                        if n not in on_disk and n not in attributed and n not in elsewhere)
+                        if n not in on_disk and n not in attributed
+                        and n not in elsewhere and n not in generated)
         if ghosts:
             fail("assets", f"named in docs/ but not in {directory.relative_to(ROOT)}/: "
                            + ", ".join(ghosts))

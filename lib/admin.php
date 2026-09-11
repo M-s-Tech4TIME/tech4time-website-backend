@@ -32,6 +32,7 @@ require_once __DIR__ . '/html.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/publish_client.php';
 require_once __DIR__ . '/upload.php';
+require_once __DIR__ . '/settings.php';
 
 /**
  * What the rail lists, in the order it lists them.
@@ -132,6 +133,16 @@ const ADMIN_SECTIONS = [
         /* No single page: this screen edits all of them. */
         'view'  => '',
     ],
+    'settings' => [
+        'label' => 'Settings',
+        /* A cog, which is what a settings screen has been drawn with for forty
+           years. Nothing else in the rail is close: this is the one row that
+           is not a page or a part of one. */
+        'icon'  => 'cog',
+        'desc'  => 'The logo, the tab icon, the brand colours and where enquiries go',
+        /* No single page: every page of the site draws from it. */
+        'view'  => '',
+    ],
     'account' => [
         'label' => 'Account',
         'icon'  => 'user-shield',
@@ -160,7 +171,7 @@ const ADMIN_SECTIONS = [
  */
 const ADMIN_RAIL_SECTIONS = ['overview', 'home', 'about', 'services', 'company',
                              'careers', 'contact', 'certifications', 'branding',
-                             'privacy', 'chrome', 'seo'];
+                             'privacy', 'chrome', 'seo', 'settings'];
 
 /**
  * Sections that edit a page of the website, in rail order.
@@ -171,6 +182,14 @@ const ADMIN_RAIL_SECTIONS = ['overview', 'home', 'about', 'services', 'company',
  */
 const ADMIN_PAGE_SECTIONS = ['home', 'about', 'services', 'company', 'careers',
                              'contact', 'certifications', 'branding', 'privacy'];
+
+/* THREE RAIL ROWS ARE NOT IN THAT LIST, and none of them is an omission. The
+   chrome is on every page, the SEO screen edits every page's metadata, and the
+   settings hold the mark, the icons and the colours every page draws from.
+   None of them IS a page, so none has a "view the page" link and none is
+   counted where "the pages you can edit" is counted. tools/check_content_model.py
+   asks this list for the editors it must check, which is right for the same
+   reason: those three are proved by their own round-trip tests instead. */
 
 /* The marker admin_form_tail() writes and admin_form_truncated() looks for. */
 const ADMIN_TAIL_FIELD = '__tail';
@@ -583,6 +602,47 @@ function admin_asset(string $path): string
  * Everything else is artwork that ships with the public site and exists only
  * there, so it is fetched from there.
  */
+/**
+ * The company's mark, both colour modes, as this panel draws it.
+ *
+ * THE SAME MARK THE SITE DRAWS, and until now it was four committed files with
+ * their paths written out twice — once in the rail and once on the sign-in
+ * page. So a company that replaced its logo got a new website and an admin
+ * panel still wearing the old one, which is the one place they would be
+ * looking at it every day.
+ *
+ * admin_preview_src() decides where each file is served from: an uploaded mark
+ * is on THIS host, which holds the canonical copy, so the panel shows it
+ * without waiting for a publish to have succeeded; the mark that ships is in
+ * this host's own public/ too. Neither is a cross-origin request, which
+ * matters most in local development where the public site is a closed port.
+ *
+ * fetchpriority is not set here and loading="lazy" is on the dark half, for
+ * the reason the site's own lockups have it: the hidden variant should not be
+ * fetched until somebody asks for the other theme.
+ */
+function admin_brand_logo(string $class): void
+{
+    $settings = settings_load();
+
+    foreach (['light', 'dark'] as $mode) {
+        $image = settings_logo($settings, $mode);
+        $src   = admin_preview_src((string)$image['src']);
+        $webp  = trim((string)$image['webp']);
+        ?>
+        <picture class="<?= h($class) ?>-wrap theme-swap--<?= h($mode) ?>">
+<?php if ($webp !== ''): ?>
+          <source srcset="<?= h(admin_preview_src($webp)) ?>" type="image/webp">
+<?php endif; ?>
+          <img class="<?= h($class) ?>" src="<?= h($src) ?>"
+               alt="Tech4TIME" width="<?= (int)$image['width'] ?>"
+               height="<?= (int)$image['height'] ?>"<?=
+               $mode === 'dark' ? ' loading="lazy"' : '' ?> decoding="async">
+        </picture>
+        <?php
+    }
+}
+
 function admin_preview_src(string $path): string
 {
     if (str_starts_with($path, UPLOAD_URL_ROOT)) {
@@ -665,13 +725,22 @@ function admin_image_fields(string $field, string $upload, array $image,
         <?php /* Carried rather than edited. The paths and the size come from
                  the file itself when it is uploaded, and a size typed by hand
                  is a size that is wrong — which moves the page as it loads.
-                 The model re-checks all four against CONTRACT_IMAGE_ROOTS
-                 anyway, because a hidden input is a text field with the label
-                 taken off. */ ?>
-        <input type="hidden" name="<?= h($field) ?>[src]" value="<?= h((string)$image['src']) ?>">
-        <input type="hidden" name="<?= h($field) ?>[webp]" value="<?= h((string)$image['webp']) ?>">
-        <input type="hidden" name="<?= h($field) ?>[width]" value="<?= (int)$image['width'] ?>">
-        <input type="hidden" name="<?= h($field) ?>[height]" value="<?= (int)$image['height'] ?>">
+                 The model re-checks every one of them against
+                 CONTRACT_IMAGE_ROOTS anyway, because a hidden input is a text
+                 field with the label taken off.
+
+                 EVERY FIELD THE RECORD HAS, driven off the record rather than
+                 listed here. It listed four, and then a picture record grew
+                 srcset and webp_srcset — so a picture stored at several widths
+                 kept them until the next save of its screen, which rebuilt it
+                 from these inputs and silently dropped the ladder. The rungs
+                 then belonged to nothing and the unused sweep would offer to
+                 delete the widths every phone is served. A list kept in step by
+                 hand is a list that goes out of step; this one cannot. */ ?>
+<?php foreach (contract_image_defaults($image) as $key => $value): ?>
+        <input type="hidden" name="<?= h($field) ?>[<?= h($key) ?>]"
+               value="<?= h((string)$value) ?>">
+<?php endforeach; ?>
 
 <?php $problem = upload_problem(); ?>
 <?php if ($problem !== ''): ?>
@@ -703,6 +772,24 @@ function admin_image_fields(string $field, string $upload, array $image,
         </label>
 <?php endif; ?>
     <?php
+}
+
+/**
+ * One picture, rebuilt from what a form posted.
+ *
+ * ONE FUNCTION AND NOT FIVE. Four screens had a copy of this apiece and each
+ * copy named the fields it carried, so a field added to a picture record was
+ * carried by whichever copies somebody remembered to edit. None of them was
+ * edited when srcset arrived, and all four quietly dropped it.
+ *
+ * contract_image_defaults() decides what a picture record holds and
+ * contract_safe_image_path() decides what a path may be, so both are asked
+ * rather than reimplemented. Everything posted is untrusted: these are hidden
+ * inputs, which are text fields with the label taken off.
+ */
+function admin_image_from_post(mixed $image): array
+{
+    return contract_image_defaults(is_array($image) ? $image : []);
 }
 
 /**
@@ -744,27 +831,64 @@ function admin_uploaded_files(): array
 }
 
 /**
- * Send a stored picture and its WebP sibling to the live site.
+ * Send every file a stored picture is made of to the live site.
  *
- * Returns '' or a sentence. Both files go, because the page names both and a
+ * Returns '' or a sentence. ALL OF THEM GO, OR THE CALLER MUST NOT SAVE. A
  * <source> pointing at a picture the other host does not have is a broken
- * image for everybody whose browser prefers WebP — which is nearly everybody.
+ * image for everybody whose browser prefers WebP — which is nearly everybody —
+ * and a ladder makes that six chances instead of two: a laddered picture keeps
+ * most of its files inside srcset, where only the browser will ever look.
+ *
+ * contract_image_paths() is what "every file" means, so this cannot fall
+ * behind the shape: a field added to a picture record is sent by having been
+ * added. It is also already deduplicated, so the top rung — which is both the
+ * src and the last srcset entry — travels once.
+ *
+ * READ FIRST, THEN SEND. Every file is loaded off disk before any of them
+ * leaves, so "the picture was not where it had just been written" is found
+ * while nothing has travelled. It cannot make the network half atomic — a
+ * refusal on the fifth of six has already sent four — but the four are
+ * content-addressed and unreferenced, which is what the unused sweep is for.
+ * What matters is that the caller gets a sentence and leaves the document
+ * alone, so no document ever names a file that did not arrive.
  */
 function admin_send_picture(array $stored): string
 {
-    foreach (['src', 'webp'] as $which) {
-        $name = basename((string)($stored[$which] ?? ''));
+    return admin_send_files(contract_image_paths($stored));
+}
+
+/**
+ * Send a set of stored files to the live site, all of them or none named.
+ *
+ * The same guarantee as admin_send_picture() and the same reading of it — that
+ * function is this one asked for the files a picture record names. Taken apart
+ * because a generated icon set is eight files that are NOT a picture record:
+ * seven PNGs and an .ico, each named once in settings.icon.generated, and a
+ * <link rel="icon"> pointing at one that never arrived is a browser tab with
+ * no mark in it.
+ *
+ * @param list<string> $paths web paths under UPLOAD_URL_ROOT
+ */
+function admin_send_files(array $paths): string
+{
+    $files = [];
+
+    foreach ($paths as $path) {
+        $name = basename((string)$path);
         if ($name === '') {
             continue;
         }
 
-        $path = UPLOAD_DIR . '/' . $name;
-        $bytes = @file_get_contents($path);
+        $bytes = @file_get_contents(UPLOAD_DIR . '/' . $name);
 
         if ($bytes === false) {
             return 'The picture was not where it had just been written.';
         }
 
+        $files[] = $bytes;
+    }
+
+    foreach ($files as $bytes) {
         $kind = publish_asset_type($bytes);
         $result = publish_asset($bytes, $kind[1] ?? 'application/octet-stream');
 
@@ -1215,16 +1339,7 @@ function admin_head(string $section, string $user, string $lede = '',
              horizontal strip there and there is no width to narrow. */ ?>
     <div class="rail__head">
       <a class="rail__brand" href="<?= h(public_url('/')) ?>" aria-label="Tech4TIME — view the site">
-        <picture class="rail__logo-wrap theme-swap--light">
-          <source srcset="<?= h(admin_asset('/assets/images/logo/logo-light-180.webp')) ?>" type="image/webp">
-          <img class="rail__logo" src="<?= h(admin_asset('/assets/images/logo/logo-light-180.png')) ?>"
-               alt="Tech4TIME" width="180" height="64" decoding="async">
-        </picture>
-        <picture class="rail__logo-wrap theme-swap--dark">
-          <source srcset="<?= h(admin_asset('/assets/images/logo/logo-dark-180.webp')) ?>" type="image/webp">
-          <img class="rail__logo" src="<?= h(admin_asset('/assets/images/logo/logo-dark-180.png')) ?>"
-               alt="Tech4TIME" width="180" height="64" loading="lazy" decoding="async">
-        </picture>
+        <?php admin_brand_logo('rail__logo'); ?>
         <span class="rail__kicker">Admin</span>
       </a>
 
@@ -1652,16 +1767,7 @@ function admin_shell_head(string $title, string $lede = '', string $icon = 'user
 
     <div class="signin__top">
       <a class="signin__brand" href="<?= h(public_url('/')) ?>" aria-label="Tech4TIME — view the site">
-        <picture class="signin__logo-wrap theme-swap--light">
-          <source srcset="<?= h(admin_asset('/assets/images/logo/logo-light-180.webp')) ?>" type="image/webp">
-          <img class="signin__logo" src="<?= h(admin_asset('/assets/images/logo/logo-light-180.png')) ?>"
-               alt="Tech4TIME" width="180" height="64" decoding="async">
-        </picture>
-        <picture class="signin__logo-wrap theme-swap--dark">
-          <source srcset="<?= h(admin_asset('/assets/images/logo/logo-dark-180.webp')) ?>" type="image/webp">
-          <img class="signin__logo" src="<?= h(admin_asset('/assets/images/logo/logo-dark-180.png')) ?>"
-               alt="Tech4TIME" width="180" height="64" loading="lazy" decoding="async">
-        </picture>
+        <?php admin_brand_logo('signin__logo'); ?>
       </a>
       <button class="btn btn--icon" type="button" data-theme-toggle
               aria-label="Switch to dark mode" aria-pressed="false">

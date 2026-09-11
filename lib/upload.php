@@ -115,14 +115,27 @@ function upload_problem(): string
  * — or a one-sentence error under 'error'. Never throws, and never leaves a
  * partial file behind.
  *
- * TWO FILES ARE WRITTEN, NOT ONE. A WebP, which is what nearly every visitor
+ * TWO FILES PER WIDTH, NOT ONE. A WebP, which is what nearly every visitor
  * will be served, and a fallback in the original raster family for the ones
  * that will not. Both come from the same decoded pixels, so they cannot
  * disagree about what the picture is.
  *
- * @param array $file one entry of $_FILES
+ * $slot IS WHICH PICTURE ON THE SITE THIS IS -- a key of
+ * CONTRACT_IMAGE_SLOTS. It decides how wide the stored picture is and how many
+ * widths are stored, because the contract knows how wide each slot is drawn
+ * and this function does not. An empty slot, or one the contract does not
+ * know, stores a single picture at $maxSide: that is what every call site did
+ * before slots existed, so a forgotten one is a missing improvement rather
+ * than a broken upload. tools/test_upload.py reads the six call sites and
+ * fails on a slot that is not in the contract, which is where a typo is
+ * supposed to be caught.
+ *
+ * @param array  $file    one entry of $_FILES
+ * @param string $slot    which CONTRACT_IMAGE_SLOTS row this picture fills
+ * @param int    $maxSide the widest this picture may ever be stored
  */
-function upload_accept(array $file, int $maxSide = UPLOAD_MAX_DIMENSION): array
+function upload_accept(array $file, string $slot = '',
+                       int $maxSide = UPLOAD_MAX_DIMENSION): array
 {
     /* NOT upload_problem() here. That asks whether GD is present, and until
        the bytes have been read nothing knows whether GD is the library this
@@ -154,14 +167,36 @@ function upload_accept(array $file, int $maxSide = UPLOAD_MAX_DIMENSION): array
                          . (int)(UPLOAD_MAX_BYTES / 1048576) . ' MB.'];
     }
 
-    return upload_store($bytes, $maxSide);
+    return upload_store($bytes, $slot, $maxSide);
 }
 
 /**
- * Re-encode bytes and store the pair. Separated from upload_accept() so that
- * the part worth testing does not need a real HTTP upload to reach.
+ * Re-encode bytes and store the whole ladder. Separated from upload_accept()
+ * so that the part worth testing does not need a real HTTP upload to reach.
+ *
+ * WHAT A LADDER IS FOR, AND WHY IT IS NOT THE SAME AS STORING A BIG FILE. A
+ * picture drawn 56 pixels wide on a phone and 56 pixels wide on a desktop
+ * needs 56 real pixels -- and 112 of them on a 2x screen, which is most
+ * screens now. Storing one 1600px file serves every one of those the same
+ * 1600px download for a picture nobody will ever see more than 168 pixels of.
+ * Storing 56, 112 and 168 lets the browser take the one its screen can
+ * actually draw, and the three together are a fraction of the one.
+ *
+ * THE TOP RUNG IS THE src, WHICH IS THE OTHER HALF OF THE CHANGE. It used to
+ * be the whole fitted picture, so a flag arrived at 1600 and stayed 1600 no
+ * matter how small it was drawn -- the site got worse the first time somebody
+ * used the editor as intended. Now the picture is stored at the width its slot
+ * is drawn at, and src names the largest rung rather than the largest file
+ * that happened to arrive.
+ *
+ * A SLOT THAT DOES NOT LADDER STORES EXACTLY WHAT IT USED TO. One width, the
+ * fitted picture, the same two files under the same two content-addressed
+ * names. That is not an accident of the arithmetic -- contract_slot_widths()
+ * answers with the fitted width alone and nothing rescales -- and it is what
+ * lets the branding downloads and the share card keep the files they have.
  */
-function upload_store(string $bytes, int $maxSide = UPLOAD_MAX_DIMENSION): array
+function upload_store(string $bytes, string $slot = '',
+                      int $maxSide = UPLOAD_MAX_DIMENSION): array
 {
     /* A vector file is not decoded, because there is nothing to decode. It
        goes down its own path, which does the same job a different way: parse,
@@ -182,7 +217,9 @@ function upload_store(string $bytes, int $maxSide = UPLOAD_MAX_DIMENSION): array
         return ['error' => 'That file is not a JPEG, PNG, WebP or SVG picture.'];
     }
 
-    [$ext] = $kind;
+    /* The fallback keeps the family it arrived in, except that a WebP has no
+       older family of its own: a PNG is what a browser too old for WebP gets. */
+    $ext = $kind[0] === 'webp' ? 'png' : $kind[0];
 
     /* The decode. Everything that was not pixel data stops existing here. */
     $image = @imagecreatefromstring($bytes);
@@ -190,50 +227,158 @@ function upload_store(string $bytes, int $maxSide = UPLOAD_MAX_DIMENSION): array
         return ['error' => 'That picture could not be read. It may be damaged.'];
     }
 
+    /* Encoded in full before ANY of it is written. A rung that fails at the
+       end must not leave the earlier ones on disk with nothing naming them. */
+    $rungs = [];
+
     try {
         $image = upload_fit($image, $maxSide);
 
         /* Transparency survives the copy in upload_fit(); these tell the two
-           encoders that can carry it to do so. */
-        imagealphablending($image, false);
-        imagesavealpha($image, true);
+           encoders that can carry it to do so -- and every rescale below
+           starts from an image whose alpha is already being kept. */
+        upload_keep_alpha($image);
 
-        $webp = upload_encode($image, 'webp');
-        $raster = upload_encode($image, $ext === 'webp' ? 'png' : $ext);
+        $widths = contract_slot_widths($slot, imagesx($image), $maxSide);
 
-        $width  = imagesx($image);
-        $height = imagesy($image);
+        /* [] is a decision, not an omission: the slot does not ladder, or the
+           caller named none. One rung, the fitted picture, as it always was. */
+        if ($widths === []) {
+            $widths = [imagesx($image)];
+        }
+
+        foreach ($widths as $want) {
+            $rung = upload_scale($image, $want);
+
+            if ($rung === null) {
+                return ['error' => 'That picture could not be resized.'];
+            }
+
+            try {
+                $webp   = upload_encode($rung, 'webp');
+                $raster = upload_encode($rung, $ext);
+                $width  = imagesx($rung);
+                $height = imagesy($rung);
+            } finally {
+                /* upload_scale() hands back the image itself when it is
+                   already that wide, and destroying it here would take the
+                   next rung's source with it. */
+                if ($rung !== $image) {
+                    imagedestroy($rung);
+                }
+            }
+
+            if ($webp === null || $raster === null) {
+                return ['error' => 'That picture could not be re-encoded.'];
+            }
+
+            if (strlen($webp) > PUBLISH_ASSET_MAX_BYTES
+                    || strlen($raster) > PUBLISH_ASSET_MAX_BYTES) {
+                return ['error' => 'That picture is still too large after being '
+                                 . 'reduced. Try a smaller one.'];
+            }
+
+            $rungs[] = [
+                'width'  => $width,
+                'height' => $height,
+                'src'    => $raster,
+                'webp'   => $webp,
+                'names'  => ['src'  => publish_asset_name($raster, $ext),
+                             'webp' => publish_asset_name($webp, 'webp')],
+            ];
+        }
     } finally {
         imagedestroy($image);
     }
 
-    if ($webp === null || $raster === null) {
-        return ['error' => 'That picture could not be re-encoded.'];
-    }
-
-    if (strlen($webp) > PUBLISH_ASSET_MAX_BYTES
-            || strlen($raster) > PUBLISH_ASSET_MAX_BYTES) {
-        return ['error' => 'That picture is still too large after being '
-                         . 'reduced. Try a smaller one.'];
-    }
-
-    $names = [
-        'webp' => publish_asset_name($webp, 'webp'),
-        'src'  => publish_asset_name($raster, $ext === 'webp' ? 'png' : $ext),
-    ];
-
-    foreach (['src' => $raster, 'webp' => $webp] as $which => $blob) {
-        if (!upload_write($names[$which], $blob)) {
-            return ['error' => 'The picture could not be saved on this server.'];
+    foreach ($rungs as $rung) {
+        foreach (['src', 'webp'] as $which) {
+            if (!upload_write($rung['names'][$which], $rung[$which])) {
+                return ['error' => 'The picture could not be saved on this server.'];
+            }
         }
     }
 
+    /* Ascending, so the last is the largest: what src names, and what the
+       stored width and height describe. */
+    $top = $rungs[count($rungs) - 1];
+
     return [
-        'src'    => UPLOAD_URL_ROOT . $names['src'],
-        'webp'   => UPLOAD_URL_ROOT . $names['webp'],
-        'width'  => $width,
-        'height' => $height,
+        'src'         => UPLOAD_URL_ROOT . $top['names']['src'],
+        'webp'        => UPLOAD_URL_ROOT . $top['names']['webp'],
+        'width'       => $top['width'],
+        'height'      => $top['height'],
+        'srcset'      => upload_srcset($rungs, 'src'),
+        'webp_srcset' => upload_srcset($rungs, 'webp'),
     ];
+}
+
+/**
+ * One rung's worth of picture, or the picture itself when it is already that
+ * wide.
+ *
+ * THE CALLER MUST NOT DESTROY WHAT IT DID NOT GET A NEW IMAGE OF. Handing the
+ * original back is what keeps a slot that does not ladder byte-identical to
+ * what it stored before: nothing is rescaled, so the encoder sees exactly the
+ * pixels it saw, so publish_asset_name() computes exactly the same name and
+ * the file that is already on both hosts is the file that is still wanted.
+ *
+ * Height follows width, because imagescale() preserves the aspect ratio and
+ * the whole site's Cumulative Layout Shift rests on the stored dimensions
+ * being the real ones.
+ */
+function upload_scale(GdImage $image, int $width): ?GdImage
+{
+    if ($width <= 0 || $width === imagesx($image)) {
+        return $image;
+    }
+
+    $scaled = imagescale($image, $width);
+
+    if ($scaled === false) {
+        return null;
+    }
+
+    upload_keep_alpha($scaled);
+
+    return $scaled;
+}
+
+/**
+ * Tell the encoders to keep the alpha channel rather than composite it away.
+ *
+ * imagescale() hands back an image with blending on and saving off, which is
+ * how a transparent logo becomes a logo on a black rectangle. Every image this
+ * file encodes goes through here first.
+ */
+function upload_keep_alpha(GdImage $image): void
+{
+    imagealphablending($image, false);
+    imagesavealpha($image, true);
+}
+
+/**
+ * The srcset for one side of a ladder, or '' when there is no ladder.
+ *
+ * A single rung gets no srcset ON PURPOSE. One candidate is not a choice, and
+ * an empty string is how contract_image_defaults() records "no ladder was
+ * stored" -- which the renderers read as "emit src alone, exactly as before".
+ * Writing "one-file 400w" instead would put a candidate list on every picture
+ * on the site to say nothing.
+ */
+function upload_srcset(array $rungs, string $which): string
+{
+    if (count($rungs) < 2) {
+        return '';
+    }
+
+    $out = [];
+
+    foreach ($rungs as $rung) {
+        $out[] = UPLOAD_URL_ROOT . $rung['names'][$which] . ' ' . $rung['width'] . 'w';
+    }
+
+    return implode(', ', $out);
 }
 
 /**
@@ -253,6 +398,10 @@ function upload_store(string $bytes, int $maxSide = UPLOAD_MAX_DIMENSION): array
  *
  * NO DIMENSION CEILING, and none is needed. A vector has no resolution to
  * reduce, and SVG_MAX_BYTES bounds the file itself.
+ *
+ * AND NO LADDER, for the same reason turned around: a ladder exists so a
+ * browser can pick the number of pixels its screen can draw, and a vector
+ * draws every screen's number from the one file. That is what a vector is for.
  */
 function upload_store_svg(string $bytes): array
 {

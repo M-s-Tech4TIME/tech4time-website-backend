@@ -27,68 +27,58 @@ Link and focus colour in light mode is --accent-text #6A6C71 rather than the
 gradient's end stop #6E7075, which lands at 4.39:1 on bg-surface. The end stop
 keeps its plan value and is still what the gradient fills use.
 
-Keep this in sync with assets/css/theme.css.
+THE PALETTE AND THE PAIRS COME FROM lib/contract.php
+Both were typed here once, under a note reading "keep this in sync with
+assets/css/theme.css". They are SETTINGS_COLOURS and SETTINGS_CONTRAST_PAIRS
+now, because a person can change a colour from the editor and the editor has to
+judge one too -- and two lists of "which pairs matter" is one more than the
+number that can be right.
+
+THE ARITHMETIC IS STILL THIS FILE'S OWN, DELIBERATELY. The data is shared; the
+sums are not. That is the rule tools/publish_stub.py works to -- each half
+checked against an independent implementation written from the description,
+never against its own counterpart -- and it is why the last group below asks
+the contract for its answer on all 38 pairs and compares it with the answer
+worked out here. A shared list cannot drift. A shared bug could.
 """
 
+import json
+import shutil
+import subprocess
 import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
 
 AA_TEXT = 4.5
 AA_LARGE = 3.0
 
-LIGHT = {
-    "bg-base": "#FAFAFA",
-    "bg-surface": "#F1F1F2",
-    "bg-elevated": "#FFFFFF",
-    "text-primary": "#111113",
-    "text-secondary": "#4A4A4E",
-    "text-muted": "#6A6A6E",
-    "border-subtle": "#E1E1E3",
-    "border-strong": "#8A8A8E",
-    "silver-accent-start": "#C7C9CC",
-    "silver-accent-mid": "#9EA1A6",
-    "silver-accent-end": "#6E7075",
-    "accent-text": "#6A6C71",
-    "focus-ring": "#6A6C71",
-    "on-accent": "#111113",
-}
+def contract(code: str):
+    """Ask lib/contract.php for something, and refuse to guess if it cannot."""
+    if not shutil.which("php"):
+        raise SystemExit("php not found, and the palette lives in lib/contract.php:\n"
+                         "  sudo apt install php-cli")
 
-DARK = {
-    "bg-base": "#0B0B0C",
-    "bg-surface": "#151517",
-    "bg-elevated": "#1D1D20",
-    "text-primary": "#F5F5F6",
-    "text-secondary": "#B4B4B8",
-    "text-muted": "#8A8A8E",
-    "border-subtle": "#2A2A2D",
-    "border-strong": "#6A6A6E",
-    "silver-accent-start": "#E8E9EB",
-    "silver-accent-mid": "#B8BABE",
-    "silver-accent-end": "#7C7E83",
-    "accent-text": "#B8BABE",
-    "focus-ring": "#B8BABE",
-    "on-accent": "#111113",
-}
+    out = subprocess.run(["php", "-r", "require 'lib/contract.php'; " + code],
+                         cwd=ROOT, capture_output=True, text=True)
 
-SURFACES = ["bg-base", "bg-surface", "bg-elevated"]
+    if out.returncode != 0 or not out.stdout.strip():
+        raise SystemExit("could not read the palette from lib/contract.php:\n"
+                         + (out.stderr or out.stdout)[:400])
 
-# (foreground, backgrounds, role, threshold)
-PAIRS = [
-    ("text-primary", SURFACES, "body text and headings", AA_TEXT),
-    ("text-secondary", SURFACES, "subtext", AA_TEXT),
-    ("text-muted", SURFACES, "captions, placeholders", AA_TEXT),
-    ("accent-text", ["bg-base", "bg-surface"], "links, accent text, icon strokes", AA_TEXT),
-    ("focus-ring", SURFACES, "keyboard focus indicator", AA_LARGE),
-    ("border-strong", SURFACES, "form/control boundaries", AA_LARGE),
-    # Primary buttons are filled with the silver gradient's start->mid range and
-    # take dark ink. The mid stop is the worst case under that ink.
-    ("on-accent", ["silver-accent-start", "silver-accent-mid"], "button label on silver fill", AA_TEXT),
-]
+    return json.loads(out.stdout)
+
+
+PALETTE = contract("echo json_encode(SETTINGS_COLOURS);")
+LIGHT, DARK = PALETTE["light"], PALETTE["dark"]
+
+# (foreground, backgrounds, role, threshold), in the contract's own order.
+PAIRS = [(p["fg"], p["on"], p["role"], float(p["ratio"]))
+         for p in contract("echo json_encode(SETTINGS_CONTRAST_PAIRS);")]
 
 # No contrast requirement; reported so regressions stay visible.
-DECORATIVE = [
-    ("border-subtle", SURFACES, "hairline dividers, card edges"),
-    ("silver-accent-end", ["bg-base"], "gradient end stop (fills/sweeps only)"),
-]
+DECORATIVE = [(p["fg"], p["on"], p["role"])
+              for p in contract("echo json_encode(SETTINGS_CONTRAST_DECORATIVE);")]
 
 
 def srgb_to_linear(c: float) -> float:
@@ -138,8 +128,45 @@ def check(name: str, t: dict) -> list[str]:
     return failures
 
 
+def agree() -> list[str]:
+    """Every pair, worked out twice, by two implementations that share no code.
+
+    The shared list is what stops the two going out of step about WHICH pairs
+    matter. This is what stops them going out of step about the answer.
+    """
+    print("\nTHE SAME SUMS, DONE TWICE")
+    print("-" * 76)
+
+    theirs = contract(
+        "$o = [];"
+        "foreach (['light', 'dark'] as $m) {"
+        "  foreach (SETTINGS_CONTRAST_PAIRS as $p) {"
+        "    foreach ($p['on'] as $g) {"
+        "      $o[$m . '/' . $p['fg'] . '/' . $g] = round(contract_contrast_ratio("
+        "        SETTINGS_COLOURS[$m][$p['fg']], SETTINGS_COLOURS[$m][$g]), 4); } } }"
+        "echo json_encode($o);")
+
+    mine = {}
+    for mode, table in (("light", LIGHT), ("dark", DARK)):
+        for fg, bgs, _role, _threshold in PAIRS:
+            for bg in bgs:
+                mine[f"{mode}/{fg}/{bg}"] = round(ratio(table[fg], table[bg]), 4)
+
+    if set(theirs) != set(mine):
+        return [f"the two implementations disagree about which pairs exist: "
+                f"{sorted(set(theirs) ^ set(mine))[:4]}"]
+
+    apart = [f"{k}: contract says {theirs[k]}, this file says {mine[k]}"
+             for k in mine if abs(theirs[k] - mine[k]) > 0.0001]
+
+    print(f"  [{'PASS' if not apart else 'FAIL'}] {len(mine)} pairs, "
+          f"contract_contrast_ratio() against this file's own ratio()")
+
+    return apart
+
+
 def main() -> None:
-    failures = check("LIGHT MODE", LIGHT) + check("DARK MODE", DARK)
+    failures = check("LIGHT MODE", LIGHT) + check("DARK MODE", DARK) + agree()
 
     print("\n" + "=" * 76)
     if failures:
@@ -147,7 +174,8 @@ def main() -> None:
         for f in failures:
             print(f"  - {f}")
         sys.exit(1)
-    print("All functional colour pairs meet WCAG AA in both modes.")
+    print("All functional colour pairs meet WCAG AA in both modes,\n"
+          "and both implementations of the sum agree on every one of them.")
 
 
 if __name__ == "__main__":

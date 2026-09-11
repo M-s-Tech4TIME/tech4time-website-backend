@@ -77,6 +77,7 @@ that reticks every thirty seconds, and you sign in yourself.
 | `check_docs.py` | the documentation still describes the code: undocumented tools, libraries and **assets**; dead links; cited paths that have gone; constants whose documented values drifted. The asset and tool checks run **both** ways — a stylesheet or script named in the prose but absent from disk fails too, unless some document says in full which repository it moved to |
 | `build_deploy_set.py --check` | the set of files bound for the server holds nothing it must not, and nothing is missing |
 | `check_shared_lib.py` | the four files both repositories hold identically have not been edited here |
+| `check_icons.py` | every icon name either half can draw resolves to a symbol in the sprite. A name the sprite does not carry is **silent** — `<use href="#name">` paints nothing, with no error and no console line — so a blank box ships and reads as a design choice. `ADMIN_SECTIONS` named `cog` while the sprite had only `cogs`, and the Settings rail row and its Overview tile were empty for a release. Three lists have to agree: the sprite, the `*_ICONS` a picker offers, and `ADMIN_ICONS` — a name missing from the last draws in the site and not in the editor, which is the harder half to notice |
 | `check_form_dom.py` | no script reads a property off a `<form>` that one of the form's own controls has hidden. `HTMLFormElement` is `[LegacyOverrideBuiltIns]`, so a control's **name wins over the interface's own property of that name**: a form holding `<input name="action">` answers `form.action` with that input, `fetch()` posts to `/[object%20HTMLInputElement]`, and the server answers 404. Ordinary submission is unaffected, which is why it can appear years after the field was added — on the day a script starts posting the form. It refuses eight members outright (`action`, `method`, `enctype`, `target`, `elements`, `submit`, `requestSubmit`, `reset`) and re-derives the rest from the markup, so a field added tomorrow that shadows something a script already reads fails tomorrow. Control names that shadow a property nothing reads are listed as a standing notice, not a fault |
 | `check_shared_facts.py` | facts stated in two documents at once — the offices, the email and the telephone are authored in **both** `content/privacy.json` and `content/contact.json`, on purpose, so this asks whether the policy still states what the contact page manages. Compared on a normalised form, so it reports a different street and stays quiet about a different comma. It can only see the **seed**: content edited in the admin never passes through git, and that half is covered by the standing notice the privacy editor draws from the same function |
 | `check_shared_repos.py` | the same files, compared against **the other repository** rather than a local digest — plus every same-named tool, which must match unless `DIVERGENT` says why not. This is the only check anywhere that can see the two halves drift apart; `check_shared_lib.py` structurally cannot. Needs both repos present, or `--clone` |
@@ -179,6 +180,13 @@ target rather than inside it.
 `check_shared_lib.py` covers the icon sprite as well as the three PHP files. `CONTACT_ICONS` is in
 the contract, so an icon this editor offers must be one the public page can actually draw; a drifted
 sprite renders as an empty box with both halves behaving exactly as written.
+
+**That empty box was written down here before anything checked for it, and it duly happened.** Not
+through drift between the halves — the two sprites were identical — but because a name was asked of
+a sprite that had never carried it: `ADMIN_SECTIONS` named `cog`, the sprite had only `cogs`, and
+the Settings rail row and its Overview tile were blank for a release. `check_shared_lib.py` cannot
+see that; it compares the two copies with each other, not the names against either.
+`check_icons.py` is the one that asks.
 
 ---
 

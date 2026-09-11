@@ -126,6 +126,7 @@ failures, and both say exactly what is wrong.
 python3 tools/check_contrast.py        python3 tools/check_css.py        python3 tools/check_content_model.py
 python3 tools/check_secrets.py         python3 tools/check_docs.py
 python3 tools/build_deploy_set.py --check
+python3 tools/check_icons.py
 python3 tools/check_shared_lib.py
 python3 tools/check_shared_repos.py
 python3 tools/check_form_dom.py

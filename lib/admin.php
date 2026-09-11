@@ -206,6 +206,12 @@ const ADMIN_ICONS = [
     'home', 'th-large', 'briefcase', 'envelope', 'sun', 'moon', 'chevron-left',
     'chevron-right', 'arrow-up', 'arrow-down', 'arrow-right', 'link', 'user',
     'times', 'check', 'eye', 'lock', 'cogs', 'info-circle',
+    /* The Settings rail row and its Overview tile. It was named in
+       ADMIN_SECTIONS without ever being in the sprite or in this list, and a
+       name that is in neither fails SILENTLY -- <use href="#cog"> draws
+       nothing, with no error and no console line -- so both the row and the
+       tile shipped blank. tools/check_icons.py is what notices that now. */
+    'cog',
     'phone', 'mobile-alt', 'clock', 'map-marker-alt', 'building', 'globe',
     'headset', 'comment-alt', 'paper-plane', 'calendar-alt', 'linkedin',
     'github',

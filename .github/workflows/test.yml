@@ -53,6 +53,12 @@ jobs:
       - run: python3 tools/check_content_model.py
       - run: python3 tools/check_secrets.py
       - run: python3 tools/check_docs.py
+
+      # An icon name the sprite does not carry paints NOTHING, with no error and
+      # no console line, so a blank box ships and reads as a design choice. That
+      # is how the admin's Settings row and its Overview tile were empty for a
+      # release: ADMIN_SECTIONS named 'cog' and the sprite had only 'cogs'.
+      - run: python3 tools/check_icons.py
       - run: python3 tools/build_deploy_set.py --check
       # The four files both repositories hold identically -- including the icon
       # sprite, because CONTACT_ICONS is in the contract and an icon this side

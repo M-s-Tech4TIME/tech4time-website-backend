@@ -142,8 +142,7 @@ function chrome_logo_from_post(string $part, array $current): array
 {
     $logo = $current;
 
-    $logo['alt']   = chrome_post_text($_POST[$part]['logo']['alt'] ?? '');
-    $logo['sizes'] = chrome_post_text($_POST[$part]['logo']['sizes'] ?? '');
+    $logo['alt'] = chrome_post_text($_POST[$part]['logo']['alt'] ?? '');
 
     return $logo;
 }
@@ -479,22 +478,17 @@ function chrome_icon_field(string $name, string $value): void
  * it.
  *
  * The alt text stays because it is genuinely this screen's: the header's and
- * the footer's are different sentences about the same picture, and $responsive
- * is still a parameter because the header's lockup is drawn at several widths
- * and the footer's at one.
+ * the footer's are different sentences about the same picture. How wide the
+ * lockup is DRAWN went with the picture: that is a fact about the layout, not
+ * something to be typed, and what had been typed in it was wrong by 60%.
  */
-function chrome_logo_fields(string $part, array $logo, bool $responsive): void
+function chrome_logo_fields(string $part, array $logo): void
 {
     ?>
     <div class="admin__grid">
       <?php chrome_text_field($part . '[logo][alt]', 'Alt text', (string)$logo['alt'],
           'Read aloud where the picture cannot be seen. It describes the logo; '
           . 'where the link GOES is the description above.', false, true); ?>
-<?php if ($responsive): ?>
-      <?php chrome_text_field($part . '[logo][sizes]', 'Displayed size',
-          (string)$logo['sizes'],
-          'How wide the lockup is drawn, per screen width — a CSS “sizes” list.', true); ?>
-<?php endif; ?>
     </div>
 
     <div class="admin-card">
@@ -797,7 +791,7 @@ if ($screen === 'header') {
           . '— “Tech4TIME — home”, not just the company name.', true, true); ?>
     </div>
 
-    <?php chrome_logo_fields('header', $header['logo'], true); ?>
+    <?php chrome_logo_fields('header', $header['logo']); ?>
   </fieldset>
 
   <fieldset class="admin__block" id="band-nav">
@@ -883,7 +877,7 @@ if ($screen === 'footer') {
           . 'site repeats most often.'); ?>
     </div>
 
-    <?php chrome_logo_fields('footer', $footer['logo'], false); ?>
+    <?php chrome_logo_fields('footer', $footer['logo']); ?>
   </fieldset>
 
   <fieldset class="admin__block" id="band-links">

@@ -1100,9 +1100,19 @@ const CONTRACT_IMAGE_SLOTS = [
        sizes= is the header's alone. The footer draws one file and says so by
        having none, and the About row likewise -- see settings_logo_largest()
        in tech4time-website-frontend/lib/settings.php, named with the
-       repository because this file is shared and the renderer is over there. */
+       repository because this file is shared and the renderer is over there.
+
+       IT SAID '(max-width: 48em) 140px, 180px' AND THAT WAS NEVER TRUE. The
+       lockup's height is a clamp() and its width follows the 360x128 ratio, so
+       it is 79px at 320, 100px at 768 and 112.5px above about 1035 -- never
+       140, never 180. Declaring 180 does not make a picture bigger; it makes
+       the browser pick a file for a slot 60% wider than the one it is drawing
+       into, so a 3x phone took the 540px file (44 kB) where the 360 (27 kB)
+       is more than it can show. Both steps round UP from the measurement,
+       which is the safe direction: slightly more pixels than the screen can
+       draw, never fewer. */
     'settings.logo'     => ['width' => 180,
-                            'sizes' => '(max-width: 48em) 140px, 180px'],
+                            'sizes' => '(min-width: 48em) 113px, 100px'],
 
     /* No ladder -- see the docblock above. */
     'branding.file'     => ['width' => 0, 'sizes' => ''],
@@ -5735,12 +5745,7 @@ function chrome_defaults(): array
                announces this link as. The header's and the footer's are
                legitimately different sentences about the same picture, which is
                exactly why they are not one field somewhere else. */
-            'logo' => [
-                'alt'   => 'Tech4TIME',
-                /* Three widths behind one displayed size. The header shows the
-                   lockup at 140px on a phone and 180px above 48em. */
-                'sizes' => '(max-width: 48em) 140px, 180px',
-            ],
+            'logo' => ['alt' => 'Tech4TIME'],
             'nav' => ['items' => [
                 ['id' => 'home',     'target' => 'home',     'label' => '', 'status' => 'shown'],
                 ['id' => 'about',    'target' => 'about',    'label' => '', 'status' => 'shown'],
@@ -5755,12 +5760,7 @@ function chrome_defaults(): array
             'brand_label' => 'Tech4TIME — home',
             /* Likewise -- see the header's. The footer says nothing about
                the picture except how it should be announced. */
-            'logo' => [
-                'alt'   => 'Tech4TIME',
-                /* No sizes and no srcset: the footer draws one width and always
-                   has. An empty string says "emit no sizes attribute". */
-                'sizes' => '',
-            ],
+            'logo' => ['alt' => 'Tech4TIME'],
             'tagline'     => 'Orchestrating Technology with Time',
             'description' => 'Open-Source & Enterprise-grade cybersecurity, software '
                            . 'development, and IT solutions. Orchestrate, build, maintain '
@@ -5991,10 +5991,7 @@ function chrome_logo_defaults(mixed $logo, array $fallback): array
     $logo = is_array($logo) ? $logo : [];
     $logo += $fallback;
 
-    return [
-        'alt'   => trim((string)$logo['alt']),
-        'sizes' => trim((string)$logo['sizes']),
-    ];
+    return ['alt' => trim((string)$logo['alt'])];
 }
 
 /* ------------------------------------------------------ normalising */

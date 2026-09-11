@@ -50,6 +50,8 @@ from publish_stub import PublishStub  # noqa: E402
 ROOT = Path(__file__).resolve().parent.parent
 DOCROOT = ROOT / "public"
 DATA = ROOT / "content" / "contact.json"
+# The opening-hours rows live here; the notice above joins the two.
+SEO  = ROOT / "content" / "seo.json"
 
 ADMIN = "/?s=contact"
 
@@ -578,6 +580,99 @@ def run(client, r, site):
     lead = published(site).get("form", {}).get("lead", "")
     r.check("but ordinary formatting is",
             "<strong>anything</strong>" in lead and "<li>Security</li>" in lead, lead[:160])
+
+    print("\nthe offices a search engine is told no hours for")
+
+    _s, page = client.get(ADMIN)
+    r.check("as it ships, Belgium is named and the other two are not",
+            "no opening hours for: Belgium" in page, page[:300])
+
+    def named() -> str:
+        """Whoever the notice names, or '' when it is not drawn.
+
+        Read through a helper, not by splitting inline: with the notice absent
+        a str.split()[1] raises, and a suite that CRASHES on a failure reports
+        nothing about the fifty checks after it. That is how the first version
+        of this group looked like it had no teeth when it had.
+        """
+        _s, page = client.get(ADMIN)
+        marker = "no opening hours for:"
+        return page.split(marker, 1)[1][:120] if marker in page else ""
+
+    # The rule is seo_hours_for_office(), the SAME function the public site
+    # matches with -- so this cannot report covered while the site publishes
+    # nothing. Renaming an office breaks the label match, and that must show.
+    held = DATA.read_bytes()
+    try:
+        moved = json.loads(held)
+        moved["offices"]["items"][0]["name"] = "Bangla Desh"
+        DATA.write_text(json.dumps(moved, indent=4))
+        r.check("renaming an office past its hours row is reported at once",
+                "Bangla Desh" in named(), named() or "no notice at all")
+
+        # A ROW WITH NO DAYS IS NOT HOURS. It would publish an
+        # openingHoursSpecification with opening times and no day attached to
+        # them, so the matcher requires days and this proves it does.
+        # BYTES, NOT A RE-SERIALISATION. json.dumps() is not the inverse of
+        # json.loads(): it escapes non-ASCII unless told not to and writes no
+        # trailing newline, so "restoring" this way left content/seo.json with
+        # an em dash as \u2014 and its last line unterminated -- a file this
+        # suite had quietly rewritten while reporting that it put it back.
+        # The same mistake tools/test_upload.py made with a .gitignore.
+        seo_held = SEO.read_bytes()
+        try:
+            dayless = json.loads(seo_held)
+            dayless["hours"]["items"].append(
+                {"id": "", "label": "Belgium office", "days": [],
+                 "opens": "09:00", "closes": "17:00", "status": "shown"})
+            SEO.write_text(json.dumps(dayless, indent=4))
+            r.check("a row with a matching label but NO DAYS is not hours",
+                    "Belgium" in named(), named() or "no notice at all")
+        finally:
+            SEO.write_bytes(seo_held)
+    finally:
+        DATA.write_bytes(held)
+
+    _s, page = client.get(ADMIN)
+    r.check("and it is a notice, never an error",
+            "admin__notice--error" not in page, "drawn as an error")
+
+    print("\nan office's coordinates, which are the one pair here that is checked")
+
+    field = "offices[items][0][schema]"
+    client.post(ADMIN, dict(good, **{f"{field}[latitude]": "23.8103",
+                                     f"{field}[longitude]": "90.4125"}))
+    got = published(site)["offices"]["items"][0]["schema"]
+    r.check("a real pair is stored", (got["latitude"], got["longitude"])
+            == ("23.8103", "90.4125"), str(got))
+
+    # KEPT AS TYPED. A round trip through a float would drop the trailing zero,
+    # and how many places somebody gave is a claim about precision.
+    client.post(ADMIN, dict(good, **{f"{field}[latitude]": "23.80",
+                                     f"{field}[longitude]": "90.40"}))
+    got = published(site)["offices"]["items"][0]["schema"]
+    r.check("and stored as typed, trailing zero and all",
+            (got["latitude"], got["longitude"]) == ("23.80", "90.40"), str(got))
+
+    for what, lat, lon in [
+        ("a latitude past the pole", "90.1", "90.4125"),
+        ("a longitude past the meridian", "23.8103", "180.1"),
+        ("words", "near the airport", "90.4125"),
+        ("scientific notation", "1e5", "90.4125"),
+        ("a coordinate with a stray character", "23.8103N", "90.4125"),
+    ]:
+        client.post(ADMIN, dict(good, **{f"{field}[latitude]": lat,
+                                         f"{field}[longitude]": lon}))
+        got = published(site)["offices"]["items"][0]["schema"]
+        r.check(f"{what} is dropped rather than published",
+                got["latitude"] == "" or got["longitude"] == "", str(got))
+
+    # Emptying them is how an office goes back to having no pin.
+    client.post(ADMIN, dict(good, **{f"{field}[latitude]": "",
+                                     f"{field}[longitude]": ""}))
+    got = published(site)["offices"]["items"][0]["schema"]
+    r.check("and clearing both is allowed",
+            (got["latitude"], got["longitude"]) == ("", ""), str(got))
 
     # ------------------------------------------------------ publishing again
     print("\nthe retry the failed-publish notice offers")

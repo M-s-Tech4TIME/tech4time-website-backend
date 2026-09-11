@@ -544,7 +544,25 @@ function contact_office_defaults(array $office): array
         'region'      => '',
         'postal_code' => '',
         'country'     => '',
+        'latitude'    => '',
+        'longitude'   => '',
     ];
+
+    /* THE TWO THAT ARE NOT FREE TEXT. Every other field here is a line of an
+       address: whatever somebody types is what that place is called, and this
+       file is in no position to argue. A coordinate is different -- it is a
+       number with a range, it is never read by a person, and it goes into
+       structured data where a search engine acts on it. "near the airport" in
+       a latitude does not degrade to a vaguer pin; it is a broken property in
+       a graph that was otherwise fine.
+
+       So these are the one pair here that is CHECKED rather than trimmed, and
+       anything that is not a coordinate becomes empty -- which seo_offices()
+       reads as "no geo", the honest answer. */
+    $office['schema']['latitude']  =
+        contact_coordinate($office['schema']['latitude'] ?? '', 90.0);
+    $office['schema']['longitude'] =
+        contact_coordinate($office['schema']['longitude'] ?? '', 180.0);
 
     if ($office['id'] === '') {
         $office['id'] = contact_slug($office['name']);
@@ -562,6 +580,73 @@ function contact_office_defaults(array $office): array
  * Everything below the form is optional; the form is the page.
  */
 const CONTACT_BANDS = ['reach', 'offices'];
+
+/**
+ * A latitude or longitude as a canonical string, or '' when it is not one.
+ *
+ * Kept as a STRING rather than a float on purpose. It is stored in JSON and
+ * printed into JSON-LD, and a round trip through PHP's float would rewrite
+ * what somebody typed: 23.80 loses its trailing zero, and a coordinate given
+ * to six places is a claim about precision that this file has no business
+ * rounding. So it is validated as a number and stored as the digits.
+ *
+ * Refuses anything outside the range, anything with a stray character in it,
+ * and the empty string -- all of which come back as '', which every reader
+ * treats as "not given".
+ */
+function contact_coordinate(mixed $value, float $limit): string
+{
+    if (is_float($value) || is_int($value)) {
+        $value = (string)$value;
+    }
+    if (!is_string($value)) {
+        return '';
+    }
+
+    $value = trim($value);
+
+    /* Deliberately not is_numeric(): that accepts "1e5", "0x1A" and leading
+       whitespace, none of which is a coordinate anybody typed on purpose. */
+    if (!preg_match('/^[+-]?\d{1,3}(\.\d{1,15})?$/', $value)) {
+        return '';
+    }
+
+    return abs((float)$value) <= $limit ? $value : '';
+}
+
+/**
+ * The opening-hours rows that belong to one office, by the label somebody typed.
+ *
+ * The hours live in content/seo.json and the offices in content/contact.json,
+ * and nothing but a label joins them: a row called "Bangladesh office" against
+ * an office called "Bangladesh". That is loose, and it is the looseness that
+ * makes it editable -- a fourth office needs no code.
+ *
+ * HERE, IN THE SHARED FILE, BECAUSE TWO HALVES ASK IT. The public site asks in
+ * order to publish openingHoursSpecification on a LocalBusiness; the editor
+ * asks in order to say which office has no hours attached to it. Written twice
+ * they would drift, and the failure would be an editor reporting that an office
+ * is covered while the site publishes nothing for it -- which is the exact
+ * shape of defect the footer's contact rows already produced once.
+ *
+ * A row matching nothing is left off rather than attached to every office,
+ * because opening hours on the wrong continent are worse than none.
+ */
+function seo_hours_for_office(array $rows, string $name): array
+{
+    $name = trim($name);
+
+    if ($name === '') {
+        return [];
+    }
+
+    return array_values(array_filter(
+        $rows,
+        static fn(array $row): bool =>
+            ($row['days'] ?? []) !== []
+            && stripos((string)($row['label'] ?? ''), $name) !== false
+    ));
+}
 
 /** Trim a list of strings and drop the blanks, whatever shape it arrived in. */
 function contact_string_list(mixed $value): array

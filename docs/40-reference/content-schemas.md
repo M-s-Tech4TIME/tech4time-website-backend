@@ -114,7 +114,7 @@ anybody meant to publish.
 | `hours` | opening hours |
 | `languages` | array of strings |
 | `status` | `shown` or hidden — `contact_shown_offices()` filters on it |
-| `schema` | `street`, `locality`, `region`, `postal_code`, `country` — for `PostalAddress` structured data |
+| `schema` | `street`, `locality`, `region`, `postal_code`, `country` — for `PostalAddress` structured data — plus `latitude` and `longitude`, which are the only pair in this document **checked** rather than trimmed: `contact_coordinate()` refuses anything outside ±90 / ±180, anything with a stray character, and scientific notation, and both halves are needed or no `geo` is emitted. Stored as strings so `23.80` keeps its trailing zero |
 
 **`contact_images()` counts an office picture when the unused-upload sweep asks what is in use** —
 and it did not exist until it had to. `contract_images()` put `contact` in the arm that returns the

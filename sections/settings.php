@@ -25,12 +25,18 @@
  * alone is twenty-eight fields, and a form that is quietly truncated saves what
  * arrived and loses the rest — which looks exactly like a save that worked.
  *
- * THE PART SCREENS SHOW WHAT IS SET AND DO NOT YET CHANGE IT. The document,
- * the road it travels and this shell landed first, on purpose: every consumer
- * of the logo, the icons and the colours has to be converted to read from here
- * before anything is allowed to write to it, or a save would change one of the
- * places a mark appears and leave the other eight showing the old one. Each
- * screen says which stage brings its own controls.
+ * THE READERS WERE CONVERTED BEFORE ANY OF THIS COULD WRITE. The document, the
+ * road it travels and this shell landed first, on purpose: every consumer of
+ * the logo, the icons and the colours had to be reading from here before a save
+ * was allowed to change any of it, or the first save would have moved one of
+ * the places a mark appears and left the other eight showing the old one.
+ *
+ * ONE SCREEN REFUSES; THE REST ONLY WARN. A colour pair below WCAG AA is turned
+ * away by settings_validate(), because an unreadable site is not a matter of
+ * taste. Everything else here -- a missing dark mark, a half-replaced pair, and
+ * the icon or share card a new logo leaves behind -- is a standing notice,
+ * because each is a legitimate answer that only the person who drew the mark
+ * can judge.
  *
  * Included by public/index.php, which has already checked the password and
  * started the session.
@@ -44,6 +50,7 @@ if (!defined('T4T_ADMIN')) {
 }
 
 require_once __DIR__ . '/../lib/settings.php';
+require_once __DIR__ . '/../lib/seo.php';   /* for the share card's state, read never written */
 
 /**
  * What each part is called on the index, and what it holds.
@@ -120,15 +127,22 @@ function settings_colours_changed(array $data): bool
 /**
  * The standing notices about the state of the identity.
  *
- * NOTICES, NEVER REFUSALS. Both of the things reported here are legitimate
+ * NOTICES, NEVER REFUSALS. All four of the things reported here are legitimate
  * answers that only the person who drew the mark can judge, and a settings
- * screen that refused a save over either would be unusable halfway through
+ * screen that refused a save over any of them would be unusable halfway through
  * replacing a pair of files.
+ *
+ * They are four because there are four ways an identity goes half-changed: no
+ * dark mark at all, which renders the light one and is often right; one half
+ * replaced and the other left holding the PREVIOUS mark, which renders two
+ * different logos and is never right; and the two pictures a new logo leaves
+ * behind, the tab icon and the share card, neither of which can be made from a
+ * wordmark.
  *
  * Drawn on every render rather than after a save, because each reports a state
  * of the document rather than something that just happened.
  */
-function settings_notices(array $data, bool $linked): void
+function settings_notices(array $data, array $seo, bool $linked): void
 {
     if (settings_logo_is_shared($data)) {
         admin_standing_notice(
@@ -136,6 +150,29 @@ function settings_notices(array $data, bool $linked): void
             . 'That is right for a mark that reads on both a pale and a dark '
             . 'ground, and wrong for one drawn in dark ink — which would be very '
             . 'nearly invisible.');
+    }
+
+    if (settings_logo_is_mismatched($data)) {
+        ?>
+        <div class="admin__notice admin__notice--warn">
+          <p class="admin__notice-line"><?= admin_icon('info-circle', 'icon icon--sm') ?>
+             <strong>One half of the logo was replaced and the other was not.</strong></p>
+          <p>
+            The two halves are separate pictures, so the site is showing the new
+            mark in one colour mode and the previous one in the other. Whoever
+            is reading this is in one mode and will not see the other &mdash;
+            which is why it is said here rather than left to be noticed.
+          </p>
+<?php if ($linked): ?>
+          <p class="admin__fineprint">
+            Replace the other half on the
+            <a href="<?= h(admin_url('settings', ['part' => 'logo'])) ?>">logo</a>
+            screen, or clear it: an empty half draws the one that is set, which
+            is right for a mark that reads on both grounds.
+          </p>
+<?php endif; ?>
+        </div>
+        <?php
     }
 
     if (settings_icon_is_stale($data)) {
@@ -155,6 +192,30 @@ function settings_notices(array $data, bool $linked): void
             Upload a square mark on the
             <a href="<?= h(admin_url('settings', ['part' => 'icon'])) ?>">tab icon</a>
             screen and every favicon is made from it.
+          </p>
+<?php endif; ?>
+        </div>
+        <?php
+    }
+
+    if (settings_share_is_stale($data, $seo)) {
+        ?>
+        <div class="admin__notice admin__notice--warn">
+          <p class="admin__notice-line"><?= admin_icon('info-circle', 'icon icon--sm') ?>
+             <strong>The share card still carries the previous mark.</strong></p>
+          <p>
+            That is the picture somebody sees when a link to this site is pasted
+            into a chat or posted somewhere — 1200 by 630, with the mark drawn
+            into it. Nothing here can redraw it: the card has type set beside the
+            logo, and a card this panel generated would be a worse card. It is
+            uploaded, like the logo is.
+          </p>
+<?php if ($linked): ?>
+          <p class="admin__fineprint">
+            Replace it on the
+            <a href="<?= h(admin_url('seo', ['site' => 'share'])) ?>">share card</a>
+            screen. Until then every link shared from the site shows the old one,
+            which is visible in somebody else's window and nowhere on the site.
           </p>
 <?php endif; ?>
         </div>
@@ -323,6 +384,7 @@ $part   = in_array((string)($_GET['part'] ?? ''), SETTINGS_PARTS, true)
 $screen = $part === '' ? 'index' : $part;
 
 $data   = settings_load();
+$seo    = seo_load();     /* read-only: one notice here is about the share card */
 $errors = [];
 
 /* ----------------------------------------------------------------- saving */
@@ -482,7 +544,7 @@ if ($screen === 'index') {
         ['band-parts' => 'The four parts', 'band-elsewhere' => 'What is not here']);
 
     admin_notices($errors);
-    settings_notices($data, true);
+    settings_notices($data, $seo, true);
     ?>
 
 <section class="admin__block" id="band-parts">
@@ -668,7 +730,7 @@ if ($screen === 'icon') {
          'discard' => admin_url('settings', ['part' => 'icon'])]);
 
     admin_notices($errors);
-    settings_notices($data, false);
+    settings_notices($data, $seo, false);
     ?>
 
 <form class="admin__form" id="settings-form" method="post" data-async
@@ -745,7 +807,7 @@ if ($screen === 'logo') {
          'discard' => admin_url('settings', ['part' => 'logo'])]);
 
     admin_notices($errors);
-    settings_notices($data, false);
+    settings_notices($data, $seo, false);
     ?>
 
 <form class="admin__form" id="settings-form" method="post" data-async
@@ -808,7 +870,7 @@ admin_head('settings', $user,
      'discard' => admin_url('settings', ['part' => 'mail'])]);
 
 admin_notices($errors);
-settings_notices($data, false);
+settings_notices($data, $seo, false);
 ?>
 
 <form class="admin__form" id="settings-form" method="post" data-async

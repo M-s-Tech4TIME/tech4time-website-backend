@@ -378,6 +378,17 @@ def run(b: Browser, base: str, r: Results) -> None:
                    # screen, and the two site-wide ones.
                    "/?s=seo", "/?s=seo&page=about",
                    "/?s=seo&site=identity", "/?s=seo&site=crawl",
+                   # And the two editors that are split by PART rather than by
+                   # page. Both were shipped after this list was written and
+                   # neither was added to it, so every guarantee below -- no
+                   # link that reloads the panel, somewhere to report a slow
+                   # post, no button that is quietly not a submit -- was
+                   # untested on eight screens.
+                   "/?s=chrome", "/?s=chrome&part=header",
+                   "/?s=chrome&part=footer", "/?s=chrome&part=dock",
+                   "/?s=settings", "/?s=settings&part=logo",
+                   "/?s=settings&part=icon", "/?s=settings&part=colour",
+                   "/?s=settings&part=mail",
                    "/?s=account"):
         b.go(base + screen)
         loud = b.js("""
@@ -497,6 +508,13 @@ def run(b: Browser, base: str, r: Results) -> None:
                    # exactly that below.
                    "/?s=seo&page=about", "/?s=seo&page=notfound",
                    "/?s=seo&site=identity", "/?s=seo&site=crawl",
+                   # The part screens of the two split editors. Their indexes
+                   # are not here for the reason the SEO index is not: they
+                   # edit nothing.
+                   "/?s=chrome&part=header", "/?s=chrome&part=footer",
+                   "/?s=chrome&part=dock",
+                   "/?s=settings&part=logo", "/?s=settings&part=icon",
+                   "/?s=settings&part=colour", "/?s=settings&part=mail",
                    "/?s=account"):
         b.go(base + screen)
         counts = b.js(
@@ -700,6 +718,17 @@ def navigate(b: Browser, base: str, r: Results) -> None:
                    # screen, and the two site-wide ones.
                    "/?s=seo", "/?s=seo&page=about",
                    "/?s=seo&site=identity", "/?s=seo&site=crawl",
+                   # And the two editors that are split by PART rather than by
+                   # page. Both were shipped after this list was written and
+                   # neither was added to it, so every guarantee below -- no
+                   # link that reloads the panel, somewhere to report a slow
+                   # post, no button that is quietly not a submit -- was
+                   # untested on eight screens.
+                   "/?s=chrome", "/?s=chrome&part=header",
+                   "/?s=chrome&part=footer", "/?s=chrome&part=dock",
+                   "/?s=settings", "/?s=settings&part=logo",
+                   "/?s=settings&part=icon", "/?s=settings&part=colour",
+                   "/?s=settings&part=mail",
                    "/?s=account"):
         b.go(base + screen)
         stragglers = b.js(STRAGGLERS)
@@ -733,6 +762,17 @@ def navigate(b: Browser, base: str, r: Results) -> None:
                    # screen, and the two site-wide ones.
                    "/?s=seo", "/?s=seo&page=about",
                    "/?s=seo&site=identity", "/?s=seo&site=crawl",
+                   # And the two editors that are split by PART rather than by
+                   # page. Both were shipped after this list was written and
+                   # neither was added to it, so every guarantee below -- no
+                   # link that reloads the panel, somewhere to report a slow
+                   # post, no button that is quietly not a submit -- was
+                   # untested on eight screens.
+                   "/?s=chrome", "/?s=chrome&part=header",
+                   "/?s=chrome&part=footer", "/?s=chrome&part=dock",
+                   "/?s=settings", "/?s=settings&part=logo",
+                   "/?s=settings&part=icon", "/?s=settings&part=colour",
+                   "/?s=settings&part=mail",
                    "/?s=account"):
         b.go(base + screen)
         r.check(f"{screen}: there is somewhere to say it",

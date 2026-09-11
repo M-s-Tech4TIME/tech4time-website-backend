@@ -65,6 +65,9 @@ ROOT = Path(__file__).resolve().parent.parent
 DOCROOT = ROOT / "public"
 ROUTER = ROOT / "tools" / "dev-router.php"
 DATA = ROOT / "content" / "settings.json"
+# The share-card notice is the one thing on these screens that reads another
+# document, so this suite has to be able to move it and put it back.
+SEO  = ROOT / "content" / "seo.json"
 UPLOADS = ROOT / "public" / "uploads"
 
 PARTS = ["logo", "icon", "colour", "mail"]
@@ -191,6 +194,13 @@ def write(change) -> None:
     DATA.write_text(json.dumps(data, indent=4))
 
 
+def write_seo(change) -> None:
+    """Change seo.json the way ?s=seo&site=share would."""
+    data = json.loads(SEO.read_text())
+    change(data)
+    SEO.write_text(json.dumps(data, indent=4))
+
+
 def php(code: str) -> dict:
     out = subprocess.run(["php", "-r", "require 'lib/settings.php';" + code],
                          cwd=str(ROOT), capture_output=True, text=True)
@@ -271,16 +281,73 @@ def the_shell(client, r) -> None:
     r.check("an unknown part falls back to the index rather than failing",
             status == 200 and "The four parts" in page, f"status {status}")
 
+    the_panels_own_mark(client, r)
+
+
+def the_panels_own_mark(client, r) -> None:
+    """The ninth place the logo appears, and the one nobody would think to check.
+
+    A company that replaces its mark gets a new website and, if this is not
+    wired, an admin panel still wearing the old one -- on the rail of every
+    screen and on the sign-in page, which is the one place they see it daily.
+    It was two pairs of hard-coded paths before this document existed.
+
+    THE UPLOAD IS SHOWN FROM THIS HOST, NOT FETCHED FROM THE PUBLIC SITE. The
+    backend holds the canonical copy, so the panel must not be waiting on a
+    publish to have succeeded before it can draw what was just chosen -- and in
+    local development the public site is a closed port, so a cross-origin
+    preview draws nothing at all.
+    """
+    print("\nthe panel wears the same mark")
+
+    held = stored()
+    mark = "/uploads/0f0f0f0f0f0f0f0f.png"
+    try:
+        write(lambda d: d["logo"]["light"].update(
+            {"src": mark, "webp": "", "width": 400, "height": 100,
+             "srcset": "", "webp_srcset": ""}))
+
+        _, page = client.get("/?s=overview")
+        rail = re.findall(r'<img class="rail__logo".*?>', page, re.S)
+        r.check("the rail draws the published mark",
+                rail and any(mark in tag for tag in rail),
+                str(rail)[:200] or "no rail logo at all")
+        r.check("at the size the document gives, not a remembered one",
+                any('width="400"' in tag and 'height="100"' in tag for tag in rail),
+                str(rail)[:200])
+        r.check("and from this host, not across the wire to the public site",
+                all("http://" not in tag and "https://" not in tag for tag in rail),
+                str(rail)[:200])
+
+        # The sign-in page draws it too, and is reached without a session.
+        page = urllib.request.urlopen(client.base + "/login.php",
+                                      timeout=20).read().decode("utf-8", "replace")
+        signin = re.findall(r'<img class="signin__logo".*?>', page, re.S)
+        r.check("the sign-in page draws it as well",
+                signin and any(mark in tag for tag in signin),
+                str(signin)[:200] or "no sign-in logo at all")
+    finally:
+        DATA.write_text(json.dumps(held, indent=4))
+
+
+SHARE_NOTICE = "share card still carries the previous mark"
+DARK_NOTICE  = "dark mode shows the light one"
+ICON_NOTICE  = "has been replaced and the tab icon has not"
+PAIR_NOTICE  = "One half of the logo was replaced and the other was not"
+
 
 def the_notices(client, r) -> None:
-    print("\nthe two standing notices, each on its own condition")
+    print("\nthe four standing notices, each on its own condition")
 
-    # As shipped: a dark half IS set, and the logo is not an upload.
+    # As shipped: a dark half IS set, the logo is not an upload, and so the
+    # share card cannot be behind one.
     _, index = client.get("/?s=settings")
-    r.check("as it ships, neither notice is drawn",
-            "dark mode shows the light one" not in index
-            and "has been replaced and the tab icon has not" not in index,
+    r.check("as it ships, no notice is drawn",
+            DARK_NOTICE not in index and ICON_NOTICE not in index
+            and SHARE_NOTICE not in index and PAIR_NOTICE not in index,
             index[:300])
+
+    the_mismatched_pair(client, r)
 
     write(lambda d: d["logo"].__setitem__("dark", {
         "src": "", "webp": "", "width": 0, "height": 0,
@@ -293,21 +360,118 @@ def the_notices(client, r) -> None:
             "the wrong notice appeared")
 
     # An uploaded logo with no uploaded icon: the tab is still the shipped one.
+    r.check("and does not claim the share card is behind either",
+            SHARE_NOTICE not in index, "the wrong notice appeared")
+
+    # An uploaded logo with no uploaded icon: the tab is still the shipped one.
     write(lambda d: d["logo"]["light"].__setitem__("src", "/uploads/00112233aabbccdd.png"))
     _, index = client.get("/?s=settings")
     r.check("a replaced logo with the shipped icon under it says so",
-            "has been replaced and the tab icon has not" in index, "notice missing")
+            ICON_NOTICE in index, "notice missing")
+
+    # ... and the share card is a second thing the new logo left behind. It is
+    # a separate condition on a separate document, so it gets its own notice.
+    r.check("the same replaced logo says the share card is behind too",
+            SHARE_NOTICE in index, "share notice missing")
 
     write(lambda d: d["icon"]["master"].__setitem__("src", "/uploads/44556677eeff0011.png"))
     _, index = client.get("/?s=settings")
     r.check("and stops saying it once an icon is uploaded",
-            "has been replaced and the tab icon has not" not in index,
-            "the notice outlived its condition")
+            ICON_NOTICE not in index, "the notice outlived its condition")
+    r.check("uploading an icon does not answer the share card",
+            SHARE_NOTICE in index, "one upload silenced two notices")
 
-    # Neither is an error: nothing on this screen is refused over either.
+    # The card is not generated here; it is replaced at ?s=seo&site=share, and
+    # replacing it is what ends this notice.
+    r.check("the share notice points at the screen that owns the card",
+            "site=share" in index.replace("&amp;", "&"),
+            "no link to the share screen")
+
+    seo_backup = SEO.read_bytes()
+    try:
+        write_seo(lambda d: d["site"]["share"].__setitem__(
+            "src", "/uploads/8899aabbccddeeff.png"))
+        _, index = client.get("/?s=settings")
+        r.check("replacing the card ends the notice",
+                SHARE_NOTICE not in index, "the notice outlived its condition")
+
+        # A save is never blocked by any of this. The mail screen is the
+        # cheapest one to prove it on: two fields and no upload.
+        write_seo(lambda d: d["site"]["share"].__setitem__(
+            "src", "/assets/images/og/tech4time-og.png"))
+        _, form = client.get("/?s=settings&part=mail")
+        r.check("the notice stands on the part screen as well",
+                SHARE_NOTICE in form, "notice missing from the part screen")
+
+        fields = form_fields(form)
+        fields["contact[mail_to]"] = "someone@tech4time.bd"
+        status, _headers, _body = client.post("/?s=settings&part=mail", fields)
+        r.check("and a save goes through with it standing",
+                status == 302, f"status {status} -- a refusal answers 200")
+        r.check("the save actually landed",
+                stored()["contact"]["mail_to"] == "someone@tech4time.bd",
+                str(stored()["contact"]))
+    finally:
+        SEO.write_bytes(seo_backup)
+
+    # None of the three is an error: nothing here is refused over any of them.
     _, index = client.get("/?s=settings")
     r.check("no notice is drawn as an error",
             "admin__notice--error" not in index, "a notice was drawn as an error")
+
+
+def the_mismatched_pair(client, r) -> None:
+    """One half replaced, the other not — the quiet way a pair goes wrong.
+
+    An empty dark half renders the light one, so both modes agree. A dark half
+    still holding the PREVIOUS mark renders that, so the site shows two
+    different logos depending on a setting the operator is not in. Nothing on
+    the site says so and nothing on the site could.
+    """
+    held = stored()
+    try:
+        # Light replaced, dark still the mark that ships.
+        write(lambda d: d["logo"]["light"].__setitem__(
+            "src", "/uploads/1234567890abcdef.png"))
+        _, index = client.get("/?s=settings")
+        r.check("  replacing only the light half is reported",
+                PAIR_NOTICE in index, "notice missing")
+        r.check("  and not as the empty-dark-half one, which is a different fault",
+                DARK_NOTICE not in index, "the wrong notice appeared")
+
+        # THE SAME FAULT THE OTHER WAY ROUND. Rarer order, identical result.
+        write(lambda d: (d["logo"]["light"].__setitem__(
+                             "src", "/assets/images/logo/logo-light-360.png"),
+                         d["logo"]["dark"].__setitem__(
+                             "src", "/uploads/fedcba0987654321.png")))
+        _, index = client.get("/?s=settings")
+        r.check("  and so is replacing only the dark half",
+                PAIR_NOTICE in index, "the notice only looks one way")
+
+        # Both replaced: they agree again.
+        write(lambda d: d["logo"]["light"].__setitem__(
+            "src", "/uploads/1234567890abcdef.png"))
+        _, index = client.get("/?s=settings")
+        r.check("  replacing both ends it",
+                PAIR_NOTICE not in index, "the notice outlived its condition")
+
+        # An empty dark half is the other condition, and must not raise this
+        # one as well: two notices about one field is noise.
+        write(lambda d: d["logo"]["dark"].__setitem__("src", ""))
+        _, index = client.get("/?s=settings")
+        r.check("  an empty dark half raises the OTHER notice and not this one",
+                DARK_NOTICE in index and PAIR_NOTICE not in index,
+                "both notices fired for one fault")
+
+        # And it never blocks a save.
+        _, form = client.get("/?s=settings&part=mail")
+        fields = form_fields(form)
+        fields["contact[mail_to]"] = "pair@tech4time.bd"
+        status, _headers, _body = client.post("/?s=settings&part=mail", fields)
+        r.check("  and no notice here blocks a save", status == 302,
+                f"status {status} -- a refusal answers 200")
+    finally:
+        DATA.write_text(json.dumps(held, indent=4))
 
 
 def the_road(r, site) -> None:

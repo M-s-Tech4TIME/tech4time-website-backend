@@ -654,13 +654,28 @@ an **override** — empty means the site's mark, filled wins — because Google 
 
 **Reading the identity is in [`contract.php`](#contractphp), not here, and that is a correction.**
 `settings_logo()` (which mark for which theme, falling back to the light one), `settings_logo_largest()`,
-`settings_logo_is_shared()`, `settings_logo_is_uploaded()`, `settings_icon_is_stale()` and
-`settings_colours()` are pure functions of the document — none reads a file, emits markup or knows
+`settings_logo_is_shared()`, `settings_logo_is_uploaded()`, `settings_logo_is_mismatched()`,
+`settings_icon_is_stale()`, `settings_share_is_stale()` and `settings_colours()` are pure
+functions of the document — none reads a file, emits markup or knows
 which host it is on — and **both halves render the mark**: the public site draws it in the header,
 the footer and the About row; the editor draws it in its own rail and on its sign-in page. Putting
 them on the renderer's side got `settings_logo_is_shared()` written out twice within the hour, which
 is the drift the shared file exists to prevent. What is left in each half is that half's own
 business: the file path and the read here, plus the save, the validation and the screens over there.
+
+**Four standing notices, and all four are notices rather than refusals**, because each is also
+what a correct half-finished edit looks like. `settings_logo_is_shared()` reports an empty dark
+half, which renders the light mark in both modes — an answer, not an omission.
+`settings_logo_is_mismatched()` reports the worse and quieter case: one half replaced and the other
+still holding the **previous** mark, so the site shows two different logos and whoever uploaded it
+is in one mode and will never see the other. It is symmetric, because replacing only the dark half
+is rarer and exactly as wrong. `settings_icon_is_stale()` and `settings_share_is_stale()` report
+the two pictures a new logo leaves behind — the tab icon, which is a separate square master because
+a wordmark becomes a smear at sixteen pixels, and the share card, which is uploaded because nothing
+here can set type. The share one takes the **seo** document as an argument rather than reading it,
+since the shared file lives in a repository whose `seo.json` is a replica.
+
+The one **refusal** on these screens is a colour pair below WCAG AA. See `settings_validate()`.
 
 `settings_edit()` is `chrome_edit()` line for line, and it locks for the same reason: each screen
 holds one **part** of this document — the colour screen never sees the logo — so a save merges the

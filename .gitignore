@@ -24,16 +24,11 @@ tools/shots/
 
 # Runtime artefacts from the job post editor. careers.json itself IS tracked
 # (it seeds a fresh deploy); its backup and the test harness router are not.
-content/careers.json.bak
-content/contact.json.bak
-content/company.json.bak
-content/about.json.bak
-content/home.json.bak
-content/services.json.bak
-content/certifications.json.bak
-content/branding.json.bak
-content/privacy.json.bak
-content/seo.json.bak
+# ONE PATTERN, NOT ONE LINE PER DOCUMENT. This was ten enumerated names and it
+# had already fallen behind twice — chrome.json.bak was never added when that
+# screen shipped, and settings.json.bak would have been the second miss. The
+# documents are listed in CONTRACT_DOCUMENTS and nowhere else needs a copy.
+content/*.json.bak
 content/*.tmp
 .test-router-*.php
 

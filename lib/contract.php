@@ -6985,6 +6985,66 @@ function settings_icon_is_stale(array $settings): bool
         && trim((string)($settings['icon']['master']['src'] ?? '')) === '';
 }
 
+/**
+ * True when the logo has been replaced but the share card still has not.
+ *
+ * The card a link preview shows is 1200x630 with the mark drawn into it and
+ * type set beside it. Nothing here draws it: generating it would mean
+ * reimplementing typography against a font stack the server does not have, and
+ * a card with the wrong kerning is worse than one made by the person who owns
+ * the brand. So it stays its own upload at ?s=seo&site=share.
+ *
+ * Which leaves exactly one failure, and this reports it: the logo changes, the
+ * card does not, and every link shared from the site keeps showing the previous
+ * mark. Nobody sees that on the site itself -- it is only visible in somebody
+ * else's chat window, which is the last place anyone looks.
+ *
+ * Takes the seo document rather than reading it, because this file is shared
+ * with a repository whose copy of seo.json is a replica and whose copy of this
+ * function is never called.
+ */
+function settings_share_is_stale(array $settings, array $seo): bool
+{
+    return settings_logo_is_uploaded($settings)
+        && !str_starts_with(
+            trim((string)($seo['site']['share']['src'] ?? '')),
+            SETTINGS_UPLOAD_ROOT
+        );
+}
+
+/**
+ * True when one half of the pair was replaced and the other was not.
+ *
+ * THE WORSE OF THE TWO WAYS A PAIR CAN BE WRONG, and the quiet one. An empty
+ * dark half at least renders the light mark, so the two modes agree about what
+ * the company's logo is. A half that still holds the PREVIOUS mark renders that
+ * one -- so the site shows the new logo in light mode and the old logo in dark
+ * mode, and nothing on the site itself says so. The person who uploaded it is
+ * almost certainly in one mode and will never see the other.
+ *
+ * Symmetric on purpose. Replacing only the dark half is the rarer order and
+ * exactly as wrong, and a check that only looked one way would be a notice
+ * that fires for one operator's habits and not another's.
+ *
+ * Not a refusal: replacing a pair is two uploads and there is a moment between
+ * them when this is true and nothing is wrong. It is a notice for the same
+ * reason every other one on that screen is.
+ */
+function settings_logo_is_mismatched(array $settings): bool
+{
+    $light = trim((string)($settings['logo']['light']['src'] ?? ''));
+    $dark  = trim((string)($settings['logo']['dark']['src'] ?? ''));
+
+    /* An empty dark half is the OTHER condition, reported by
+       settings_logo_is_shared(). Two notices about one field would be noise. */
+    if ($light === '' || $dark === '') {
+        return false;
+    }
+
+    return str_starts_with($light, SETTINGS_UPLOAD_ROOT)
+        !== str_starts_with($dark, SETTINGS_UPLOAD_ROOT);
+}
+
 /** True when the light mark is an upload rather than the one that ships. */
 function settings_logo_is_uploaded(array $settings): bool
 {

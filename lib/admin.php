@@ -683,13 +683,22 @@ function admin_image_fields(string $field, string $upload, array $image,
         <?php /* Carried rather than edited. The paths and the size come from
                  the file itself when it is uploaded, and a size typed by hand
                  is a size that is wrong — which moves the page as it loads.
-                 The model re-checks all four against CONTRACT_IMAGE_ROOTS
-                 anyway, because a hidden input is a text field with the label
-                 taken off. */ ?>
-        <input type="hidden" name="<?= h($field) ?>[src]" value="<?= h((string)$image['src']) ?>">
-        <input type="hidden" name="<?= h($field) ?>[webp]" value="<?= h((string)$image['webp']) ?>">
-        <input type="hidden" name="<?= h($field) ?>[width]" value="<?= (int)$image['width'] ?>">
-        <input type="hidden" name="<?= h($field) ?>[height]" value="<?= (int)$image['height'] ?>">
+                 The model re-checks every one of them against
+                 CONTRACT_IMAGE_ROOTS anyway, because a hidden input is a text
+                 field with the label taken off.
+
+                 EVERY FIELD THE RECORD HAS, driven off the record rather than
+                 listed here. It listed four, and then a picture record grew
+                 srcset and webp_srcset — so a picture stored at several widths
+                 kept them until the next save of its screen, which rebuilt it
+                 from these inputs and silently dropped the ladder. The rungs
+                 then belonged to nothing and the unused sweep would offer to
+                 delete the widths every phone is served. A list kept in step by
+                 hand is a list that goes out of step; this one cannot. */ ?>
+<?php foreach (contract_image_defaults($image) as $key => $value): ?>
+        <input type="hidden" name="<?= h($field) ?>[<?= h($key) ?>]"
+               value="<?= h((string)$value) ?>">
+<?php endforeach; ?>
 
 <?php $problem = upload_problem(); ?>
 <?php if ($problem !== ''): ?>
@@ -721,6 +730,24 @@ function admin_image_fields(string $field, string $upload, array $image,
         </label>
 <?php endif; ?>
     <?php
+}
+
+/**
+ * One picture, rebuilt from what a form posted.
+ *
+ * ONE FUNCTION AND NOT FIVE. Four screens had a copy of this apiece and each
+ * copy named the fields it carried, so a field added to a picture record was
+ * carried by whichever copies somebody remembered to edit. None of them was
+ * edited when srcset arrived, and all four quietly dropped it.
+ *
+ * contract_image_defaults() decides what a picture record holds and
+ * contract_safe_image_path() decides what a path may be, so both are asked
+ * rather than reimplemented. Everything posted is untrusted: these are hidden
+ * inputs, which are text fields with the label taken off.
+ */
+function admin_image_from_post(mixed $image): array
+{
+    return contract_image_defaults(is_array($image) ? $image : []);
 }
 
 /**

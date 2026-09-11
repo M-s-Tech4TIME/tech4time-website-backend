@@ -74,6 +74,24 @@ def php(code: str) -> dict:
         return {"fatal": "not JSON: " + out.stdout.strip()[:400]}
 
 
+def admin(code: str) -> dict:
+    """Run a snippet against lib/admin.php — the editor's own side.
+
+    Separate from php() because lib/upload.php does not bring the editor in,
+    and the picture component and its round trip are the editor's.
+    """
+    out = subprocess.run(
+        ["php", "-r", "define('T4T_ADMIN', true); require 'lib/admin.php';" + code],
+        cwd=ROOT, capture_output=True, text=True,
+    )
+    if out.returncode != 0:
+        return {"fatal": (out.stderr or out.stdout).strip()[:400]}
+    try:
+        return json.loads(out.stdout)
+    except json.JSONDecodeError:
+        return {"fatal": "not JSON: " + out.stdout.strip()[:400]}
+
+
 def has_gd() -> bool:
     out = subprocess.run(["php", "-r", "echo extension_loaded('gd') ? '1' : '';"],
                          capture_output=True, text=True)
@@ -275,6 +293,48 @@ def run(r: Results, gd: bool) -> None:
             not (set(named) - declared), f"unknown: {sorted(set(named) - declared)}")
     r.check("and every slot the contract declares is named by a screen",
             not (declared - set(named)), f"never used: {sorted(declared - set(named))}")
+
+    print("\na ladder survives a save that uploaded nothing")
+    # THE LADDER IS ONLY WORTH STORING IF IT COMES BACK. A picture's record
+    # travels through its screen as hidden inputs and is rebuilt from them on
+    # every save, upload or no upload. That list named four fields; a record
+    # grew to six; so a picture stored at several widths kept them exactly
+    # until the next time somebody saved that screen, which rebuilt it without
+    # them. The rungs then belonged to nothing, and the unused sweep would have
+    # offered to delete the widths every phone is served.
+    #
+    # Asked of the component rather than of one screen, because the component
+    # is what all six of them draw.
+    LADDERED = ("['src' => '/uploads/3333333333333333.png',"
+                " 'webp' => '/uploads/4444444444444444.webp',"
+                " 'width' => 168, 'height' => 126,"
+                " 'srcset' => '/uploads/1111111111111111.png 56w,"
+                " /uploads/3333333333333333.png 168w',"
+                " 'webp_srcset' => '/uploads/5555555555555555.webp 56w,"
+                " /uploads/4444444444444444.webp 168w']")
+
+    html = admin("ob_start(); admin_image_fields('row[image]', 'upload[x][0]', %s);"
+                 "echo json_encode(['html' => ob_get_clean()]);"
+                 % LADDERED).get("html", "")
+
+    carried = set(re.findall(r'name="row\[image\]\[(\w+)\]"', html))
+    wanted = set(php("echo json_encode(array_keys(contract_image_defaults([])));") or [])
+
+    r.check("the form carries every field a picture record has",
+            wanted and carried == wanted,
+            f"carries {sorted(carried)}, record has {sorted(wanted)}")
+
+    # And the other half of the round trip: what comes back off the wire.
+    back = admin("echo json_encode(admin_image_from_post(%s));" % LADDERED)
+    r.check("and rebuilds it from them with the ladder intact",
+            back.get("srcset", "").count("56w") == 1
+            and back.get("webp_srcset", "").count("56w") == 1,
+            str(back)[:250])
+    r.check("dropping a rung that is not a servable path, and keeping the rest",
+            admin("echo json_encode(admin_image_from_post("
+                  "['src' => '/uploads/a.png', 'srcset' => "
+                  "'https://evil.example/x.png 56w, /uploads/b.png 168w']));")
+            .get("srcset") == "/uploads/b.png 168w")
 
     print("\na ladder's rungs count as pictures in use")
     # A laddered picture keeps most of its files inside srcset and nowhere

@@ -161,14 +161,7 @@ function branding_asset_from_post(array $asset): array
  */
 function branding_image_from_post(mixed $image): array
 {
-    $image = is_array($image) ? $image : [];
-
-    return contract_image_defaults([
-        'src'    => contract_safe_image_path((string)($image['src'] ?? '')),
-        'webp'   => contract_safe_image_path((string)($image['webp'] ?? '')),
-        'width'  => (int)($image['width'] ?? 0),
-        'height' => (int)($image['height'] ?? 0),
-    ]);
+    return admin_image_from_post($image);
 }
 
 /* ---------------------------------------------------------------- actions */

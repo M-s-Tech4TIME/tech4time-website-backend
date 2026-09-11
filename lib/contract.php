@@ -1084,6 +1084,26 @@ const CONTRACT_IMAGE_SLOTS = [
                             'sizes' => '(max-width: 414px) 33vw, 80px'],
     'contact.offices'   => ['width' => 56,  'sizes' => '56px'],
 
+    /* The company mark, and the one picture on this site drawn at three
+       different sizes in three different places -- measured, at ten viewports,
+       the same way as the rest:
+
+           the header        79 -> 113px    height-driven by a clamp()
+           the footer       101px           fixed
+           the About row    274 -> 693px    widest at 768, like about.story
+
+       The ladder is cut from the HEADER's width, because that is the drawing
+       that is on all seventeen pages; the About row takes the widest rung it
+       finds rather than a rung of its own. 180 reproduces the 180/360/540 set
+       the site ships with, so an upload replaces those files like for like.
+
+       sizes= is the header's alone. The footer draws one file and says so by
+       having none, and the About row likewise -- see settings_logo_largest()
+       in tech4time-website-frontend/lib/settings.php, named with the
+       repository because this file is shared and the renderer is over there. */
+    'settings.logo'     => ['width' => 180,
+                            'sizes' => '(max-width: 48em) 140px, 180px'],
+
     /* No ladder -- see the docblock above. */
     'branding.file'     => ['width' => 0, 'sizes' => ''],
     'seo.share'         => ['width' => 0, 'sizes' => ''],
@@ -1250,6 +1270,44 @@ function contract_srcset(string $value): string
     }
 
     return implode(', ', $out);
+}
+
+/**
+ * The widest entry of a srcset: its path, and how wide it says it is.
+ *
+ * WHICH IS NOT ALWAYS THE RECORD'S src. For a picture the uploader stored it
+ * is -- upload_store() names the top rung as src. For the logo the site SHIPS
+ * with it is not: the header's src is the 360px file and the ladder goes on to
+ * 540, because those files were built before this document existed and the
+ * seed reproduces them exactly rather than tidying them.
+ *
+ * So a consumer that wants the largest rendition asks for it rather than
+ * assuming, which is what lets the About page's big lockup, Organization.logo
+ * and the job postings' hiring-organisation logo all read one document and
+ * still name the file each of them names today.
+ *
+ * Answers {src: '', width: 0} for a record with no ladder, which the caller
+ * reads as "src is already the largest there is".
+ */
+function contract_srcset_top(string $value): array
+{
+    $best = ['src' => '', 'width' => 0];
+
+    foreach (explode(',', $value) as $entry) {
+        $bits       = preg_split('/\s+/', trim($entry)) ?: [];
+        $path       = contract_safe_image_path((string)array_shift($bits));
+        $descriptor = trim(implode(' ', $bits));
+
+        if ($path === '' || !preg_match('/^(\d+)w$/', $descriptor, $found)) {
+            continue;
+        }
+
+        if ((int)$found[1] > $best['width']) {
+            $best = ['src' => $path, 'width' => (int)$found[1]];
+        }
+    }
+
+    return $best;
 }
 
 /**

@@ -137,6 +137,14 @@ the attribute. `contract_srcset()` checks each candidate path the way `contract_
 checks a single one; it was `chrome_srcset()` while the header lockup was the only picture stored at
 more than one width.
 
+`contract_srcset_top()` answers the widest rung of a ladder, which is **not always the record's
+`src`.** For a picture the uploader stored it is — `upload_store()` names the top rung as `src`. For
+the logo the site *ships* with it is not: the header's `src` is the 360 px file and the ladder goes
+on to 540, because those files were built before the settings document existed and the seed
+reproduces them rather than tidying them. So the About page's big lockup, `Organization.logo` and
+every job posting's hiring-organisation logo ask for the largest rendition instead of assuming, and
+each still names the file it names today.
+
 `contract_image_paths()` answers the other half of the same question: **every** file a picture record
 names, srcset entries included. A ladder keeps most of its files inside `srcset` and nowhere else —
 only the top rung is also the `src` — so a caller reading `src` and `webp` alone sees two of six.
@@ -526,6 +534,16 @@ section describes, a second time, from listing a document in the wrong arm rathe
 listing it at all. `contact_images()` exists now, and `test_upload.py` asks **every** name in
 `CONTRACT_DOCUMENTS` for an answer rather than trusting that each was placed correctly.
 
+**A picture's record survives a save that uploaded nothing, and for a while it did not.** The
+record travels through its screen as hidden inputs and is rebuilt from them on every save.
+`admin_image_fields()` listed four field names there and four screens each had their own copy of the
+rebuild; then a picture record grew `srcset` and `webp_srcset`, and none of the five lists was
+changed. A picture stored at several widths kept them exactly until the next save of its screen —
+which rebuilt it without them, leaving the rungs belonging to nothing and the unused sweep offering
+to delete the widths every phone is served. The component now emits an input for every key
+`contract_image_defaults()` fills, and `admin_image_from_post()` is the one rebuild all of them use,
+so a field added to a picture is carried **by having been added**.
+
 **All of a picture goes to the live site, or the caller must not save.**
 `admin_send_picture()` reads every file `contract_image_paths()` names off disk *before* any of them
 leaves, so a file that is not where it had just been written is found while nothing has travelled.
@@ -577,8 +595,8 @@ would differ by construction). It is never created on demand — see
 **Backend only** — the writing half. The renderer's half is
 `tech4time-website-frontend/lib/settings.php`.
 
-`settings_load()` · `settings_edit()` · `settings_logo_is_shared()` ·
-`settings_logo_is_uploaded()` · `settings_icon_is_stale()`
+`settings_load()` · `settings_edit()` · `settings_validate()` ·
+`settings_logo_is_shared()` · `settings_logo_is_uploaded()` · `settings_icon_is_stale()`
 
 One document, `content/settings.json`, holding the four things every page depends on and no page
 owns: the logo, the square mark the favicons are made from, the colour tokens the site is drawn
@@ -588,6 +606,11 @@ from, and the address the contact form sends to.
 holds one **part** of this document — the colour screen never sees the logo — so a save merges the
 rest back from the file. A read-modify-write without a lock loses one of two concurrent edits to
 different parts, which here is the normal case rather than an edge one.
+
+`settings_validate()` refuses one thing and it is not a matter of taste: **an empty light-mode
+logo.** That is the company's mark missing from the header and the footer of every page, and from
+the structured data a search engine reads. An empty *dark* half is the opposite — a legitimate
+answer for a single-colour mark — and is never refused; the screen says in words what it means.
 
 The three questions at the end exist so the screens can **say** something rather than refuse it.
 An empty dark logo half is a legitimate answer for a single-colour mark and indistinguishable, in

@@ -94,6 +94,44 @@ function settings_edit(callable $mutate): bool
     return true;
 }
 
+/* ------------------------------------------------------------- validation */
+
+/**
+ * What is wrong with the settings, as sentences for the editor.
+ *
+ * REFUSES ONLY WHAT WOULD BE WRONG ON THE SITE, which is a short list.
+ * settings_normalise() has already dropped a picture path this site would not
+ * serve, fallen back on a colour that is not six hex digits and on an address
+ * that is not one, so nothing here repeats that work.
+ *
+ * WHAT IS LEFT FOR THE LOGO IS ONE THING NORMALISING CANNOT DECIDE: whether
+ * there is a light mark at all. An empty DARK half is a legitimate answer and
+ * is never refused — a single-colour mark reads on both grounds, and the
+ * screen says in words what an empty one means. An empty LIGHT half is not an
+ * answer: it is the company's mark missing from the header and the footer of
+ * every page of the site, and from the structured data a search engine reads.
+ *
+ * ONE PART AT A TIME, for the reason chrome_validate() takes a part: each
+ * screen holds one and merges the rest back from the file, so judging the
+ * whole document would let a fault in the colours — set by somebody else, an
+ * hour ago, on another screen — refuse a save on the logo. Pass '' to judge
+ * all four, which is what a check outside the editor wants.
+ */
+function settings_validate(array $data, string $part = ''): array
+{
+    $errors = [];
+    $wanted = $part === '' ? SETTINGS_PARTS : [$part];
+
+    if (in_array('logo', $wanted, true)
+            && trim((string)($data['logo']['light']['src'] ?? '')) === '') {
+        $errors[] = 'The logo has no light-mode picture. That is the mark in the '
+                  . 'header and the footer of every page, so it cannot be empty. '
+                  . 'Upload one, or leave the one that is there.';
+    }
+
+    return $errors;
+}
+
 /* ----------------------------------------------------------- what is set */
 
 /**

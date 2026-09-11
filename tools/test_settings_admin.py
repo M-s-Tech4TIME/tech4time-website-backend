@@ -43,6 +43,9 @@ import json
 import os
 import re
 import shutil
+import struct
+import uuid
+import zlib
 import socket
 import subprocess
 import sys
@@ -62,6 +65,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DOCROOT = ROOT / "public"
 ROUTER = ROOT / "tools" / "dev-router.php"
 DATA = ROOT / "content" / "settings.json"
+UPLOADS = ROOT / "public" / "uploads"
 
 PARTS = ["logo", "icon", "colour", "mail"]
 
@@ -100,6 +104,80 @@ class Client:
     def get(self, path):
         with self.opener.open(self.base + path, timeout=20) as r:
             return r.status, r.read().decode("utf-8", "replace")
+
+    def post(self, path, fields, files=None):
+        """A real multipart POST, because a file input needs one.
+
+        NOTHING IN EITHER REPOSITORY HAD EVER DONE THIS. Every admin suite
+        checks that a screen says enctype="multipart/form-data" and stops
+        there, because the harness could not build the body — so the whole
+        upload path, from the browser's bytes through upload_accept() to the
+        signed asset POST, had never been driven through a form. It matters
+        most here: upload_accept() refuses anything is_uploaded_file() does not
+        recognise, which is exactly the thing a hand-built POST cannot fake and
+        a genuine multipart one does not have to.
+        """
+        boundary = "----t4t" + uuid.uuid4().hex
+        out = []
+
+        for name, value in fields.items():
+            out.append(f"--{boundary}\r\n".encode())
+            out.append(f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode())
+            out.append(str(value).encode() + b"\r\n")
+
+        for name, (filename, blob, kind) in (files or {}).items():
+            out.append(f"--{boundary}\r\n".encode())
+            out.append(f'Content-Disposition: form-data; name="{name}"; '
+                       f'filename="{filename}"\r\n'.encode())
+            out.append(f"Content-Type: {kind}\r\n\r\n".encode())
+            out.append(blob + b"\r\n")
+
+        out.append(f"--{boundary}--\r\n".encode())
+        body = b"".join(out)
+
+        req = urllib.request.Request(self.base + path, data=body, method="POST")
+        req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+        try:
+            with self.opener.open(req, timeout=30) as r:
+                return r.status, dict(r.headers), r.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as e:
+            return e.code, dict(e.headers), e.read().decode("utf-8", "replace")
+
+
+def png_chunk(kind: bytes, payload: bytes) -> bytes:
+    body = kind + payload
+    return struct.pack(">I", len(payload)) + body + struct.pack(">I", zlib.crc32(body))
+
+
+def png(width: int, height: int) -> bytes:
+    """A real, decodable PNG of a solid colour — no image library needed."""
+    raw = b"".join(b"\x00" + bytes([30, 90, 200]) * width for _ in range(height))
+    return (b"\x89PNG\r\n\x1a\n"
+            + png_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+            + png_chunk(b"IDAT", zlib.compress(raw))
+            + png_chunk(b"IEND", b""))
+
+
+def form_fields(html: str) -> dict:
+    """Every named control on the screen, as the browser would submit it.
+
+    Read out of the page rather than written here, which is what makes this a
+    test of the SCREEN: a field the form stops rendering disappears from the
+    submission too, and whatever depended on it fails.
+    """
+    fields = {}
+
+    for tag in re.findall(r"<input\b[^>]*>", html):
+        name = re.search(r'name="([^"]+)"', tag)
+        if not name or 'type="submit"' in tag or 'type="file"' in tag:
+            continue
+        value = re.search(r'value="([^"]*)"', tag)
+        raw = value.group(1) if value else ""
+        fields[name.group(1)] = (raw.replace("&lt;", "<").replace("&gt;", ">")
+                                   .replace("&quot;", '"').replace("&#039;", "'")
+                                   .replace("&amp;", "&"))
+
+    return fields
 
 
 def stored() -> dict:
@@ -246,6 +324,87 @@ def the_road(r, site) -> None:
             "the save rebuilt the document instead of merging into it")
 
 
+def the_upload(client, r, site) -> None:
+    print("\na logo somebody chose, through the form, as a browser sends it")
+
+    status, page = client.get("/?s=settings&part=logo")
+    r.check("the logo screen is a form that accepts a file",
+            'enctype="multipart/form-data"' in page, "no enctype")
+    r.check("with a file input for each half",
+            'name="upload[light][0]"' in page and 'name="upload[dark][0]"' in page,
+            "a half has no file input")
+
+    fields = form_fields(page)
+    r.check("and hidden inputs carrying the ladder it already has",
+            "logo[light][srcset]" in fields and "logo[light][webp_srcset]" in fields,
+            str(sorted(k for k in fields if k.startswith("logo[light]"))))
+
+    # A value in a part this screen does not hold. Saving the logo must not
+    # touch it: the form never carried the colours, so a save that rebuilt the
+    # whole document from the form would quietly reset them.
+    write(lambda d: d["colours"]["light"].__setitem__("accent-text", "#123456"))
+
+    before = stored()
+    status, headers, body = client.post(
+        "/?s=settings&part=logo", fields,
+        {"upload[light][0]": ("mark.png", png(900, 320), "image/png")})
+
+    r.check("the save redirects rather than re-rendering",
+            status == 302, f"status {status}  {body[:200]}")
+
+    after = stored()
+    light = after["logo"]["light"]
+
+    r.check("the uploaded mark replaced the one that shipped",
+            light["src"].startswith("/uploads/"), str(light)[:200])
+    r.check("and it was stored at the widths the slot declares",
+            [int(w) for w in re.findall(r"\s(\d+)w", light["srcset"])] == [180, 360, 540],
+            light["srcset"])
+    r.check("with a WebP ladder to match",
+            [int(w) for w in re.findall(r"\s(\d+)w", light["webp_srcset"])] == [180, 360, 540],
+            light["webp_srcset"])
+
+    # Six files for one half, and every one of them has to be on both hosts or
+    # the <source srcset> names something that is not there.
+    names = {Path(p).name for p in
+             re.findall(r"(/uploads/[A-Za-z0-9]+\.[a-z]+)", json.dumps(light))}
+    r.check("every file it names is on this host",
+            all((ROOT / "public" / "uploads" / n).is_file() for n in names),
+            str(sorted(names)))
+    r.check("and every one of them reached the live site",
+            names <= set(site.assets), f"{sorted(names - set(site.assets))} missing")
+
+    r.check("the dark half was left exactly as it was",
+            after["logo"]["dark"] == before["logo"]["dark"], str(after["logo"]["dark"])[:160])
+    r.check("and so was every part this screen does not hold",
+            after["colours"]["light"]["accent-text"] == "#123456"
+            and after["contact"] == before["contact"] and after["icon"] == before["icon"],
+            str(after["colours"]["light"])[:160])
+
+    print("\nwhat the logo screen refuses")
+    # An empty light half is the company's mark missing from every page. An
+    # empty DARK half is a legitimate answer and must never be refused.
+    fields = form_fields(client.get("/?s=settings&part=logo")[1])
+    for key in ("src", "webp", "width", "height", "srcset", "webp_srcset"):
+        fields[f"logo[light][{key}]"] = ""
+
+    status, _headers, body = client.post("/?s=settings&part=logo", fields)
+    r.check("clearing the light mark is refused", status == 200, f"status {status}")
+    r.check("and says why, in words",
+            "no light-mode picture" in body, body[:300])
+    r.check("and the document is untouched",
+            stored()["logo"]["light"] == after["logo"]["light"], "it saved anyway")
+
+    fields = form_fields(client.get("/?s=settings&part=logo")[1])
+    for key in ("src", "webp", "width", "height", "srcset", "webp_srcset"):
+        fields[f"logo[dark][{key}]"] = ""
+
+    status, _headers, _body = client.post("/?s=settings&part=logo", fields)
+    r.check("clearing the DARK mark is allowed", status == 302, f"status {status}")
+    r.check("and it is really gone", stored()["logo"]["dark"]["src"] == "",
+            str(stored()["logo"]["dark"])[:160])
+
+
 def main() -> None:
     if not shutil.which("php"):
         raise SystemExit("php not found:  sudo apt install php-cli")
@@ -253,6 +412,11 @@ def main() -> None:
         raise SystemExit(f"Missing {DATA.relative_to(ROOT)}")
 
     backup = DATA.read_bytes()
+    # The upload group writes real files here, through the real uploader. They
+    # are not committed, but leaving six of them behind after every run turns
+    # public/uploads/ into a pile nobody can tell apart from real artwork.
+    UPLOADS.mkdir(parents=True, exist_ok=True)
+    uploads = {f.name: f.read_bytes() for f in UPLOADS.iterdir() if f.is_file()}
     port = free_port()
     work = Path(tempfile.mkdtemp(prefix="t4t-settings-"))
     private = work / "private"
@@ -286,6 +450,7 @@ def main() -> None:
 
             the_shell(client, r)
             the_notices(client, r)
+            the_upload(client, r, site)
 
             # settings_edit() publishes through the private store, which the
             # server process was given; this runs it in a process of its own.
@@ -299,7 +464,12 @@ def main() -> None:
             DATA.write_bytes(backup)
             for stray in (DATA.with_suffix(".json.bak"), DATA.with_suffix(".json.moved")):
                 stray.unlink(missing_ok=True)
-            print(f"\n{DATA.relative_to(ROOT)} restored")
+            for f in list(UPLOADS.iterdir()):
+                if f.is_file() and f.name not in uploads:
+                    f.unlink()
+            for name, blob in uploads.items():
+                (UPLOADS / name).write_bytes(blob)
+            print(f"\n{DATA.relative_to(ROOT)} and public/uploads/ restored")
 
     total = r.passed + len(r.failed)
     if r.failed:

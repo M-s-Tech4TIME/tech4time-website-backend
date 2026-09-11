@@ -162,6 +162,43 @@ function settings_notices(array $data, bool $linked): void
     }
 }
 
+/**
+ * Take whatever pictures were attached, and put each on the half it belongs to.
+ *
+ * A picture is stored here and sent to the live site immediately rather than at
+ * save time, for the reason every other screen does it: the operator finds out
+ * at once if the channel is broken, while they still know what they were doing.
+ *
+ * An orphan is possible — a mark uploaded and the save then abandoned — and is
+ * the right trade. It costs disk; the other order costs an edit.
+ */
+function settings_take_uploads(array $data, array &$errors): array
+{
+    foreach (admin_uploaded_files() as [$band, $_index, $file]) {
+        if (!in_array($band, ['light', 'dark'], true)) {
+            continue;
+        }
+
+        $where  = $band === 'light' ? 'The light-mode logo' : 'The dark-mode logo';
+        $stored = upload_accept($file, 'settings.logo');
+
+        if (isset($stored['error'])) {
+            $errors[] = $where . ': ' . $stored['error'];
+            continue;
+        }
+
+        $sent = admin_send_picture($stored);
+        if ($sent !== '') {
+            $errors[] = $where . ': ' . $sent;
+            continue;
+        }
+
+        $data['logo'][$band] = contract_image_defaults($stored);
+    }
+
+    return $data;
+}
+
 /* ------------------------------------------------------------ which screen */
 
 $part   = in_array((string)($_GET['part'] ?? ''), SETTINGS_PARTS, true)
@@ -170,6 +207,52 @@ $screen = $part === '' ? 'index' : $part;
 
 $data   = settings_load();
 $errors = [];
+
+/* ----------------------------------------------------------------- saving */
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $screen === 'logo') {
+    admin_check_csrf();
+
+    if (admin_form_truncated()) {
+        $errors[] = admin_truncated_message();
+    } else {
+        /* ONLY THIS PART IS REBUILT FROM THE FORM. The other three were never
+           in it, and settings_edit() merges them back from the file under the
+           lock — so saving the logo cannot reset the colours, and two people on
+           two screens cannot lose each other's work. */
+        $posted = $data;
+
+        foreach (['light', 'dark'] as $mode) {
+            $posted['logo'][$mode] =
+                admin_image_from_post($_POST['logo'][$mode] ?? []);
+        }
+
+        /* Uploads are applied AFTER the form is read back, so a picture chosen
+           in this very request wins over the hidden inputs describing the one
+           it replaces. */
+        $posted = settings_take_uploads($posted, $errors);
+
+        /* NORMALISED BEFORE IT IS JUDGED, because normalising decides what
+           would actually be stored: a path this site will not serve is emptied
+           here, and validating the raw POST would pass a document and then
+           store a different one. */
+        $posted = settings_normalise($posted);
+        $errors = array_merge($errors, settings_validate($posted, 'logo'));
+
+        if (!$errors) {
+            $saved = settings_edit(static fn(array $was): array => array_replace(
+                $was, ['logo' => $posted['logo']]));
+
+            if ($saved) {
+                admin_redirect('settings', 'Saved the logo.', ['part' => 'logo']);
+            }
+            $errors[] = 'Could not write content/settings.json. Check the file is '
+                      . 'writable by PHP.';
+        }
+
+        $data = $posted;
+    }
+}
 
 /* ------------------------------------------------------------------ index */
 
@@ -263,6 +346,72 @@ if ($screen === 'index') {
 
 $screens = SETTINGS_PART_SCREENS[$part];
 
+/* ------------------------------------------------------------- the logo */
+
+if ($screen === 'logo') {
+    admin_head('settings', $user,
+        $screens['blurb'] . ' <a href="' . h(admin_url('settings'))
+        . '">Back to Settings</a>.',
+        ['band-logo' => 'The mark'],
+        ['form' => 'settings-form', 'label' => 'Save the logo',
+         'discard' => admin_url('settings', ['part' => 'logo'])]);
+
+    admin_notices($errors);
+    settings_notices($data, false);
+    ?>
+
+<form class="admin__form" id="settings-form" method="post" data-async
+      enctype="multipart/form-data"
+      action="<?= h(admin_url('settings', ['part' => 'logo'])) ?>">
+  <?= admin_form_fields('settings') ?>
+
+<section class="admin__block" id="band-logo">
+  <?php admin_band_head('The mark',
+      'Drawn in the header and the footer of every page, on the About page, and '
+      . 'in this panel\'s own rail — and named in the structured data a search '
+      . 'engine reads. One upload reaches all of them.'); ?>
+
+<?php foreach (['light' => 'Light mode', 'dark' => 'Dark mode'] as $mode => $label): ?>
+    <div class="admin-card">
+      <div class="admin-card__head">
+        <span class="admin-card__preview">
+          <strong><?= h($label) ?></strong>
+          <span class="admin-card__value">
+<?php if (trim((string)$data['logo'][$mode]['src']) === ''): ?>
+            Not set — dark mode shows the light mark
+<?php else: ?>
+            <?php $rungs = $data['logo'][$mode]['srcset'] === '' ? 1
+                         : count(explode(',', $data['logo'][$mode]['srcset'])); ?>
+            <?= $rungs > 1 ? 'Stored at ' . $rungs . ' widths' : 'One width' ?>
+<?php endif; ?>
+          </span>
+        </span>
+      </div>
+      <?php admin_image_fields("logo[$mode]", "upload[$mode][0]",
+          $data['logo'][$mode], 'logo',
+          $mode === 'dark'
+              ? 'No dark-mode logo. Dark mode shows the light one.'
+              : 'No logo.'); ?>
+    </div>
+<?php endforeach; ?>
+
+  <p class="admin__fineprint">
+    The mark is stored at <?= implode(', ', contract_slot_widths('settings.logo',
+        UPLOAD_MAX_DIMENSION, UPLOAD_MAX_DIMENSION)) ?> pixels wide, so a phone
+    downloads the small one and a high-resolution screen the large one. The words
+    a screen reader announces the logo link as are on the
+    <a href="<?= h(admin_url('chrome')) ?>">Header &amp; Footer</a> screen, because
+    the header's and the footer's are legitimately different sentences.
+  </p>
+</section>
+
+  <?= admin_form_tail() ?>
+</form>
+    <?php
+    admin_foot();
+    return;
+}
+
 admin_head('settings', $user,
     $screens['blurb'] . ' <a href="' . h(admin_url('settings'))
     . '">Back to Settings</a>.',
@@ -278,30 +427,7 @@ settings_notices($data, false);
       . 'this part arrive with the stage that converts everything reading it. '
       . 'Until then this says what the site is using.'); ?>
 
-<?php if ($part === 'logo'): ?>
-<?php foreach (['light' => 'Light mode', 'dark' => 'Dark mode'] as $mode => $label):
-        $image = $data['logo'][$mode];
-        $shown = trim((string)$image['src']); ?>
-    <div class="admin-card">
-      <div class="admin-card__head">
-        <span class="admin-card__preview">
-          <strong><?= h($label) ?></strong>
-          <span class="admin-card__value">
-            <?= $shown === '' ? 'Not set — dark mode shows the light mark' : h($shown) ?>
-          </span>
-        </span>
-      </div>
-<?php if ($shown !== ''): ?>
-      <p class="admin__fineprint">
-        <?= (int)$image['width'] ?> &times; <?= (int)$image['height'] ?> pixels<?php
-        $rungs = $image['srcset'] === '' ? 0 : count(explode(',', $image['srcset']));
-        echo $rungs > 1 ? ', stored at ' . $rungs . ' widths' : ''; ?>.
-      </p>
-<?php endif; ?>
-    </div>
-<?php endforeach; ?>
-
-<?php elseif ($part === 'icon'): ?>
+<?php if ($part === 'icon'): ?>
     <div class="admin-card">
       <div class="admin-card__head">
         <span class="admin-card__preview">

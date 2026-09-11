@@ -21,8 +21,8 @@ the sign-in, which is the half nobody has ever looked at.
 
 WHY ONE FILE AND NOT FOUR
 Over there, four files is right: sixteen public pages, and each tool carries a
-lot of crawl machinery for its own question. Here it is a dozen screens, which
-SIGNED_IN_SCREENS lists. Four copies of "start PHP, start geckodriver, sign in,
+lot of crawl machinery for its own question. Here it is the couple of dozen
+screens SIGNED_IN_SCREENS lists. Four copies of "start PHP, start geckodriver, sign in,
 walk the screens" would be four copies of the sign-in -- and the sign-in is the
 part most likely to need changing, because it is the part that depends on the
 login page's markup.

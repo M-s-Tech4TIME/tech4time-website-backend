@@ -138,6 +138,13 @@ jobs:
       # the last one that was not, and it hid two failures behind one on the
       # run that added test_branding_admin.py to it.
       #
+      # THREE OF THESE WERE ON DISK AND NOT ON THIS LIST, which is the same as
+      # not existing: test_chrome_admin.py shipped with the header-and-footer
+      # work, test_settings_admin.py and test_reconcile.py with the settings
+      # work, and none of the three had ever been run by anything that cannot
+      # forget. 230 checks that passed on a laptop and were asserted nowhere.
+      # A suite absent from here rots and then gets deleted for being broken.
+      #
       # test_seo_admin.py makes the one assertion no other suite here can:
       # saving one of the nine page editors leaves that document's meta band
       # exactly as it was. Those forms no longer RENDER the meta fields but
@@ -149,11 +156,12 @@ jobs:
           set -uo pipefail
           failed=""
           for s in test_svg test_store test_upload test_qr \
-                   test_admin_auth test_publish_client \
+                   test_admin_auth test_publish_client test_reconcile \
                    test_careers_admin test_contact_admin test_company_admin \
                    test_about_admin test_home_admin test_services_admin \
                    test_certifications_admin test_branding_admin \
-                   test_privacy_admin test_seo_admin; do
+                   test_privacy_admin test_seo_admin test_chrome_admin \
+                   test_settings_admin; do
             echo "::group::$s"
             if python3 "tools/$s.py"; then
               echo "-- $s passed"
@@ -167,7 +175,46 @@ jobs:
             echo "::error::failing suites:$failed"
             exit 1
           fi
-          echo "all sixteen php suites passed"
+          echo "every php suite passed"
+
+  # ------------------------------------------------------------------------
+  # THE TWO HALVES AGAINST EACH OTHER, WHICH IS DELIBERATELY NOT WHAT THE JOB
+  # ABOVE DOES.
+  #
+  # Those suites publish to tools/publish_stub.py, a second implementation of
+  # the wire format written in Python from its description, and that is the
+  # right shape for them: two implementations agreeing is evidence, where one
+  # shared library agreeing with itself is not.
+  #
+  # This job asks a different question, which neither half can answer alone:
+  # do the FILES arrive. A logo is not a document -- uploading one stores a
+  # ladder of renditions, sends each as its own signed POST, and only then
+  # writes the document naming them. A stub receiver cannot half-fail that way
+  # and a hand-made document never had rungs to lose, so the risk the settings
+  # plan named in one line -- a partial publish is a broken image -- was the
+  # one thing nothing here could see.
+  #
+  # It is EXPECTED TO BE RED in the window where one half is merged and the
+  # other is not, exactly as check_shared_repos --clone is, and for the same
+  # reason: it fetches the sibling on THIS branch. Merge the frontend, then
+  # re-run. That ordering is in docs/20-deployment/ci-cd.md.
+  end-to-end:
+    name: both halves
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # The uploader decodes and re-encodes every picture, so without GD this
+      # job would skip the only part of itself that matters. Same bargain as
+      # the suites job above.
+      - name: php-gd, so the renditions are really made
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq php-gd
+          php -r 'exit(extension_loaded("gd") ? 0 : 1);' \
+            || { echo "php-gd did not load"; exit 1; }
+
+      - run: python3 tools/test_end_to_end.py --clone
 
   browser:
     name: firefox

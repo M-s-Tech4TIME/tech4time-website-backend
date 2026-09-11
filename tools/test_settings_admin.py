@@ -455,6 +455,52 @@ def the_upload(client, r, site) -> None:
     r.check("the logo was left exactly as it was",
             after["logo"] == before["logo"], "the icon save touched the logo")
 
+    print("\nwhere enquiries go")
+
+    status, page = client.get("/?s=settings&part=mail")
+    r.check("the mail screen renders", status == 200, f"status {status}")
+    r.check("with an address and a subject line to type in",
+            'name="contact[mail_to]"' in page and 'name="contact[mail_subject]"' in page,
+            "a field is missing")
+    # The one field somebody might look for and must not find. Absent with no
+    # explanation reads as an oversight; the explanation is the point.
+    r.check("and says what messages are sent AS, and why that is not a field",
+            "no-reply@tech4time.bd" in page and "SPF" in page,
+            "the From address is not explained")
+
+    fields = form_fields(page)
+    fields["contact[mail_to]"] = "enquiries@example.org"
+    fields["contact[mail_subject]"] = "A marked subject"
+    status, _headers, _body = client.post("/?s=settings&part=mail", fields)
+
+    r.check("a real address is saved", status == 302, f"status {status}")
+    r.check("and reached the document",
+            stored()["contact"]["mail_to"] == "enquiries@example.org",
+            str(stored()["contact"]))
+    r.check("and the live site",
+            site.documents.get("settings", {}).get("contact", {}).get("mail_to")
+            == "enquiries@example.org", "the publish stub was not sent it")
+
+    # AN ADDRESS THAT IS NOT ONE IS REFUSED HERE AND FALLEN BACK ON ELSEWHERE.
+    # settings_normalise() meets a document off the wire, where the alternative
+    # is a form posting into nowhere. This meets somebody typing, where falling
+    # back silently would replace what they wrote and look like a save.
+    held = stored()
+    for bad, what in (("not an address", "something that is not an address"),
+                      ("", "an empty address")):
+        fields = form_fields(client.get("/?s=settings&part=mail")[1])
+        fields["contact[mail_to]"] = bad
+        status, _headers, body = client.post("/?s=settings&part=mail", fields)
+        r.check(f"{what} is refused rather than quietly replaced", status == 200,
+                f"status {status}")
+        r.check(f"  and nothing was written",
+                stored()["contact"] == held["contact"], "it saved anyway")
+
+    fields = form_fields(client.get("/?s=settings&part=mail")[1])
+    fields["contact[mail_subject]"] = ""
+    status, _headers, _body = client.post("/?s=settings&part=mail", fields)
+    r.check("an empty subject line is refused too", status == 200, f"status {status}")
+
     print("\nthe colours, and the one refusal in this editor")
 
     status, page = client.get("/?s=settings&part=colour")

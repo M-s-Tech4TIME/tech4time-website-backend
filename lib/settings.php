@@ -130,6 +130,35 @@ function settings_validate(array $data, string $part = ''): array
                   . 'Upload one, or leave the one that is there.';
     }
 
+    /* AN ADDRESS THAT IS NOT ONE IS REFUSED HERE AND FALLEN BACK ON
+       ELSEWHERE, and the difference is who is asking. settings_normalise()
+       meets a document arriving over the wire, where the alternative to the
+       shipped address is a contact form posting into nowhere -- so it falls
+       back. This meets somebody TYPING, where falling back silently would
+       replace what they wrote with info@tech4time.bd and look exactly like a
+       save that worked. The same value, refused in one direction and repaired
+       in the other, on purpose.
+
+       An empty subject line likewise: it is what every enquiry's subject
+       starts with, and "": something they typed" is not a subject. */
+    if (in_array('mail', $wanted, true)) {
+        $to = trim((string)($data['contact']['mail_to'] ?? ''));
+
+        if ($to === '') {
+            $errors[] = 'Enquiries need an address to go to. Without one the '
+                      . 'contact form has nowhere to send.';
+        } elseif (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = '"' . $to . '" is not an email address. Enquiries would '
+                      . 'have nowhere to go.';
+        }
+
+        if (trim((string)($data['contact']['mail_subject'] ?? '')) === '') {
+            $errors[] = 'The subject line cannot be empty: it is what every '
+                      . 'enquiry\'s subject starts with, before whatever the '
+                      . 'sender typed.';
+        }
+    }
+
     /* THE COLOURS ARE THE ONE PLACE IN THIS EDITOR WHERE A REFUSAL IS RIGHT.
        Everything else here is a standing notice, because everything else here
        is a judgement only the person who drew the mark can make. This is not a

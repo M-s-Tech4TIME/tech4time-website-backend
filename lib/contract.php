@@ -6617,6 +6617,26 @@ function settings_contrast_faults(array $colours, string $mode): array
 const SETTINGS_ICON_ICO = [16, 32, 48];
 
 /**
+ * What enquiry mail is sent AS, which is not the same question as where it goes.
+ *
+ * NOT EDITABLE, AND IT MUST NOT BECOME SO. A message has to be sent from an
+ * address at this site's own domain or it fails SPF -- the DNS record saying
+ * which servers may send as tech4time.bd -- and is filed as spam. That record
+ * lives with the domain and nothing in this editor can change it, so a field
+ * for this would let somebody make every enquiry disappear into a spam folder
+ * with nothing on the screen to say why. The sender's own address goes on
+ * Reply-To, so answering still reaches them.
+ *
+ * HERE RATHER THAN IN THE HANDLER because both halves need it: the frontend
+ * sends with it and the editor's screen has to be able to SAY what messages
+ * are sent as, or the one field somebody might look for is simply absent with
+ * no explanation. tech4time-website-frontend/contact-handler.php keeps a
+ * constant of its own as the answer when nothing can be loaded at all, and
+ * its test asserts the two agree.
+ */
+const SETTINGS_MAIL_FROM = 'no-reply@tech4time.bd';
+
+/**
  * The ground an app icon is composited onto.
  *
  * A CONSTANT, AND NOT settings_colours()['bg-base']. It is the same value

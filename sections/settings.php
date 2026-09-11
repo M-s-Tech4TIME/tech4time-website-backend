@@ -327,6 +327,45 @@ $errors = [];
 
 /* ----------------------------------------------------------------- saving */
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $screen === 'mail') {
+    admin_check_csrf();
+
+    if (admin_form_truncated()) {
+        $errors[] = admin_truncated_message();
+    } else {
+        $posted = $data;
+        $posted['contact'] = [
+            'mail_to'      => trim((string)($_POST['contact']['mail_to'] ?? '')),
+            'mail_subject' => trim((string)($_POST['contact']['mail_subject'] ?? '')),
+        ];
+
+        /* JUDGED BEFORE IT IS NORMALISED, WHICH IS THE OPPOSITE OF THE OTHER
+           THREE, and the difference matters. settings_normalise() falls back
+           to the shipped address for anything that is not one -- which is
+           right for a document arriving over the wire, where the alternative
+           is a contact form posting into nowhere. It is wrong for somebody
+           typing: a save that silently replaced what they wrote with
+           info@tech4time.bd would look exactly like a save that worked. */
+        $errors = settings_validate($posted, 'mail');
+
+        if (!$errors) {
+            $posted = settings_normalise($posted);
+
+            $saved = settings_edit(static fn(array $was): array => array_replace(
+                $was, ['contact' => $posted['contact']]));
+
+            if ($saved) {
+                admin_redirect('settings', 'Saved where enquiries go.',
+                               ['part' => 'mail']);
+            }
+            $errors[] = 'Could not write content/settings.json. Check the file is '
+                      . 'writable by PHP.';
+        }
+
+        $data = $posted;
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $screen === 'colour') {
     admin_check_csrf();
 
@@ -764,34 +803,67 @@ if ($screen === 'logo') {
 admin_head('settings', $user,
     $screens['blurb'] . ' <a href="' . h(admin_url('settings'))
     . '">Back to Settings</a>.',
-    ['band-now' => 'What is set now']);
+    ['band-now' => 'Where the enquiry form sends'],
+    ['form' => 'settings-form', 'label' => 'Save where enquiries go',
+     'discard' => admin_url('settings', ['part' => 'mail'])]);
 
 admin_notices($errors);
 settings_notices($data, false);
 ?>
 
-<?php /* ONLY THE MAIL PART REACHES HERE. The logo, the icon and the colours
-         each have a screen of their own above; this one still says what is set
-         rather than letting it be changed, because the contact handler is
-         still reading its own constant. That is the next stage. */ ?>
-<section class="admin__block" id="band-now">
-  <?php admin_band_head('What is set now',
-      'The document holds this already and it travels to the live site; what is '
-      . 'not built yet is the contact form reading it instead of its own '
-      . 'constant. Until then this says where enquiries actually go.'); ?>
+<form class="admin__form" id="settings-form" method="post" data-async
+      action="<?= h(admin_url('settings', ['part' => 'mail'])) ?>">
+  <?= admin_form_fields('settings') ?>
 
-    <div class="admin-card">
-      <div class="admin-card__head">
-        <span class="admin-card__preview">
-          <strong>Enquiries are sent to</strong>
-          <span class="admin-card__value"><?= h((string)$data['contact']['mail_to']) ?></span>
-        </span>
-      </div>
-      <p class="admin__fineprint">
-        With the subject line <strong><?= h((string)$data['contact']['mail_subject']) ?></strong>,
-        followed by whatever the sender typed.
-      </p>
+<section class="admin__block" id="band-now">
+  <?php admin_band_head('Where the enquiry form sends',
+      'Every message the contact page\'s form takes arrives at this address, '
+      . 'with the sender\'s own address on Reply-To so answering reaches them.'); ?>
+
+  <div class="admin__grid">
+    <label class="admin__field admin__field--wide">
+      <span class="admin__label">Address</span>
+      <input class="admin__input" type="email" required
+             name="contact[mail_to]"
+             value="<?= h((string)$data['contact']['mail_to']) ?>">
+      <span class="admin__hint">
+        Where enquiries arrive. It can be anywhere — it does not have to be at
+        this site's domain.
+      </span>
+    </label>
+
+    <label class="admin__field admin__field--wide">
+      <span class="admin__label">Subject line</span>
+      <input class="admin__input" type="text" required
+             name="contact[mail_subject]"
+             value="<?= h((string)$data['contact']['mail_subject']) ?>">
+      <span class="admin__hint">
+        What every message starts its subject with. Whatever the sender typed
+        follows it, after a colon.
+      </span>
+    </label>
+  </div>
+
+  <div class="admin-card">
+    <div class="admin-card__head">
+      <span class="admin-card__preview">
+        <strong>What the messages are sent AS</strong>
+        <span class="admin-card__value"><?= h(SETTINGS_MAIL_FROM) ?></span>
+      </span>
     </div>
+    <p class="admin__fineprint">
+      Not a field, and it must not become one. A message has to be sent from an
+      address at this site's own domain or it fails SPF — the record that says
+      which servers may send as <code>tech4time.bd</code> — and is filed as spam.
+      That record lives with the domain and nothing on this screen can change it,
+      so a box here would let somebody make every enquiry disappear into a spam
+      folder with nothing to say why. The sender's own address goes on Reply-To,
+      so hitting reply still reaches them.
+    </p>
+  </div>
 </section>
+
+  <?= admin_form_tail() ?>
+</form>
 <?php
 admin_foot();

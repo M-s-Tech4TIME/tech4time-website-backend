@@ -38,7 +38,7 @@ jobs:
     name: checks
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Printed, not asserted. The host runs PHP 8.2.33 and the runner will
       # drift ahead of it; that is worth seeing in the log rather than
@@ -77,7 +77,7 @@ jobs:
     name: php
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # These drive a real PHP server and a real sign-in, served from public/
       # exactly as the host serves it, with the private store beside the
@@ -202,7 +202,7 @@ jobs:
     name: both halves
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The uploader decodes and re-encodes every picture, so without GD this
       # job would skip the only part of itself that matters. Same bargain as
@@ -220,7 +220,7 @@ jobs:
     name: firefox
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # From Mozilla's tarball rather than apt. On Ubuntu 24.04 `apt install
       # firefox` is a transitional package that pulls the snap, which does not

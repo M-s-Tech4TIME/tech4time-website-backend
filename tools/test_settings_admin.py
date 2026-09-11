@@ -395,6 +395,20 @@ def the_upload(client, r, site) -> None:
     r.check("and the document is untouched",
             stored()["logo"]["light"] == after["logo"]["light"], "it saved anyway")
 
+    # A picture on somebody else's server. The hidden inputs are text fields
+    # with the label taken off, so this is the one thing a POST can still try —
+    # and it used to be a typed field on ?s=chrome, where that screen refused
+    # it. The refusal travels with the field.
+    fields = form_fields(client.get("/?s=settings&part=logo")[1])
+    fields["logo[light][src]"] = "https://evil.example/logo.png"
+    fields["logo[light][srcset]"] = ("https://evil.example/logo.png 180w, "
+                                     "/assets/images/logo/logo-light-360.png 360w")
+    status, _headers, body = client.post("/?s=settings&part=logo", fields)
+    r.check("a mark on another origin is refused rather than stored",
+            status == 200 and "no light-mode picture" in body, f"status {status}")
+    r.check("and the rung that WAS a path this site serves is not lost with it",
+            "/assets/images/logo/logo-light-360.png 360w" in body, "the good rung went too")
+
     fields = form_fields(client.get("/?s=settings&part=logo")[1])
     for key in ("src", "webp", "width", "height", "srcset", "webp_srcset"):
         fields[f"logo[dark][{key}]"] = ""

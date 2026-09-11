@@ -602,6 +602,19 @@ One document, `content/settings.json`, holding the four things every page depend
 owns: the logo, the square mark the favicons are made from, the colour tokens the site is drawn
 from, and the address the contact form sends to.
 
+**One mark, nine consumers, and now one document.** The logo is read from `content/settings.json` by
+the header, the footer, the About page's lockup, `Organization.logo`, every job posting's hiring
+organisation, the branding kit, the favicon set and the admin's own rail. It used to be typed into
+`content/chrome.json` as eleven text fields per part — twice, for the header and the footer — while
+the other seven named committed files nobody could reach from any editor at all. **The SEO screen
+already had a working logo upload that was completely disconnected from the header**, so changing
+one left the other showing the old mark with nothing comparing them.
+
+What stays in the chrome is the **alt text**, which is genuinely the chrome's: the header's and the
+footer's are different sentences about the same picture. `identity.logo` on the SEO screen stays as
+an **override** — empty means the site's mark, filled wins — because Google renders
+`Organization.logo` in a near-square slot and this lockup is nearly three to one.
+
 `settings_edit()` is `chrome_edit()` line for line, and it locks for the same reason: each screen
 holds one **part** of this document — the colour screen never sees the logo — so a save merges the
 rest back from the file. A read-modify-write without a lock loses one of two concurrent edits to

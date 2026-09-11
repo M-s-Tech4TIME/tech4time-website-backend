@@ -27,10 +27,10 @@
         "price_range": "$$",
         "area_served": "Worldwide",
         "logo": {
-            "src": "/assets/images/logo/logo-light-540.png",
+            "src": "",
             "webp": "",
-            "width": 540,
-            "height": 192
+            "width": 0,
+            "height": 0
         },
         "service_types": [
             "Cybersecurity Services",

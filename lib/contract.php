@@ -5725,23 +5725,21 @@ function chrome_defaults(): array
             /* The accessible name of the logo link. It is not the alt text:
                the picture says "Tech4TIME" and the link says where it goes. */
             'brand_label' => 'Tech4TIME — home',
+            /* THE PICTURE IS NOT HERE ANY MORE, and the alt text still is.
+               The mark is one thing drawn in nine places -- this header, the
+               footer, the About page, the admin's own rail, the favicon set,
+               the branding kit and two structured-data graphs -- so it lives in
+               content/settings.json and every one of them reads it.
+
+               What stays is what the CHROME owns: the words a screen reader
+               announces this link as. The header's and the footer's are
+               legitimately different sentences about the same picture, which is
+               exactly why they are not one field somewhere else. */
             'logo' => [
-                'alt'    => 'Tech4TIME',
+                'alt'   => 'Tech4TIME',
                 /* Three widths behind one displayed size. The header shows the
                    lockup at 140px on a phone and 180px above 48em. */
-                'sizes'  => '(max-width: 48em) 140px, 180px',
-                'width'  => 360,
-                'height' => 128,
-                'light'  => [
-                    'src'    => '/assets/images/logo/logo-light-360.png',
-                    'srcset' => '/assets/images/logo/logo-light-180.png 180w, /assets/images/logo/logo-light-360.png 360w, /assets/images/logo/logo-light-540.png 540w',
-                    'webp'   => '/assets/images/logo/logo-light-180.webp 180w, /assets/images/logo/logo-light-360.webp 360w, /assets/images/logo/logo-light-540.webp 540w',
-                ],
-                'dark'   => [
-                    'src'    => '/assets/images/logo/logo-dark-360.png',
-                    'srcset' => '/assets/images/logo/logo-dark-180.png 180w, /assets/images/logo/logo-dark-360.png 360w, /assets/images/logo/logo-dark-540.png 540w',
-                    'webp'   => '/assets/images/logo/logo-dark-180.webp 180w, /assets/images/logo/logo-dark-360.webp 360w, /assets/images/logo/logo-dark-540.webp 540w',
-                ],
+                'sizes' => '(max-width: 48em) 140px, 180px',
             ],
             'nav' => ['items' => [
                 ['id' => 'home',     'target' => 'home',     'label' => '', 'status' => 'shown'],
@@ -5755,24 +5753,13 @@ function chrome_defaults(): array
 
         'footer' => [
             'brand_label' => 'Tech4TIME — home',
+            /* Likewise -- see the header's. The footer says nothing about
+               the picture except how it should be announced. */
             'logo' => [
-                'alt'    => 'Tech4TIME',
-                /* No sizes and no srcset: the footer draws one width and
-                   always has. An empty srcset is not a missing value, it says
-                   "emit no srcset attribute". */
-                'sizes'  => '',
-                'width'  => 360,
-                'height' => 128,
-                'light'  => [
-                    'src'    => '/assets/images/logo/logo-light-360.png',
-                    'srcset' => '',
-                    'webp'   => '/assets/images/logo/logo-light-360.webp',
-                ],
-                'dark'   => [
-                    'src'    => '/assets/images/logo/logo-dark-360.png',
-                    'srcset' => '',
-                    'webp'   => '/assets/images/logo/logo-dark-360.webp',
-                ],
+                'alt'   => 'Tech4TIME',
+                /* No sizes and no srcset: the footer draws one width and always
+                   has. An empty string says "emit no sizes attribute". */
+                'sizes' => '',
             ],
             'tagline'     => 'Orchestrating Technology with Time',
             'description' => 'Open-Source & Enterprise-grade cybersecurity, software '
@@ -6004,25 +5991,10 @@ function chrome_logo_defaults(mixed $logo, array $fallback): array
     $logo = is_array($logo) ? $logo : [];
     $logo += $fallback;
 
-    $out = [
-        'alt'    => trim((string)$logo['alt']),
-        'sizes'  => trim((string)$logo['sizes']),
-        'width'  => max(0, (int)$logo['width']),
-        'height' => max(0, (int)$logo['height']),
+    return [
+        'alt'   => trim((string)$logo['alt']),
+        'sizes' => trim((string)$logo['sizes']),
     ];
-
-    foreach (['light', 'dark'] as $mode) {
-        $image = is_array($logo[$mode] ?? null) ? $logo[$mode] : [];
-        $image += ['src' => '', 'srcset' => '', 'webp' => ''];
-
-        $out[$mode] = [
-            'src'    => contract_safe_image_path((string)$image['src']),
-            'srcset' => contract_srcset((string)$image['srcset']),
-            'webp'   => contract_srcset((string)$image['webp']),
-        ];
-    }
-
-    return $out;
 }
 
 /* ------------------------------------------------------ normalising */
@@ -6230,37 +6202,17 @@ function chrome_rows_shown(mixed $rows): array
 /**
  * Every picture the chrome points at, as web paths, without duplicates.
  *
- * Both logos, both modes, and every entry of every srcset -- the 540px file is
- * only ever named inside a srcset, and a sweep that counted the <img src>
- * alone would offer to delete it.
+ * NONE, NOW, AND THE ARM STILL HAS TO BE HERE. The chrome held the two logo
+ * lockups; the mark moved to content/settings.json, which is read by the nine
+ * places that draw it, and what is left here is alt text. contract_images()
+ * throws on a document it has no arm for, so removing this one would turn "the
+ * chrome has no pictures" into "the chrome is not a document" -- and a
+ * document that cannot answer is how a new one becomes a new way to lose
+ * files. It answers with none, which is the truth.
  */
 function chrome_images(array $data): array
 {
-    $seen = [];
-
-    foreach (['header', 'footer'] as $part) {
-        foreach (['light', 'dark'] as $mode) {
-            $image = $data[$part]['logo'][$mode] ?? [];
-
-            foreach ([$image['src'] ?? ''] as $path) {
-                $path = trim((string)$path);
-                if ($path !== '') {
-                    $seen[$path] = true;
-                }
-            }
-
-            foreach ([$image['srcset'] ?? '', $image['webp'] ?? ''] as $list) {
-                foreach (explode(',', (string)$list) as $entry) {
-                    $path = trim((string)(preg_split('/\s+/', trim($entry))[0] ?? ''));
-                    if ($path !== '') {
-                        $seen[$path] = true;
-                    }
-                }
-            }
-        }
-    }
-
-    return array_keys($seen);
+    return [];
 }
 
 /* ------------------------------------------------------- the drift notice

@@ -30,7 +30,7 @@ breath**.
 | Anything the privacy policy says — a clause, the retention table, the effective date | `/?s=privacy` |
 | A navigation link, on the site or in the footer or the mobile dock | `/?s=chrome` |
 | The footer's tagline, its contact rows, the copyright line | `/?s=chrome` |
-| The logo lockup at the top or the bottom of every page | `/?s=chrome` |
+| What the logo link says out loud, at the top or the bottom | `/?s=chrome` |
 | The logo itself — the picture, light and dark | `/?s=settings&part=logo` |
 | The icon a browser tab and a phone's home screen show | `/?s=settings&part=icon` |
 | A brand colour, in light mode or dark | `/?s=settings&part=colour` |

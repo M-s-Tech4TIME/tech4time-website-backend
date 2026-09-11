@@ -218,18 +218,13 @@ function chrome_validate(array $data, string $part = ''): array
         if (trim((string)$data[$owner]['logo']['alt']) === '') {
             $errors[] = $what . '\'s logo has no alt text.';
         }
-        foreach (['light' => 'light mode', 'dark' => 'dark mode'] as $mode => $when) {
-            /* Empty covers two cases and the message has to cover both: a
-               field left blank, and a field filled in with somebody else's
-               address, which contract_safe_image_path() refuses and empties
-               before this ever sees it. */
-            if (trim((string)$data[$owner]['logo'][$mode]['src']) === '') {
-                $errors[] = $what . '\'s logo has no picture for ' . $when . '. '
-                          . 'It must be a path on this site, like '
-                          . '/assets/images/logo/logo-light-360.png — another '
-                          . 'site\'s address is refused.';
-            }
-        }
+
+        /* THE PICTURE IS NOT JUDGED HERE ANY MORE. It used to be typed as a
+           path into this screen, so this refused an empty one and explained
+           what a path looked like. It is uploaded on ?s=settings now and
+           settings_validate() refuses an empty light mark there -- beside the
+           field somebody would have to fix, which is the only place a refusal
+           is any use. */
     }
 
     /* A shown contact row with nothing in it is an icon beside white space. */

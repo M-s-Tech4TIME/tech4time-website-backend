@@ -84,6 +84,11 @@ EXPECT = [
     ("/sections/seo.php",     (404,),      "including the one that controls indexing"),
     ("/content/careers.json", (404,),      "and the system of record"),
     ("/content/seo.json",     (404,),      "including the site-wide SEO document"),
+    # And the identity document, named for a reason of its own: it holds the
+    # address the public site's enquiry form delivers to. Every other file in
+    # here is content somebody meant to publish; that one line is the company's
+    # working inbox, and a fetchable copy of it is a harvested address.
+    ("/content/settings.json", (404,),     "and the address enquiries are sent to"),
     ("/tools/admin-cli.php",  (404,),      "tools/ is not deployed at all"),
 
     ("/t4t-private-admin/secret.key", (403, 404), "a store dropped in the web root is refused"),

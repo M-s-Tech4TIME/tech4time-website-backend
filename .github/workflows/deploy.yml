@@ -139,10 +139,19 @@ jobs:
           # spaces, and a pattern expecting one silently matches nothing —
           # a gate that always passes, which is worse than no gate at all.
           # Caught by running this against a deliberately unprotected plan.
-          if grep -E '^\*deleting[[:space:]]+(content/|\.well-known/|public/\.well-known/|cgi-bin/|([^[:space:]]*/)?error_log|\.user\.ini|php\.ini)' /tmp/plan.txt; then
+          # public/uploads/ IS ON THIS LIST NOW AND WAS NOT. The protect rule
+          # above has named it since ADR 0019, while this gate -- whose entire
+          # purpose is to be an INDEPENDENT check that the filters worked -- did
+          # not. And it matters more on this half than on the other: this is
+          # where pictures are AUTHORED. The public site holds a replica that a
+          # reconcile can rebuild; these are the originals, and they are in no
+          # repository.
+          if grep -E '^\*deleting[[:space:]]+(content/|public/uploads/|\.well-known/|public/\.well-known/|cgi-bin/|([^[:space:]]*/)?error_log|\.user\.ini|php\.ini)' /tmp/plan.txt; then
             echo "::error::The deploy proposed deleting something the host owns. Refusing."
             echo "content/ here is the SYSTEM OF RECORD — every job post and contact"
             echo "detail the client has written. The public site holds a replica of it."
+            echo "public/uploads/ is where every picture was ACCEPTED — the originals,"
+            echo "held in no repository and rebuildable from nowhere."
             echo "Nothing has been written to the server. Fix the protect list and re-run."
             exit 1
           fi

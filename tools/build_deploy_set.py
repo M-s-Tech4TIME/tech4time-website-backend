@@ -120,20 +120,11 @@ REQUIRED = [
     "lib/about.php",                 # the about editor's model
     "lib/home.php",                  # and the home editor's
     "lib/publish_client.php",        # without it a save writes and never sends
-    "sections/careers.php",
-    "sections/contact.php",
-    "sections/company.php",
-    "sections/about.php",
-    "sections/home.php",
-    # These four were never added as each editor landed. They still shipped --
-    # sections/ is not in FORBIDDEN_TREES, so the sweep picked them up -- but
-    # the assertion read as though it covered every editor and did not. A list
-    # that is silently incomplete is worse than no list.
-    "sections/services.php",
-    "sections/certifications.php",
-    "sections/branding.php",
-    "sections/privacy.php",
     "lib/privacy.php",               # the privacy editor's model
+    # NO sections/ ENTRIES HERE ANY MORE. They used to be listed one by one and
+    # the list went incomplete twice -- four editors added after the fact, then
+    # ?s=chrome and ?s=settings never added at all. Every screen in sections/ is
+    # asserted further down by asking the directory, which cannot fall behind.
 ]
 
 # Never in the set, whatever else changes. Stated separately from "not in
@@ -303,6 +294,16 @@ def check(paths: list[str], out_dir: Path) -> tuple[int, int]:
         assert_(f"{rel} is in the upload set", rel in paths)
 
     for php in sorted((ROOT / "admin").rglob("*.php")):
+        rel = php.relative_to(ROOT).as_posix()
+        assert_(f"{rel} is in the upload set", rel in paths)
+
+    # AND EVERY SCREEN, for the reason the libraries are asked for rather than
+    # listed. These WERE listed, and the list went silently incomplete twice:
+    # four editors were added to it after the fact with a comment saying a list
+    # that is quietly incomplete is worse than none -- and then ?s=chrome and
+    # ?s=settings shipped and neither was added either. A list nobody updates
+    # is a list that lies about what it covers, so this asks the directory.
+    for php in sorted((ROOT / "sections").glob("*.php")):
         rel = php.relative_to(ROOT).as_posix()
         assert_(f"{rel} is in the upload set", rel in paths)
 

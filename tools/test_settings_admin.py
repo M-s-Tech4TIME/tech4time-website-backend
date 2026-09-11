@@ -200,6 +200,28 @@ def php(code: str) -> dict:
         return {"fatal": (out.stderr or out.stdout).strip()[:400]}
 
 
+def icon_master(width: int, height: int, mark=None) -> bytes:
+    """Artwork: a transparent canvas with one solid mark somewhere in it.
+
+    `mark` is the mark's own width and height, and DEFAULTS TO NON-SQUARE on
+    purpose. A mark that happens to be square after trimming never reaches the
+    padding branch of settings_icon_square(), so a fixture built that way
+    reports a pass on code it did not run — which is what the first version of
+    this did, and why breaking the padding failed nothing.
+    """
+    mw, mh = mark or (int(width * 0.7), int(height * 0.3))
+    return bytes.fromhex(php(
+        "$im = imagecreatetruecolor(%d, %d);"
+        "imagealphablending($im, false); imagesavealpha($im, true);"
+        "imagefilledrectangle($im, 0, 0, %d, %d, imagecolorallocatealpha($im, 0, 0, 0, 127));"
+        "imagefilledellipse($im, %d, %d, %d, %d, imagecolorallocate($im, 240, 240, 245));"
+        "ob_start(); imagepng($im); $b = ob_get_clean(); imagedestroy($im);"
+        "echo json_encode(['hex' => bin2hex($b)]);"
+        % (width, height, width - 1, height - 1,
+           width // 2, height // 2, mw, mh)
+    )["hex"])
+
+
 def stop(proc):
     for attempt in (proc.terminate, proc.kill):
         try:
@@ -392,6 +414,47 @@ def the_upload(client, r, site) -> None:
             and after["contact"] == before["contact"] and after["icon"] == before["icon"],
             str(after["colours"]["light"])[:160])
 
+    print("\na square mark, through the icon screen")
+
+    status, page = client.get("/?s=settings&part=icon")
+    r.check("the icon screen is a form that accepts a file",
+            'enctype="multipart/form-data"' in page and 'name="upload[icon][0]"' in page,
+            "no file input")
+
+    before = stored()
+    fields = form_fields(page)
+    status, _headers, body = client.post(
+        "/?s=settings&part=icon", fields,
+        {"upload[icon][0]": ("mark.png", icon_master(600, 600, mark=(500, 500)), "image/png")})
+
+    import re as _re
+    i = body.find("Not saved")
+    said = _re.sub(r"<[^>]+>", " ", body[i:i + 700]) if i >= 0 else body[:300]
+    said = _re.sub(r"\s+", " ", said).strip()[:400]
+    r.check("the save redirects rather than re-rendering",
+            status == 302, f"status {status} — {_re.sub(r'<[^>]+>|\s+', ' ', said).strip()}")
+
+    after = stored()
+    r.check("the master is stored", after["icon"]["master"]["src"].startswith("/uploads/"),
+            str(after["icon"]["master"])[:160])
+    r.check("and every icon the shape declares was generated",
+            all(v.startswith("/uploads/") for v in after["icon"]["generated"].values()),
+            str(after["icon"]["generated"])[:250])
+
+    files = {Path(v).name for v in after["icon"]["generated"].values()}
+    files |= {Path(after["icon"]["master"]["src"]).name}
+    r.check("every one of them is on this host",
+            all((UPLOADS / n).is_file() for n in files),
+            str(sorted(n for n in files if not (UPLOADS / n).is_file())))
+    # A <link rel="icon"> pointing at a file the live site has not got is a
+    # browser tab with no mark in it, so all nine travel before the document
+    # names any of them.
+    r.check("and every one of them reached the live site",
+            files <= set(site.assets), f"{sorted(files - set(site.assets))} missing")
+
+    r.check("the logo was left exactly as it was",
+            after["logo"] == before["logo"], "the icon save touched the logo")
+
     print("\nwhat the logo screen refuses")
     # An empty light half is the company's mark missing from every page. An
     # empty DARK half is a legitimate answer and must never be refused.
@@ -428,6 +491,140 @@ def the_upload(client, r, site) -> None:
     r.check("clearing the DARK mark is allowed", status == 302, f"status {status}")
     r.check("and it is really gone", stored()["logo"]["dark"]["src"] == "",
             str(stored()["logo"]["dark"])[:160])
+
+
+def the_icons(r: Results) -> None:
+    print("every favicon a browser or a phone asks for, from one square master")
+
+    blob = icon_master(900, 600)
+    r.check("the master for this test really is a picture", len(blob) > 100, str(len(blob)))
+
+    got = php("echo json_encode(settings_icon_generate(base64_decode('%s')));"
+              % __import__("base64").b64encode(blob).decode())
+    r.check("the set is generated", "error" not in got, str(got)[:250])
+    if "error" in got:
+        return
+
+    wanted = php("echo json_encode(array_keys(settings_defaults()['icon']['generated']));")
+    r.check("one file for every name the shape declares",
+            sorted(got) == sorted(wanted), f"{sorted(got)} vs {sorted(wanted)}")
+    r.check("and no favicon.ico among them, because that is assembled where it is served",
+            "ico" not in got, str(sorted(got)))
+
+    on_disk = {n: UPLOADS / Path(path).name for n, path in got.items()}
+    r.check("and every one of them is on disk",
+            all(f.is_file() for f in on_disk.values()),
+            str([n for n, f in on_disk.items() if not f.is_file()]))
+
+    # TWO KINDS, AND THE DIFFERENCE IS NOT COSMETIC. A browser favicon is drawn
+    # against the browser's own chrome and must be transparent; an app icon
+    # goes on a home screen against a photograph nobody can predict, and a
+    # transparent one there is a mark on somebody's wallpaper.
+    facts = php("$o = [];"
+                "foreach (%s as $n => $f) {"
+                "  $im = imagecreatefrompng($f); $c = imagecolorat($im, 0, 0);"
+                "  $o[$n] = ['w' => imagesx($im), 'a' => ($c >> 24) & 0x7F,"
+                "            'rgb' => sprintf('%%d,%%d,%%d', ($c >> 16) & 255, ($c >> 8) & 255, $c & 255)];"
+                "  imagedestroy($im); }"
+                "echo json_encode($o);"
+                % php_array({n: str(f) for n, f in on_disk.items()}))
+
+    spec = php("echo json_encode(SETTINGS_ICON_SIZES);")
+
+    for name, want in spec.items():
+        made = facts.get(name, {})
+        r.check(f"{name} is {want['size']} pixels square",
+                made.get("w") == want["size"], str(made))
+        if want["pad"] == 0:
+            r.check(f"  and transparent, because a tab draws its own background",
+                    made.get("a") == 127, str(made))
+        else:
+            r.check(f"  and opaque on the ground, because a home screen does not",
+                    made.get("a") == 0 and made.get("rgb") == "11,11,12", str(made))
+
+    print("\nthe .ico, written by hand around PNG payloads")
+    # ASSEMBLED, NOT STORED. The asset channel carries what
+    # getimagesizefromstring() recognises and an .ico is not among them, so the
+    # public site builds the container from the three PNGs it already holds.
+    # Here that is the same function, asked directly.
+    ico = bytes.fromhex(php(
+        "$p = %s; $o = [];"
+        "foreach (SETTINGS_ICON_ICO as $s) { $o[$s] = file_get_contents($p['png' . $s]); }"
+        "echo json_encode(['hex' => bin2hex(contract_ico_container($o))]);"
+        % php_array({n: str(UPLOADS / Path(got[n]).name)
+                     for n in ("png16", "png32", "png48")})
+    )["hex"])
+
+    res, kind, count = struct.unpack("<HHH", ico[:6])
+    r.check("it is an icon directory, not a cursor", res == 0 and kind == 1,
+            f"reserved={res} type={kind}")
+    r.check("holding the sizes the shape declares",
+            count == len(php("echo json_encode(SETTINGS_ICON_ICO);")), f"{count} entries")
+
+    entries = []
+    for i in range(count):
+        entries.append(struct.unpack("<BBBBHHII", ico[6 + i * 16:22 + i * 16]))
+
+    r.check("each entry names its own size",
+            [e[0] for e in entries] == php("echo json_encode(SETTINGS_ICON_ICO);"),
+            str([e[0] for e in entries]))
+
+    # THE OFFSET ARITHMETIC IS THE WHOLE OF WHAT A CONTAINER IS. An entry that
+    # points at the wrong byte is a file every tool still calls an .ico and no
+    # browser can draw, which is exactly the failure this format invites.
+    bad = []
+    for w, h, _c, _r, _p, _bc, length, offset in entries:
+        payload = ico[offset:offset + length]
+        if len(payload) != length:
+            bad.append(f"{w}x{h}: runs past the end of the file")
+        elif payload[:8] != b"\x89PNG\r\n\x1a\n":
+            bad.append(f"{w}x{h}: offset {offset} is not the start of a PNG")
+
+    r.check("and every offset and length points at its own payload",
+            not bad, "; ".join(bad))
+    r.check("with nothing left over at the end",
+            entries and entries[-1][6] + entries[-1][7] == len(ico),
+            f"{entries[-1][6] + entries[-1][7]} vs {len(ico)} bytes")
+
+    print("\nwhat happens to a mark that is not square")
+    # Trimming first is what stops a wide transparent margin becoming a tiny
+    # mark in the middle of every tile; padding back to a square is what stops
+    # the trim turning a circular dial into an oval.
+    # A CIRCULAR mark on a wide canvas, because a circle is the one shape that
+    # says whether it was distorted. Asking "is there a transparent band at the
+    # top" does not: a source with its own margin keeps a band either way, and
+    # a check built that way passes on code that squashed the mark. This
+    # measures how far the mark reaches across the tile and how far down it,
+    # and a circle reaches equally.
+    wide = php("echo json_encode(settings_icon_generate(base64_decode('%s')));"
+               % __import__("base64").b64encode(
+                   icon_master(1200, 800, mark=(400, 400))).decode())
+    r.check("a circular mark on a 3:2 canvas still makes square icons",
+            "error" not in wide, str(wide)[:200])
+
+    if "error" not in wide:
+        shape = php(
+            "$im = imagecreatefrompng('%s');"
+            "$across = 0; $down = 0;"
+            "for ($x = 0; $x < 96; $x++) { if (((imagecolorat($im, $x, 48) >> 24) & 0x7F) < 60) { $across++; } }"
+            "for ($y = 0; $y < 96; $y++) { if (((imagecolorat($im, 48, $y) >> 24) & 0x7F) < 60) { $down++; } }"
+            "echo json_encode(['w' => imagesx($im), 'h' => imagesy($im),"
+            "  'across' => $across, 'down' => $down]);"
+            % (UPLOADS / Path(wide["png96"]).name))
+
+        r.check("  96 pixels by 96", shape.get("w") == 96 and shape.get("h") == 96, str(shape))
+        r.check("  and the mark is still round, not squashed to fit the canvas",
+                shape.get("across") and abs(shape["across"] - shape["down"]) <= 2,
+                f'{shape.get("across")} across, {shape.get("down")} down')
+
+    print("\nwhat the generator refuses")
+    r.check("something that is not a picture at all",
+            "error" in php("echo json_encode(settings_icon_generate('not a picture'));"))
+
+
+def php_array(mapping: dict) -> str:
+    inner = ", ".join(f"{json.dumps(k)} => {json.dumps(v)}" for k, v in mapping.items())
+    return "[" + inner + "]"
 
 
 def main() -> None:
@@ -473,6 +670,7 @@ def main() -> None:
             client = Client(base)
             admin_session.sign_in(client.opener, base, secret)
 
+            the_icons(r)
             the_shell(client, r)
             the_notices(client, r)
             the_upload(client, r, site)

@@ -137,6 +137,15 @@ the attribute. `contract_srcset()` checks each candidate path the way `contract_
 checks a single one; it was `chrome_srcset()` while the header lockup was the only picture stored at
 more than one width.
 
+`contract_ico_container()` writes a `.ico` by hand: a six-byte directory, a sixteen-byte entry per
+image, then the PNG payloads. **It is in the contract because it is assembled where it is served,
+not sent over the wire.** The asset channel carries what `getimagesizefromstring()` recognises — PNG,
+JPEG, WebP — and an `.ico` is none of them; widening that list so one file could travel would also
+widen what an editor can upload as page artwork. So the editor generates the PNGs and the public site
+builds the container from the three it already holds, which is why both halves need the same writer.
+Embedding PNG rather than the older BMP-with-mask has been valid since Windows Vista and is what the
+committed `favicon.ico` already contained — all three of its entries, checked before this was written.
+
 `contract_srcset_top()` answers the widest rung of a ladder, which is **not always the record's
 `src`.** For a picture the uploader stored it is — `upload_store()` names the top rung as `src`. For
 the logo the site *ships* with it is not: the header's `src` is the 360 px file and the ladder goes
@@ -601,7 +610,8 @@ would differ by construction). It is never created on demand — see
 **Backend only** — the writing half. The renderer's half is
 `tech4time-website-frontend/lib/settings.php`.
 
-`settings_load()` · `settings_edit()` · `settings_validate()`
+`settings_load()` · `settings_edit()` · `settings_validate()` ·
+`settings_icon_generate()` · `settings_icon_square()` · `settings_icon_render()`
 
 One document, `content/settings.json`, holding the four things every page depends on and no page
 owns: the logo, the square mark the favicons are made from, the colour tokens the site is drawn
@@ -634,6 +644,21 @@ business: the file path and the read here, plus the save, the validation and the
 holds one **part** of this document — the colour screen never sees the logo — so a save merges the
 rest back from the file. A read-modify-write without a lock loses one of two concurrent edits to
 different parts, which here is the normal case rather than an edge one.
+
+`settings_icon_generate()` makes every favicon from one square master: seven PNGs, written
+through `upload_write()` so each lands under a content-addressed name and travels the same signed
+channel as an upload. **Two kinds, and the difference is not cosmetic.** The four browser sizes ship
+**transparent** — a tab draws its own background, pale in light mode and dark in dark, and a mark
+with a plate behind it would be a rectangle floating in it. The three app sizes are **tiles** on an
+opaque ground with room around them, because an iOS home screen or an app switcher puts them against
+a photograph nobody can predict. `settings_icon_square()` trims the master's empty edges and pads it
+back to a square first, which is what stops a wide margin becoming a tiny mark in the middle of every
+tile *and* stops the trim turning a round dial into an oval.
+
+It writes **no `favicon.ico`** — see `contract_ico_container()` for why that one is assembled where
+it is served — and it never writes a partial set: everything is encoded before anything is written,
+because a set with three of seven files on disk is a site with four `<link>` elements pointing at
+nothing.
 
 `settings_validate()` refuses one thing and it is not a matter of taste: **an empty light-mode
 logo.** That is the company's mark missing from the header and the footer of every page, and from

@@ -29,14 +29,13 @@
             "webp_srcset": ""
         },
         "generated": {
-            "ico": "",
             "png16": "",
             "png32": "",
             "png48": "",
             "png96": "",
+            "apple": "",
             "png192": "",
-            "png512": "",
-            "apple": ""
+            "png512": ""
         }
     },
     "colours": {

@@ -28,6 +28,11 @@ declare(strict_types=1);
 require_once __DIR__ . '/contract.php';
 require_once __DIR__ . '/store.php';
 require_once __DIR__ . '/publish_client.php';
+/* The icon generator is image work: it needs GD through upload_problem(),
+   and it writes its output through upload_write(), which is what puts a
+   generated file under the same content-addressed name and the same
+   signed channel as an uploaded one. */
+require_once __DIR__ . '/upload.php';
 
 const SETTINGS_FILE = __DIR__ . '/../content/settings.json';
 
@@ -130,3 +135,169 @@ function settings_validate(array $data, string $part = ''): array
 
 /* ----------------------------------------------------------- what is set */
 
+
+/* --------------------------------------------------------- the icon set */
+
+/**
+ * Every favicon PNG a browser or a phone asks for, made from one square master.
+ *
+ * WHY THE SERVER DOES THIS AND NOT A SCRIPT. The set is eight files -- seven
+ * PNGs and an ICO -- and every one of them has to be the same mark. That was a
+ * developer running tools/build_favicons.py with Pillow and committing the
+ * result, so a company could not change what its own browser tab shows.
+ *
+ * Returns the 'generated' band, or ['error' => 'a sentence']. It writes
+ * through upload_write(), so each file lands under a content-addressed name
+ * beside the uploads and travels the same signed channel.
+ *
+ * NO favicon.ico IS WRITTEN HERE. The asset channel carries what
+ * getimagesizefromstring() recognises and an .ico is not among them; widening
+ * that list to carry one file would also widen what an editor can upload as
+ * page artwork. The public site holds the three PNGs an .ico needs already, so
+ * it assembles the container itself -- contract_ico_container(), served at
+ * /favicon.ico.
+ *
+ * IT NEVER WRITES A PARTIAL SET. Everything is encoded before anything is
+ * written, for the reason upload_store() does it: a set with three of eight
+ * files on disk is a site with three of eight icons, and the other five are
+ * <link> elements pointing at nothing.
+ *
+ * @param string $bytes the master, as it was stored
+ */
+function settings_icon_generate(string $bytes): array
+{
+    $problem = upload_problem();
+    if ($problem !== '') {
+        return ['error' => $problem];
+    }
+
+    $master = @imagecreatefromstring($bytes);
+    if ($master === false) {
+        return ['error' => 'That picture could not be read. It may be damaged.'];
+    }
+
+    $made = [];
+
+    try {
+        $square = settings_icon_square($master);
+
+        try {
+            foreach (SETTINGS_ICON_SIZES as $name => $spec) {
+                $png = settings_icon_render($square, $spec['size'], (float)$spec['pad']);
+
+                if ($png === null) {
+                    return ['error' => 'The icons could not be drawn at '
+                                     . $spec['size'] . ' pixels.'];
+                }
+
+                $made[$name] = $png;
+            }
+
+        } finally {
+            if ($square !== $master) {
+                imagedestroy($square);
+            }
+        }
+    } finally {
+        imagedestroy($master);
+    }
+
+    $out = [];
+
+    foreach ($made as $name => $blob) {
+        $file = publish_asset_name($blob, 'png');
+
+        if (!upload_write($file, $blob)) {
+            return ['error' => 'The icons could not be saved on this server.'];
+        }
+
+        $out[$name] = UPLOAD_URL_ROOT . $file;
+    }
+
+    return $out;
+}
+
+/**
+ * The master, trimmed of empty edges and padded back to a square.
+ *
+ * A MARK IS RARELY SQUARE AND AN ICON ALWAYS IS. Trimming first is what stops
+ * a picture with a wide transparent margin becoming a tiny mark in the middle
+ * of every tile; padding back to a square is what stops the trim turning a
+ * circular dial into an oval. Both are what build_favicons.py does with the
+ * artwork this site ships, so a generated set sits where the committed one did.
+ *
+ * Hands the image back untouched when it is already a trimmed square, and the
+ * caller must not destroy what it did not get a new image of.
+ */
+function settings_icon_square(GdImage $image): GdImage
+{
+    $trimmed = @imagecropauto($image, IMG_CROP_TRANSPARENT);
+
+    if ($trimmed === false) {
+        /* Nothing to trim -- an opaque picture -- which is not a failure. */
+        $trimmed = $image;
+    }
+
+    $side = max(imagesx($trimmed), imagesy($trimmed));
+
+    if (imagesx($trimmed) === $side && imagesy($trimmed) === $side) {
+        return $trimmed;
+    }
+
+    $square = imagecreatetruecolor($side, $side);
+    upload_keep_alpha($square);
+    imagefilledrectangle($square, 0, 0, $side - 1, $side - 1,
+        imagecolorallocatealpha($square, 0, 0, 0, 127));
+
+    imagecopy($square, $trimmed,
+        (int)(($side - imagesx($trimmed)) / 2), (int)(($side - imagesy($trimmed)) / 2),
+        0, 0, imagesx($trimmed), imagesy($trimmed));
+
+    if ($trimmed !== $image) {
+        imagedestroy($trimmed);
+    }
+
+    return $square;
+}
+
+/**
+ * One icon, as PNG bytes: transparent when $pad is zero, an opaque tile when
+ * it is not.
+ *
+ * See SETTINGS_ICON_SIZES for why those are two different things.
+ */
+function settings_icon_render(GdImage $square, int $size, float $pad): ?string
+{
+    $inner = (int)round($size * (1 - 2 * $pad));
+
+    if ($size < 1 || $inner < 1) {
+        return null;
+    }
+
+    $canvas = imagecreatetruecolor($size, $size);
+    upload_keep_alpha($canvas);
+
+    [$r, $g, $b] = SETTINGS_ICON_GROUND;
+
+    imagefilledrectangle($canvas, 0, 0, $size - 1, $size - 1,
+        $pad > 0.0
+            ? imagecolorallocate($canvas, $r, $g, $b)
+            : imagecolorallocatealpha($canvas, 0, 0, 0, 127));
+
+    /* Blending ON for the paste, so a mark with soft edges lands ON the
+       ground rather than punching its own alpha through it -- and off again
+       before the encoder, so what alpha is left is what gets written. */
+    imagealphablending($canvas, true);
+
+    $offset = (int)(($size - $inner) / 2);
+    $ok = imagecopyresampled($canvas, $square, $offset, $offset, 0, 0,
+        $inner, $inner, imagesx($square), imagesy($square));
+
+    imagealphablending($canvas, false);
+
+    $png = $ok ? upload_encode($canvas, 'png') : null;
+
+    imagedestroy($canvas);
+
+    return $png;
+}

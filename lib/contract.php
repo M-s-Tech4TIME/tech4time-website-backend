@@ -1116,6 +1116,10 @@ const CONTRACT_IMAGE_SLOTS = [
 
     /* No ladder -- see the docblock above. */
     'branding.file'     => ['width' => 0, 'sizes' => ''],
+    /* The square master the favicons are made from. It is a SOURCE and not
+       something a page draws: what the pages get is the set generated from it,
+       at the seven fixed sizes SETTINGS_ICON_SIZES declares. */
+    'settings.icon'     => ['width' => 0, 'sizes' => ''],
     'seo.share'         => ['width' => 0, 'sizes' => ''],
     'seo.logo'          => ['width' => 0, 'sizes' => ''],
 ];
@@ -6430,10 +6434,105 @@ const SETTINGS_COLOURS = [
     ],
 ];
 
-/** Which icons the square master is rendered into, and at what size. */
-const SETTINGS_ICON_SIZES = ['png16' => 16, 'png32' => 32, 'png48' => 48,
-                             'png96' => 96, 'png192' => 192, 'png512' => 512,
-                             'apple' => 180];
+/**
+ * What the square master is rendered into, and how.
+ *
+ * TWO KINDS, AND THE DIFFERENCE IS NOT COSMETIC. A browser favicon ships
+ * TRANSPARENT: it is drawn against the browser's own chrome, which is pale in
+ * light mode and dark in dark mode, and a mark with a backing plate would be a
+ * rectangle floating in a tab. An APP icon is composited onto an opaque ground
+ * with room around it: an iOS home screen or an app switcher puts it against a
+ * photograph nobody can predict, and a transparent one there is a mark on
+ * somebody's wallpaper. iOS also masks its own corners, which is why the apple
+ * tile gets more breathing room than the two PWA ones.
+ *
+ * These are the sizes and the paddings tech4time-website-frontend's
+ * tools/build_favicons.py already produces, read off it rather than chosen
+ * again, so a generated set replaces the committed one like for like.
+ */
+const SETTINGS_ICON_SIZES = [
+    /*  name        pixels  padding, as a fraction of the tile          */
+    'png16'  => ['size' => 16,  'pad' => 0.0],
+    'png32'  => ['size' => 32,  'pad' => 0.0],
+    'png48'  => ['size' => 48,  'pad' => 0.0],
+    'png96'  => ['size' => 96,  'pad' => 0.0],
+    'apple'  => ['size' => 180, 'pad' => 0.14],
+    'png192' => ['size' => 192, 'pad' => 0.10],
+    'png512' => ['size' => 512, 'pad' => 0.10],
+];
+
+/**
+ * Which sizes go inside favicon.ico.
+ *
+ * Three, not the whole set: a browser picks the one it needs out of the
+ * container, and every extra size is bytes on a file some browsers still
+ * request on every page load. The 512px master is 136 kB; these three together
+ * are under nine.
+ */
+const SETTINGS_ICON_ICO = [16, 32, 48];
+
+/**
+ * The ground an app icon is composited onto.
+ *
+ * A CONSTANT, AND NOT settings_colours()['bg-base']. It is the same value
+ * today and the temptation to derive it is obvious, but the two are answers to
+ * different questions: bg-base is what the SITE is painted on, and this is
+ * what an icon needs behind it to be legible on somebody's home screen. Wire
+ * them together and a company that picks a pale dark-mode background gets a
+ * pale tile with a light mark on it, invisible -- and would have to regenerate
+ * every icon to find out. A dark neutral ground is always safe.
+ */
+const SETTINGS_ICON_GROUND = [11, 11, 12];
+
+/**
+ * A .ico file, written by hand, around PNG payloads.
+ *
+ * IT IS ASSEMBLED WHERE IT IS SERVED, not sent over the wire. The asset
+ * channel carries what getimagesizefromstring() recognises -- PNG, JPEG,
+ * WebP -- and an .ico is none of them; widening that list to carry one
+ * file would also widen what an editor can upload as page artwork. The
+ * public site holds the three PNGs already, so it builds the container from
+ * them on request, exactly as sitemap.php and manifest.php are built.
+ *
+ * GD HAS NO ICO WRITER AND NEITHER HALF NEEDS ONE TO BE A RENDERER:
+ * this is the container: a six-byte ICONDIR, then one
+ * sixteen-byte ICONDIRENTRY per image, then the images themselves. Embedding
+ * PNG rather than the older BMP-with-mask has been valid since Windows Vista
+ * and is what the committed favicon.ico already holds -- all three of its
+ * entries are PNG, which is how I know the format this writes is the format
+ * that has been serving this site.
+ *
+ * A width or height byte of 0 means 256. Nothing here is ever that big, but
+ * the field is one byte and saying so is cheaper than somebody rediscovering
+ * it.
+ */
+function contract_ico_container(array $images): string
+{
+    $count = count($images);
+    $offset = 6 + 16 * $count;
+
+    $directory = pack('vvv', 0, 1, $count);
+    $payloads = '';
+
+    foreach ($images as $size => $png) {
+        $directory .= pack(
+            'CCCCvvVV',
+            $size >= 256 ? 0 : $size,     /* width  */
+            $size >= 256 ? 0 : $size,     /* height */
+            0,                            /* palette entries: not a palette */
+            0,                            /* reserved */
+            1,                            /* colour planes */
+            32,                           /* bits per pixel */
+            strlen($png),
+            $offset
+        );
+
+        $payloads .= $png;
+        $offset += strlen($png);
+    }
+
+    return $directory . $payloads;
+}
 
 /**
  * The site as it ships, and the fallback for anything missing from the file.
@@ -6491,8 +6590,10 @@ function settings_defaults(): array
            directly until something replaces them. */
         'icon' => [
             'master'    => contract_image_defaults([]),
-            'generated' => ['ico' => ''] + array_map(
-                static fn(int $_size): string => '',
+            /* No 'ico' among them: /favicon.ico is assembled from three of
+               these where it is served. See contract_ico_container(). */
+            'generated' => array_map(
+                static fn(array $_spec): string => '',
                 SETTINGS_ICON_SIZES),
         ],
 

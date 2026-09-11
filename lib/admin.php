@@ -854,9 +854,26 @@ function admin_uploaded_files(): array
  */
 function admin_send_picture(array $stored): string
 {
+    return admin_send_files(contract_image_paths($stored));
+}
+
+/**
+ * Send a set of stored files to the live site, all of them or none named.
+ *
+ * The same guarantee as admin_send_picture() and the same reading of it — that
+ * function is this one asked for the files a picture record names. Taken apart
+ * because a generated icon set is eight files that are NOT a picture record:
+ * seven PNGs and an .ico, each named once in settings.icon.generated, and a
+ * <link rel="icon"> pointing at one that never arrived is a browser tab with
+ * no mark in it.
+ *
+ * @param list<string> $paths web paths under UPLOAD_URL_ROOT
+ */
+function admin_send_files(array $paths): string
+{
     $files = [];
 
-    foreach (contract_image_paths($stored) as $path) {
+    foreach ($paths as $path) {
         $name = basename((string)$path);
         if ($name === '') {
             continue;

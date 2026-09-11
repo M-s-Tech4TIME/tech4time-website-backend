@@ -199,6 +199,57 @@ function settings_take_uploads(array $data, array &$errors): array
     return $data;
 }
 
+/**
+ * Take the square master, make every icon from it, and send the lot.
+ *
+ * ONE UPLOAD, NINE FILES. The master itself is stored -- it is what a
+ * regeneration would start from, and what the screen shows back -- and the
+ * eight the server draws from it go with it. Every one of them travels before
+ * the document names any of them, because a <link rel="icon"> pointing at a
+ * file the live site has not got is a tab with no mark in it.
+ */
+function settings_take_icon(array $data, array &$errors): array
+{
+    foreach (admin_uploaded_files() as [$band, $_index, $file]) {
+        if ($band !== 'icon') {
+            continue;
+        }
+
+        $stored = upload_accept($file, 'settings.icon');
+
+        if (isset($stored['error'])) {
+            $errors[] = 'The tab icon: ' . $stored['error'];
+            continue;
+        }
+
+        $bytes = @file_get_contents(UPLOAD_DIR . '/' . basename((string)$stored['src']));
+
+        if ($bytes === false) {
+            $errors[] = 'The tab icon: the picture was not where it had just been written.';
+            continue;
+        }
+
+        $made = settings_icon_generate($bytes);
+
+        if (isset($made['error'])) {
+            $errors[] = 'The tab icon: ' . $made['error'];
+            continue;
+        }
+
+        $sent = admin_send_files([...contract_image_paths($stored), ...array_values($made)]);
+
+        if ($sent !== '') {
+            $errors[] = 'The tab icon: ' . $sent;
+            continue;
+        }
+
+        $data['icon'] = ['master' => contract_image_defaults($stored),
+                         'generated' => $made];
+    }
+
+    return $data;
+}
+
 /* ------------------------------------------------------------ which screen */
 
 $part   = in_array((string)($_GET['part'] ?? ''), SETTINGS_PARTS, true)
@@ -209,6 +260,31 @@ $data   = settings_load();
 $errors = [];
 
 /* ----------------------------------------------------------------- saving */
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $screen === 'icon') {
+    admin_check_csrf();
+
+    if (admin_form_truncated()) {
+        $errors[] = admin_truncated_message();
+    } else {
+        $posted = settings_take_icon($data, $errors);
+
+        if (!$errors) {
+            $posted = settings_normalise($posted);
+
+            $saved = settings_edit(static fn(array $was): array => array_replace(
+                $was, ['icon' => $posted['icon']]));
+
+            if ($saved) {
+                admin_redirect('settings', 'Saved the tab icon.', ['part' => 'icon']);
+            }
+            $errors[] = 'Could not write content/settings.json. Check the file is '
+                      . 'writable by PHP.';
+        }
+
+        $data = $posted;
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $screen === 'logo') {
     admin_check_csrf();
@@ -346,6 +422,83 @@ if ($screen === 'index') {
 
 $screens = SETTINGS_PART_SCREENS[$part];
 
+/* ------------------------------------------------------------- the icon */
+
+if ($screen === 'icon') {
+    admin_head('settings', $user,
+        $screens['blurb'] . ' <a href="' . h(admin_url('settings'))
+        . '">Back to Settings</a>.',
+        ['band-icon' => 'The square mark'],
+        ['form' => 'settings-form', 'label' => 'Save the tab icon',
+         'discard' => admin_url('settings', ['part' => 'icon'])]);
+
+    admin_notices($errors);
+    settings_notices($data, false);
+    ?>
+
+<form class="admin__form" id="settings-form" method="post" data-async
+      enctype="multipart/form-data"
+      action="<?= h(admin_url('settings', ['part' => 'icon'])) ?>">
+  <?= admin_form_fields('settings') ?>
+
+<section class="admin__block" id="band-icon">
+  <?php admin_band_head('The square mark',
+      'One picture, square, and ideally the mark on its own rather than the '
+      . 'wordmark — a logo three times as wide as it is tall is an illegible '
+      . 'smear at sixteen pixels, which is why this is a separate upload.'); ?>
+
+    <div class="admin-card">
+      <div class="admin-card__head">
+        <span class="admin-card__preview">
+          <strong>The master</strong>
+          <span class="admin-card__value">
+            <?= trim((string)$data['icon']['master']['src']) === ''
+                ? 'Not set — the icons that ship are being used'
+                : 'Uploaded' ?>
+          </span>
+        </span>
+      </div>
+      <?php admin_image_fields('icon[master]', 'upload[icon][0]',
+          $data['icon']['master'], 'square mark',
+          'No square mark. Every browser tab and phone home screen shows the '
+          . 'one that ships with the site.'); ?>
+    </div>
+
+    <div class="admin-card">
+      <div class="admin-card__head">
+        <span class="admin-card__preview">
+          <strong>What gets made from it</strong>
+          <span class="admin-card__value">
+            <?= count(SETTINGS_ICON_SIZES) + 1 ?> files
+          </span>
+        </span>
+      </div>
+      <p class="admin__fineprint">
+<?php foreach (SETTINGS_ICON_SIZES as $name => $spec): ?>
+        <?= (int)$spec['size'] ?>px<?= $spec['pad'] > 0 ? ' (tile)' : '' ?><?=
+            $name === array_key_last(SETTINGS_ICON_SIZES) ? '' : ' · ' ?>
+<?php endforeach; ?>
+        · <code>favicon.ico</code> holding
+        <?= implode(', ', array_map(static fn(int $s): string => $s . 'px',
+            SETTINGS_ICON_ICO)) ?>.
+      </p>
+      <p class="admin__fineprint">
+        The four smallest are <strong>transparent</strong>, because a browser tab
+        draws its own background and a mark with a plate behind it would be a
+        rectangle floating in it. The three largest are <strong>tiles</strong> on a
+        dark ground with room around them, because a phone home screen puts them
+        against a photograph nobody can predict.
+      </p>
+    </div>
+</section>
+
+  <?= admin_form_tail() ?>
+</form>
+    <?php
+    admin_foot();
+    return;
+}
+
 /* ------------------------------------------------------------- the logo */
 
 if ($screen === 'logo') {
@@ -427,25 +580,7 @@ settings_notices($data, false);
       . 'this part arrive with the stage that converts everything reading it. '
       . 'Until then this says what the site is using.'); ?>
 
-<?php if ($part === 'icon'): ?>
-    <div class="admin-card">
-      <div class="admin-card__head">
-        <span class="admin-card__preview">
-          <strong>The square mark</strong>
-          <span class="admin-card__value">
-            <?= trim((string)$data['icon']['master']['src']) === ''
-                ? 'Not set — the icons that ship are being used'
-                : h((string)$data['icon']['master']['src']) ?>
-          </span>
-        </span>
-      </div>
-      <p class="admin__fineprint">
-        <?= count(SETTINGS_ICON_SIZES) ?> sizes are made from it, plus a
-        <code>favicon.ico</code> for browsers that still ask for one.
-      </p>
-    </div>
-
-<?php elseif ($part === 'colour'): ?>
+<?php if ($part === 'colour'): ?>
 <?php foreach (['light' => 'Light mode', 'dark' => 'Dark mode'] as $mode => $label): ?>
     <div class="admin-card">
       <div class="admin-card__head">

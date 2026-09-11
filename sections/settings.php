@@ -250,6 +250,72 @@ function settings_take_icon(array $data, array &$errors): array
     return $data;
 }
 
+/**
+ * What each colour token is FOR, in words somebody picking one can use.
+ *
+ * Beside the screen and not in the contract, for the reason
+ * SETTINGS_PART_SCREENS is here: the contract says a document holds a token
+ * called 'silver-accent-mid', and what a person needs to read is "the middle
+ * of the gradient buttons are filled with".
+ *
+ * Every one of the fourteen is here. A picker with an unlabelled box in it is
+ * a picker nobody will touch.
+ */
+const SETTINGS_COLOUR_LABELS = [
+    'bg-base'             => ['The page', 'Behind everything.'],
+    'bg-surface'          => ['Cards and panels', 'The ground most blocks sit on.'],
+    'bg-elevated'         => ['Raised surfaces', 'Menus, dialogs, anything lifted off the page.'],
+    'text-primary'        => ['Body text', 'Headings and paragraphs.'],
+    'text-secondary'      => ['Subtext', 'The line under a heading.'],
+    'text-muted'          => ['Captions', 'Fine print and placeholder text.'],
+    'border-subtle'       => ['Hairlines', 'Dividers and card edges. Decorative: no contrast bar.'],
+    'border-strong'       => ['Control edges', 'The outline of a field or a button.'],
+    'silver-accent-start' => ['Gradient, start', 'The light end of the brand sweep.'],
+    'silver-accent-mid'   => ['Gradient, middle', 'What a primary button is mostly filled with.'],
+    'silver-accent-end'   => ['Gradient, end', 'The dark end. Decorative: no contrast bar.'],
+    'accent-text'         => ['Links and accents', 'Link text and icon strokes.'],
+    'focus-ring'          => ['Focus ring', 'The outline around whatever the keyboard is on.'],
+    'on-accent'           => ['Ink on the gradient', 'The label on a primary button.'],
+];
+
+/**
+ * What each pair currently measures, so the screen can show it.
+ *
+ * THE READOUT IS THE POINT OF THE SCREEN. A hex value tells nobody whether the
+ * result is readable; "4.83:1, needs 4.5" does. It is worked out on the server
+ * because the answer must be the same one the save is judged by — a number
+ * drawn by a script and a refusal decided in PHP that disagreed would be worse
+ * than no number at all.
+ */
+function settings_contrast_report(array $colours): array
+{
+    $rows = [];
+
+    foreach (SETTINGS_CONTRAST_PAIRS as $pair) {
+        $worst = null;
+
+        foreach ($pair['on'] as $ground) {
+            $ratio = contract_contrast_ratio(
+                (string)($colours[$pair['fg']] ?? ''), (string)($colours[$ground] ?? ''));
+
+            if ($worst === null || $ratio < $worst['ratio']) {
+                $worst = ['ratio' => $ratio, 'on' => $ground];
+            }
+        }
+
+        $rows[] = [
+            'fg'    => $pair['fg'],
+            'on'    => $worst['on'],
+            'role'  => $pair['role'],
+            'ratio' => $worst['ratio'],
+            'needs' => (float)$pair['ratio'],
+            'ok'    => $worst['ratio'] + 0.005 >= $pair['ratio'],
+        ];
+    }
+
+    return $rows;
+}
+
 /* ------------------------------------------------------------ which screen */
 
 $part   = in_array((string)($_GET['part'] ?? ''), SETTINGS_PARTS, true)
@@ -260,6 +326,43 @@ $data   = settings_load();
 $errors = [];
 
 /* ----------------------------------------------------------------- saving */
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $screen === 'colour') {
+    admin_check_csrf();
+
+    if (admin_form_truncated()) {
+        $errors[] = admin_truncated_message();
+    } else {
+        $posted = $data;
+
+        foreach (['light', 'dark'] as $mode) {
+            foreach (SETTINGS_COLOURS[$mode] as $token => $_shipped) {
+                $posted['colours'][$mode][$token] =
+                    (string)($_POST['colours'][$mode][$token] ?? '');
+            }
+        }
+
+        /* NORMALISED BEFORE IT IS JUDGED. A value that is not six hex digits
+           falls back to the shipped one here, so what the gate measures is
+           what would actually be stored -- judging the raw POST would refuse a
+           palette nobody was trying to save, or pass one nobody could read. */
+        $posted = settings_normalise($posted);
+        $errors = settings_validate($posted, 'colour');
+
+        if (!$errors) {
+            $saved = settings_edit(static fn(array $was): array => array_replace(
+                $was, ['colours' => $posted['colours']]));
+
+            if ($saved) {
+                admin_redirect('settings', 'Saved the colours.', ['part' => 'colour']);
+            }
+            $errors[] = 'Could not write content/settings.json. Check the file is '
+                      . 'writable by PHP.';
+        }
+
+        $data = $posted;
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $screen === 'icon') {
     admin_check_csrf();
@@ -422,6 +525,99 @@ if ($screen === 'index') {
 
 $screens = SETTINGS_PART_SCREENS[$part];
 
+/* ----------------------------------------------------------- the colours */
+
+if ($screen === 'colour') {
+    admin_head('settings', $user,
+        $screens['blurb'] . ' <a href="' . h(admin_url('settings'))
+        . '">Back to Settings</a>.',
+        ['band-light' => 'Light mode', 'band-dark' => 'Dark mode',
+         'band-readable' => 'What this palette measures'],
+        ['form' => 'settings-form', 'label' => 'Save the colours',
+         'discard' => admin_url('settings', ['part' => 'colour'])]);
+
+    admin_notices($errors);
+
+    admin_standing_notice(
+        'A colour that would make something unreadable is refused, not warned about. '
+        . 'That is the one refusal in this editor, and it is arithmetic rather than '
+        . 'taste: WCAG says what the bar is, and text nobody can read is not a '
+        . 'matter of opinion.');
+    ?>
+
+<form class="admin__form" id="settings-form" method="post" data-async
+      action="<?= h(admin_url('settings', ['part' => 'colour'])) ?>">
+  <?= admin_form_fields('settings') ?>
+
+<?php foreach (['light' => 'Light mode', 'dark' => 'Dark mode'] as $mode => $title): ?>
+<section class="admin__block" id="band-<?= h($mode) ?>">
+  <?php admin_band_head($title,
+      $mode === 'light'
+          ? 'What somebody sees by default, and what most visitors see.'
+          : 'What a visitor whose device asks for dark mode sees, and what the '
+            . 'theme switch draws.'); ?>
+
+  <div class="admin__grid">
+<?php foreach (SETTINGS_COLOUR_LABELS as $token => [$label, $hint]): ?>
+    <label class="admin__field">
+      <span class="admin__label"><?= h($label) ?></span>
+      <input class="admin__input" type="color"
+             name="colours[<?= h($mode) ?>][<?= h($token) ?>]"
+             value="<?= h((string)$data['colours'][$mode][$token]) ?>">
+      <span class="admin__hint">
+        <code><?= h($token) ?></code> — <?= h($hint) ?>
+      </span>
+    </label>
+<?php endforeach; ?>
+  </div>
+</section>
+<?php endforeach; ?>
+
+<section class="admin__block" id="band-readable">
+  <?php admin_band_head('What this palette measures',
+      'The worst ground each colour is drawn on, which is what decides it: a '
+      . 'colour legible on two surfaces and not the third is illegible somewhere '
+      . 'on the site. Saved values, not the boxes above — change one and save to '
+      . 'see it move.'); ?>
+
+<?php foreach (['light' => 'Light mode', 'dark' => 'Dark mode'] as $mode => $title): ?>
+  <div class="admin-card">
+    <div class="admin-card__head">
+      <span class="admin-card__preview">
+        <strong><?= h($title) ?></strong>
+        <span class="admin-card__value">
+<?php $report = settings_contrast_report($data['colours'][$mode]);
+      $bad = count(array_filter($report, static fn(array $r): bool => !$r['ok'])); ?>
+          <?= $bad === 0 ? 'Every pair meets AA'
+              : $bad . ' pair' . ($bad === 1 ? '' : 's') . ' below AA' ?>
+        </span>
+      </span>
+    </div>
+    <p class="admin__fineprint">
+<?php foreach ($report as $row): ?>
+      <?= $row['ok'] ? '' : '✕ ' ?><?= h($row['fg']) ?> on <?= h($row['on']) ?>
+      <strong><?= h(number_format($row['ratio'], 2)) ?>:1</strong>
+      (needs <?= h(number_format($row['needs'], 1)) ?>)<?=
+        $row === $report[count($report) - 1] ? '' : ' · ' ?>
+<?php endforeach; ?>
+    </p>
+  </div>
+<?php endforeach; ?>
+
+  <p class="admin__fineprint">
+    Two pairs carry no requirement and are not listed: the hairline dividers and
+    the gradient's end stop. Neither ever sits under text, and asking anything of
+    them would refuse a palette that is perfectly legible.
+  </p>
+</section>
+
+  <?= admin_form_tail() ?>
+</form>
+    <?php
+    admin_foot();
+    return;
+}
+
 /* ------------------------------------------------------------- the icon */
 
 if ($screen === 'icon') {
@@ -574,30 +770,16 @@ admin_notices($errors);
 settings_notices($data, false);
 ?>
 
+<?php /* ONLY THE MAIL PART REACHES HERE. The logo, the icon and the colours
+         each have a screen of their own above; this one still says what is set
+         rather than letting it be changed, because the contact handler is
+         still reading its own constant. That is the next stage. */ ?>
 <section class="admin__block" id="band-now">
   <?php admin_band_head('What is set now',
-      'The document exists and travels to the live site; the controls that change '
-      . 'this part arrive with the stage that converts everything reading it. '
-      . 'Until then this says what the site is using.'); ?>
+      'The document holds this already and it travels to the live site; what is '
+      . 'not built yet is the contact form reading it instead of its own '
+      . 'constant. Until then this says where enquiries actually go.'); ?>
 
-<?php if ($part === 'colour'): ?>
-<?php foreach (['light' => 'Light mode', 'dark' => 'Dark mode'] as $mode => $label): ?>
-    <div class="admin-card">
-      <div class="admin-card__head">
-        <span class="admin-card__preview">
-          <strong><?= h($label) ?></strong>
-          <span class="admin-card__value"><?= count($data['colours'][$mode]) ?> colours</span>
-        </span>
-      </div>
-      <p class="admin__fineprint">
-<?php foreach ($data['colours'][$mode] as $token => $value): ?>
-        <?= h($token) ?> <code><?= h($value) ?></code><?= $token === array_key_last($data['colours'][$mode]) ? '' : ' · ' ?>
-<?php endforeach; ?>
-      </p>
-    </div>
-<?php endforeach; ?>
-
-<?php else: ?>
     <div class="admin-card">
       <div class="admin-card__head">
         <span class="admin-card__preview">
@@ -610,7 +792,6 @@ settings_notices($data, false);
         followed by whatever the sender typed.
       </p>
     </div>
-<?php endif; ?>
 </section>
 <?php
 admin_foot();

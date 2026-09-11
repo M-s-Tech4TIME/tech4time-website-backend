@@ -137,6 +137,19 @@ the attribute. `contract_srcset()` checks each candidate path the way `contract_
 checks a single one; it was `chrome_srcset()` while the header lockup was the only picture stored at
 more than one width.
 
+**The contrast pairs and the sums that judge them are here, and that is a correction.**
+`SETTINGS_CONTRAST_PAIRS` says which pairs have to be readable and at what ratio;
+`contract_contrast_ratio()` and `settings_contrast_faults()` do the arithmetic. `tools/check_contrast.py`
+held its own copy of both, under a note reading *"keep this in sync with assets/css/theme.css"* — fine
+while a colour could only be changed by editing a stylesheet, and not fine the moment a person can
+pick one from a screen and the editor has to judge it too.
+
+So the data lives once and **the arithmetic deliberately does not**: `check_contrast.py` reads the
+palette and the pairs from here and keeps its own Python sums, then compares all 38 answers against
+this file's. That is `publish_stub.py`'s rule applied to colour — each side checked against an
+independent implementation, never against its own counterpart. A shared list cannot drift; a shared
+bug could.
+
 `contract_ico_container()` writes a `.ico` by hand: a six-byte directory, a sixteen-byte entry per
 image, then the PNG payloads. **It is in the contract because it is assembled where it is served,
 not sent over the wire.** The asset channel carries what `getimagesizefromstring()` recognises — PNG,
@@ -660,8 +673,15 @@ it is served — and it never writes a partial set: everything is encoded before
 because a set with three of seven files on disk is a site with four `<link>` elements pointing at
 nothing.
 
-`settings_validate()` refuses one thing and it is not a matter of taste: **an empty light-mode
-logo.** That is the company's mark missing from the header and the footer of every page, and from
+`settings_validate()` refuses **two** things, and neither is a matter of taste. An empty light-mode
+logo — see below. And **a colour that would make something unreadable**: that is the one refusal in
+this editor, everything else being a standing notice, because everything else is a judgement only the
+operator can make. A contrast ratio is arithmetic; WCAG says what the bar is; text nobody can read is
+not an opinion. A notice can be dismissed, and an unreadable site cannot. The pairs and the sums come
+from the contract, which is also where `check_contrast.py` gets them, so what the editor refuses and
+what the build check refuses cannot come apart.
+
+On the logo half: **an empty light-mode logo.** That is the company's mark missing from the header and the footer of every page, and from
 the structured data a search engine reads. An empty *dark* half is the opposite — a legitimate
 answer for a single-colour mark — and is never refused; the screen says in words what it means.
 

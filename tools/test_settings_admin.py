@@ -455,6 +455,57 @@ def the_upload(client, r, site) -> None:
     r.check("the logo was left exactly as it was",
             after["logo"] == before["logo"], "the icon save touched the logo")
 
+    print("\nthe colours, and the one refusal in this editor")
+
+    status, page = client.get("/?s=settings&part=colour")
+    r.check("the colour screen renders", status == 200, f"status {status}")
+    r.check("with a picker for every token in both modes",
+            all(f'name="colours[{mode}][{token}]"' in page
+                for mode in ("light", "dark")
+                for token in php("echo json_encode(array_keys(SETTINGS_COLOURS['light']));")),
+            "a token has no picker")
+    r.check("and says what each pair currently measures",
+            ":1" in page and "needs" in page, "no contrast readout")
+
+    fields = form_fields(page)
+    before = stored()
+
+    # A real change that stays readable: a deeper accent on the same grounds.
+    fields["colours[light][accent-text]"] = "#2a4d8f"
+    status, _headers, body = client.post("/?s=settings&part=colour", fields)
+    r.check("a colour that stays readable is saved", status == 302, f"status {status}")
+    r.check("and it reached the document",
+            stored()["colours"]["light"]["accent-text"] == "#2a4d8f",
+            str(stored()["colours"]["light"])[:160])
+    r.check("and the live site", site.documents.get("settings", {})
+            .get("colours", {}).get("light", {}).get("accent-text") == "#2a4d8f",
+            "the publish stub was not sent the new palette")
+
+    # THE ONE REFUSAL. Everything else in this editor is a standing notice,
+    # because everything else is a judgement only the operator can make. A
+    # contrast ratio is arithmetic: WCAG says what the bar is, and text nobody
+    # can read is not a matter of taste.
+    held = stored()
+    fields = form_fields(client.get("/?s=settings&part=colour")[1])
+    fields["colours[light][text-muted]"] = "#a0a0a4"
+    status, _headers, body = client.post("/?s=settings&part=colour", fields)
+
+    r.check("a colour that would be unreadable is REFUSED, not warned about",
+            status == 200, f"status {status}")
+    r.check("and the sentence names the pair, what it measures and what it needs",
+            "text-muted on bg-base" in body and "needs 4.5:1" in body,
+            _re.sub(r"<[^>]+>", " ", body[body.find("Not saved"):][:300]))
+    r.check("and nothing was written",
+            stored()["colours"] == held["colours"], "it saved anyway")
+
+    # A DECORATIVE pair carries no requirement, and asking anything of it would
+    # refuse a palette that is perfectly legible.
+    fields = form_fields(client.get("/?s=settings&part=colour")[1])
+    fields["colours[light][border-subtle]"] = "#f4f4f5"
+    status, _headers, _body = client.post("/?s=settings&part=colour", fields)
+    r.check("a hairline nobody reads text against is not refused",
+            status == 302, f"status {status}")
+
     print("\nwhat the logo screen refuses")
     # An empty light half is the company's mark missing from every page. An
     # empty DARK half is a legitimate answer and must never be refused.

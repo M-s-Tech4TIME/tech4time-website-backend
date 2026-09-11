@@ -130,6 +130,25 @@ function settings_validate(array $data, string $part = ''): array
                   . 'Upload one, or leave the one that is there.';
     }
 
+    /* THE COLOURS ARE THE ONE PLACE IN THIS EDITOR WHERE A REFUSAL IS RIGHT.
+       Everything else here is a standing notice, because everything else here
+       is a judgement only the person who drew the mark can make. This is not a
+       judgement: a contrast ratio is arithmetic, WCAG says what the bar is,
+       and text nobody can read is not a matter of taste. A notice can be
+       dismissed; an unreadable site cannot.
+
+       The pairs and the sums are SETTINGS_CONTRAST_PAIRS and
+       contract_contrast_ratio() in the contract, which is also where
+       tools/check_contrast.py gets them -- so what this refuses and what that
+       refuses cannot come apart. */
+    if (in_array('colour', $wanted, true)) {
+        foreach (['light', 'dark'] as $mode) {
+            $errors = array_merge($errors, settings_contrast_faults(
+                is_array($data['colours'][$mode] ?? null) ? $data['colours'][$mode] : [],
+                $mode));
+        }
+    }
+
     return $errors;
 }
 

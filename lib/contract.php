@@ -6461,6 +6461,151 @@ const SETTINGS_ICON_SIZES = [
     'png512' => ['size' => 512, 'pad' => 0.10],
 ];
 
+/* ------------------------------------------------ what a colour pair must be
+
+   WCAG 2.1 AA, AND THE SAME ARITHMETIC IN BOTH PLACES THAT NEED IT.
+   tools/check_contrast.py has judged this palette since before any of it was
+   editable; it held its own copy of the values AND its own copy of the pairs,
+   under a comment reading "Keep this in sync with assets/css/theme.css". Now
+   that a person can change a colour from a screen, the editor has to judge one
+   too -- and two implementations of "is this readable" is one more than the
+   number that can be right.
+
+   So the pairs and the arithmetic are here, beside the tokens they are about,
+   and check_contrast.py asks for them. What it checks is the palette this site
+   SHIPS with; what settings_validate() checks is the palette somebody is
+   trying to save. Same question, same answer, one definition.
+*/
+
+/** Normal text. WCAG 2.1 SC 1.4.3. */
+const SETTINGS_CONTRAST_AA_TEXT = 4.5;
+
+/**
+ * Large text, and non-text UI components: boundaries and focus indicators.
+ * WCAG 2.1 SC 1.4.11 and 2.4.11.
+ */
+const SETTINGS_CONTRAST_AA_LARGE = 3.0;
+
+/** The three grounds anything can be drawn on. */
+const SETTINGS_CONTRAST_SURFACES = ['bg-base', 'bg-surface', 'bg-elevated'];
+
+/**
+ * Every pair that has to be readable, and what it is used for.
+ *
+ * The WORST of each row's grounds is what decides it: a colour that is legible
+ * on two surfaces and not on the third is a colour that is illegible somewhere
+ * on the site, and which surface a given card sits on is a layout decision
+ * nobody should have to hold in their head while picking a colour.
+ */
+const SETTINGS_CONTRAST_PAIRS = [
+    ['fg' => 'text-primary',   'on' => SETTINGS_CONTRAST_SURFACES,
+     'role' => 'body text and headings',            'ratio' => SETTINGS_CONTRAST_AA_TEXT],
+    ['fg' => 'text-secondary', 'on' => SETTINGS_CONTRAST_SURFACES,
+     'role' => 'subtext',                           'ratio' => SETTINGS_CONTRAST_AA_TEXT],
+    ['fg' => 'text-muted',     'on' => SETTINGS_CONTRAST_SURFACES,
+     'role' => 'captions and placeholders',         'ratio' => SETTINGS_CONTRAST_AA_TEXT],
+    ['fg' => 'accent-text',    'on' => ['bg-base', 'bg-surface'],
+     'role' => 'links, accent text and icon strokes', 'ratio' => SETTINGS_CONTRAST_AA_TEXT],
+    ['fg' => 'focus-ring',     'on' => SETTINGS_CONTRAST_SURFACES,
+     'role' => 'the keyboard focus ring',           'ratio' => SETTINGS_CONTRAST_AA_LARGE],
+    ['fg' => 'border-strong',  'on' => SETTINGS_CONTRAST_SURFACES,
+     'role' => 'form and control boundaries',       'ratio' => SETTINGS_CONTRAST_AA_LARGE],
+    /* A primary button is filled with the silver gradient's start-to-mid range
+       and takes dark ink. The mid stop is the worst case under that ink. */
+    ['fg' => 'on-accent',      'on' => ['silver-accent-start', 'silver-accent-mid'],
+     'role' => 'a button label on the silver fill', 'ratio' => SETTINGS_CONTRAST_AA_TEXT],
+];
+
+/**
+ * Pairs with no contrast requirement, reported so a regression stays visible.
+ *
+ * A hairline between two blocks that are already distinguishable, and a
+ * gradient stop that never sits under text. WCAG asks nothing of either, and
+ * asking anyway would refuse a palette that is perfectly legible.
+ */
+const SETTINGS_CONTRAST_DECORATIVE = [
+    ['fg' => 'border-subtle',     'on' => SETTINGS_CONTRAST_SURFACES,
+     'role' => 'hairline dividers and card edges'],
+    ['fg' => 'silver-accent-end', 'on' => ['bg-base'],
+     'role' => 'the gradient end stop, in fills and sweeps only'],
+];
+
+/**
+ * How light a colour is, 0 to 1, the way WCAG defines it.
+ *
+ * Not the average of the channels and not what the eye would guess: each
+ * channel is taken out of sRGB's gamma curve first, then weighted for how much
+ * the eye actually gets from it -- green nearly three quarters of it, blue
+ * under a tenth. That is why #0000FF on #000000 fails and #FFFF00 on #FFFFFF
+ * fails, which is not obvious from the numbers.
+ */
+function contract_relative_luminance(string $hex): float
+{
+    $hex = ltrim(trim($hex), '#');
+
+    if (strlen($hex) !== 6 || !ctype_xdigit($hex)) {
+        return 0.0;
+    }
+
+    $channel = static function (int $value): float {
+        $c = $value / 255;
+
+        return $c <= 0.04045 ? $c / 12.92 : (($c + 0.055) / 1.055) ** 2.4;
+    };
+
+    return 0.2126 * $channel((int)hexdec(substr($hex, 0, 2)))
+         + 0.7152 * $channel((int)hexdec(substr($hex, 2, 2)))
+         + 0.0722 * $channel((int)hexdec(substr($hex, 4, 2)));
+}
+
+/** The contrast ratio between two colours, 1.0 to 21.0. Order does not matter. */
+function contract_contrast_ratio(string $a, string $b): float
+{
+    $one = contract_relative_luminance($a);
+    $two = contract_relative_luminance($b);
+
+    $lighter = max($one, $two);
+    $darker  = min($one, $two);
+
+    return ($lighter + 0.05) / ($darker + 0.05);
+}
+
+/**
+ * Every functional pair in one palette that falls below its threshold.
+ *
+ * Returns a sentence per fault, naming the pair, what it is used for, what it
+ * measures and what it needs -- because "this colour is not readable" is not
+ * something a person can act on and "text-muted on bg-surface is 3.1:1 and
+ * needs 4.5" is.
+ */
+function settings_contrast_faults(array $colours, string $mode): array
+{
+    $faults = [];
+    $where  = $mode === 'dark' ? 'Dark mode' : 'Light mode';
+
+    foreach (SETTINGS_CONTRAST_PAIRS as $pair) {
+        foreach ($pair['on'] as $ground) {
+            $ink  = (string)($colours[$pair['fg']] ?? '');
+            $back = (string)($colours[$ground] ?? '');
+
+            if ($ink === '' || $back === '') {
+                continue;
+            }
+
+            $ratio = contract_contrast_ratio($ink, $back);
+
+            if ($ratio + 0.005 < $pair['ratio']) {
+                $faults[] = $where . ': ' . $pair['fg'] . ' on ' . $ground
+                          . ' (' . $pair['role'] . ') is '
+                          . number_format($ratio, 2) . ':1, and needs '
+                          . number_format($pair['ratio'], 1) . ':1.';
+            }
+        }
+    }
+
+    return $faults;
+}
+
 /**
  * Which sizes go inside favicon.ico.
  *

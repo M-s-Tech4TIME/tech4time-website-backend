@@ -28,10 +28,6 @@ declare(strict_types=1);
 require_once __DIR__ . '/contract.php';
 require_once __DIR__ . '/store.php';
 require_once __DIR__ . '/publish_client.php';
-/* For UPLOAD_URL_ROOT: telling an uploaded mark from the one that ships
-   is a question about where the file came from, and that constant is
-   where the answer lives. */
-require_once __DIR__ . '/upload.php';
 
 const SETTINGS_FILE = __DIR__ . '/../content/settings.json';
 
@@ -134,42 +130,3 @@ function settings_validate(array $data, string $part = ''): array
 
 /* ----------------------------------------------------------- what is set */
 
-/**
- * True when the mark shown in dark mode is the light one, because nothing
- * else was uploaded.
- *
- * ASKED SO THAT THE SCREEN CAN SAY SO. An empty dark half is a legitimate
- * answer — plenty of marks are a single colour and read on both grounds — but
- * it is indistinguishable, in the document, from somebody having meant to
- * upload one and not got there. Only the person who drew the mark knows which,
- * so the editor states the consequence and lets them decide. It never refuses
- * a save over it.
- */
-function settings_logo_is_shared(array $settings): bool
-{
-    return trim((string)($settings['logo']['dark']['src'] ?? '')) === '';
-}
-
-/**
- * True when the logo has been replaced but the icons have not.
- *
- * The favicon is generated from its own square master and NOT from the logo,
- * because a wordmark three times as wide as it is tall becomes an illegible
- * smear at sixteen pixels. So changing the logo cannot change the tab icon,
- * and somebody who has just replaced their mark will expect it to have. The
- * screen says which is which rather than leaving them to notice.
- */
-function settings_icon_is_stale(array $settings): bool
-{
-    return settings_logo_is_uploaded($settings)
-        && trim((string)($settings['icon']['master']['src'] ?? '')) === '';
-}
-
-/** True when the light mark is an upload rather than the one that ships. */
-function settings_logo_is_uploaded(array $settings): bool
-{
-    return str_starts_with(
-        trim((string)($settings['logo']['light']['src'] ?? '')),
-        UPLOAD_URL_ROOT
-    );
-}

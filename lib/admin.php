@@ -32,6 +32,7 @@ require_once __DIR__ . '/html.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/publish_client.php';
 require_once __DIR__ . '/upload.php';
+require_once __DIR__ . '/settings.php';
 
 /**
  * What the rail lists, in the order it lists them.
@@ -601,6 +602,47 @@ function admin_asset(string $path): string
  * Everything else is artwork that ships with the public site and exists only
  * there, so it is fetched from there.
  */
+/**
+ * The company's mark, both colour modes, as this panel draws it.
+ *
+ * THE SAME MARK THE SITE DRAWS, and until now it was four committed files with
+ * their paths written out twice — once in the rail and once on the sign-in
+ * page. So a company that replaced its logo got a new website and an admin
+ * panel still wearing the old one, which is the one place they would be
+ * looking at it every day.
+ *
+ * admin_preview_src() decides where each file is served from: an uploaded mark
+ * is on THIS host, which holds the canonical copy, so the panel shows it
+ * without waiting for a publish to have succeeded; the mark that ships is in
+ * this host's own public/ too. Neither is a cross-origin request, which
+ * matters most in local development where the public site is a closed port.
+ *
+ * fetchpriority is not set here and loading="lazy" is on the dark half, for
+ * the reason the site's own lockups have it: the hidden variant should not be
+ * fetched until somebody asks for the other theme.
+ */
+function admin_brand_logo(string $class): void
+{
+    $settings = settings_load();
+
+    foreach (['light', 'dark'] as $mode) {
+        $image = settings_logo($settings, $mode);
+        $src   = admin_preview_src((string)$image['src']);
+        $webp  = trim((string)$image['webp']);
+        ?>
+        <picture class="<?= h($class) ?>-wrap theme-swap--<?= h($mode) ?>">
+<?php if ($webp !== ''): ?>
+          <source srcset="<?= h(admin_preview_src($webp)) ?>" type="image/webp">
+<?php endif; ?>
+          <img class="<?= h($class) ?>" src="<?= h($src) ?>"
+               alt="Tech4TIME" width="<?= (int)$image['width'] ?>"
+               height="<?= (int)$image['height'] ?>"<?=
+               $mode === 'dark' ? ' loading="lazy"' : '' ?> decoding="async">
+        </picture>
+        <?php
+    }
+}
+
 function admin_preview_src(string $path): string
 {
     if (str_starts_with($path, UPLOAD_URL_ROOT)) {
@@ -1280,16 +1322,7 @@ function admin_head(string $section, string $user, string $lede = '',
              horizontal strip there and there is no width to narrow. */ ?>
     <div class="rail__head">
       <a class="rail__brand" href="<?= h(public_url('/')) ?>" aria-label="Tech4TIME — view the site">
-        <picture class="rail__logo-wrap theme-swap--light">
-          <source srcset="<?= h(admin_asset('/assets/images/logo/logo-light-180.webp')) ?>" type="image/webp">
-          <img class="rail__logo" src="<?= h(admin_asset('/assets/images/logo/logo-light-180.png')) ?>"
-               alt="Tech4TIME" width="180" height="64" decoding="async">
-        </picture>
-        <picture class="rail__logo-wrap theme-swap--dark">
-          <source srcset="<?= h(admin_asset('/assets/images/logo/logo-dark-180.webp')) ?>" type="image/webp">
-          <img class="rail__logo" src="<?= h(admin_asset('/assets/images/logo/logo-dark-180.png')) ?>"
-               alt="Tech4TIME" width="180" height="64" loading="lazy" decoding="async">
-        </picture>
+        <?php admin_brand_logo('rail__logo'); ?>
         <span class="rail__kicker">Admin</span>
       </a>
 
@@ -1717,16 +1750,7 @@ function admin_shell_head(string $title, string $lede = '', string $icon = 'user
 
     <div class="signin__top">
       <a class="signin__brand" href="<?= h(public_url('/')) ?>" aria-label="Tech4TIME — view the site">
-        <picture class="signin__logo-wrap theme-swap--light">
-          <source srcset="<?= h(admin_asset('/assets/images/logo/logo-light-180.webp')) ?>" type="image/webp">
-          <img class="signin__logo" src="<?= h(admin_asset('/assets/images/logo/logo-light-180.png')) ?>"
-               alt="Tech4TIME" width="180" height="64" decoding="async">
-        </picture>
-        <picture class="signin__logo-wrap theme-swap--dark">
-          <source srcset="<?= h(admin_asset('/assets/images/logo/logo-dark-180.webp')) ?>" type="image/webp">
-          <img class="signin__logo" src="<?= h(admin_asset('/assets/images/logo/logo-dark-180.png')) ?>"
-               alt="Tech4TIME" width="180" height="64" loading="lazy" decoding="async">
-        </picture>
+        <?php admin_brand_logo('signin__logo'); ?>
       </a>
       <button class="btn btn--icon" type="button" data-theme-toggle
               aria-label="Switch to dark mode" aria-pressed="false">

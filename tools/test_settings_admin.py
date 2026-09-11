@@ -376,6 +376,17 @@ def the_upload(client, r, site) -> None:
 
     r.check("the dark half was left exactly as it was",
             after["logo"]["dark"] == before["logo"]["dark"], str(after["logo"]["dark"])[:160])
+    # NINE PLACES DRAW THIS MARK AND ONE OF THEM IS THIS PANEL. It was four
+    # committed files with their paths written out twice — once in the rail,
+    # once on the sign-in page — so a company that replaced its logo got a new
+    # website and an editor still wearing the old one, which is the copy they
+    # would be looking at every day.
+    _, rail = client.get("/?s=overview")
+    r.check("the panel's own rail wears the new mark",
+            light["src"] in rail, "the rail did not follow")
+    r.check("served from this host, not fetched from the public site",
+            f'src="{light["src"]}"' in rail, "the rail went cross-origin for it")
+
     r.check("and so was every part this screen does not hold",
             after["colours"]["light"]["accent-text"] == "#123456"
             and after["contact"] == before["contact"] and after["icon"] == before["icon"],

@@ -1746,16 +1746,20 @@ const ABOUT_ICONS = [
 /**
  * How a story row draws its picture.
  *
- * 'logo' draws a light/dark pair rather than one picture. The Tech4TIME
- * lockup that ships with the site is the fallback, so a row switched to this
- * layout works with nothing uploaded — but a new logo CAN be uploaded, per
- * row, because a company that changes its mark should not need a deploy to
- * show it.
+ * 'logo' draws a light/dark pair rather than one picture, and its fallback is
+ * THE SITE'S OWN MARK -- settings_logo_largest(), the largest rung of whatever
+ * content/settings.json holds. So a row switched to this layout shows the
+ * company's current logo with nothing uploaded to the row at all, and follows
+ * it when it changes. A row can still upload its own pair, which is how a
+ * story about some other organisation shows that organisation's mark.
  *
- * WHAT THIS DOES NOT CHANGE: the logo in the header, the footer, the browser
- * tab, the social share card and the Organization structured data. Those are
- * shared markup and build artefacts, not content — see
- * docs/40-reference/content-schemas.md.
+ * IT USED TO SAY that a logo uploaded here does not change the header, the
+ * footer, the browser tab, the share card or the Organization data, because
+ * those were "shared markup and build artefacts, not content". That was true
+ * and it was the defect: there was no way to change them at all. They are one
+ * document now, edited at ?s=settings, and this row reads it like the other
+ * eight consumers do. A picture uploaded to THIS ROW is still only this row's
+ * -- it is a story's illustration, not the company's identity.
  */
 const ABOUT_LAYOUTS = [
     'photograph' => 'A photograph',
@@ -6588,6 +6592,140 @@ function settings_normalise(array $data): array
     ];
 
     return $out;
+}
+
+/* -------------------------------------------------- reading the identity
+
+   THESE ARE IN THE CONTRACT AND NOT IN EITHER HALF'S lib/settings.php, and the
+   reason is that BOTH halves render the mark. The public site draws it in the
+   header, the footer and the About row; the editor draws it in its own rail
+   and on its sign-in page, and asks which state it is in so that its screens
+   can say so. The first version of this work put them on the renderer's side,
+   and settings_logo_is_shared() was immediately written out twice -- which is
+   the drift this file exists to prevent.
+
+   Every one of them is a pure function of the document. Nothing here reads a
+   file, emits markup or knows which host it is on. */
+
+/** Where a path that came from an upload starts, rather than shipping. */
+const SETTINGS_UPLOAD_ROOT = '/uploads/';
+
+/**
+ * The mark for one theme, falling back to the light one.
+ *
+ * AN EMPTY DARK HALF IS AN ANSWER, NOT AN OMISSION. Plenty of marks are a
+ * single colour and read on both grounds, so requiring two uploads would be
+ * friction for no gain. What must not happen is the other failure: an empty
+ * dark half rendering as NOTHING, which would put a hole in the header of
+ * every page in dark mode. So absent means "use the light one", and the
+ * editor carries a standing notice saying so in words -- because a light-ink
+ * mark on a dark ground is invisible, and only the person who drew it knows
+ * whether theirs is.
+ *
+ * $mode is anything but 'dark' meaning light, rather than being validated,
+ * because every caller passes a literal and the fallback is the safe half.
+ */
+function settings_logo(array $settings, string $mode = 'light'): array
+{
+    $light = $settings['logo']['light'] ?? [];
+
+    if ($mode !== 'dark') {
+        return contract_image_defaults($light);
+    }
+
+    $dark = $settings['logo']['dark'] ?? [];
+
+    return contract_image_defaults(
+        trim((string)($dark['src'] ?? '')) === '' ? $light : $dark
+    );
+}
+
+/** True when dark mode is showing the light mark because nothing else was set. */
+function settings_logo_is_shared(array $settings): bool
+{
+    return trim((string)($settings['logo']['dark']['src'] ?? '')) === '';
+}
+
+/**
+ * The largest rendition of the mark: what the About page's lockup, the
+ * Organization graph and every job posting name.
+ *
+ * THREE PLACES DRAW THIS MARK BIG AND ONE DRAWS IT SMALL. The header wants the
+ * rung its 113px slot can use; the About row draws it at up to 693px, and the
+ * two structured-data graphs want one absolute URL for a consumer that picks
+ * nothing. So the largest rung is asked for rather than assumed — the record's
+ * src is the 360px file, and the ladder goes on to 540.
+ *
+ * The returned record carries no ladder of its own: everything that asks for
+ * this wants ONE file. Its height is scaled from the record's, which is exact
+ * rather than approximate — every rung of a ladder is the same picture, so the
+ * ratio is the same, and 128 × 540 ÷ 360 is 192 on the nose.
+ */
+function settings_logo_largest(array $settings, string $mode = 'light'): array
+{
+    $image = settings_logo($settings, $mode);
+    $top   = contract_srcset_top((string)$image['srcset']);
+
+    if ($top['src'] === '' || (int)$image['width'] <= 0
+            || $top['width'] <= (int)$image['width']) {
+        /* No ladder, or none of it wider than src: src IS the largest there
+           is. That is the case for every uploaded mark, because upload_store()
+           names the top rung as src. */
+        return ['src' => $image['src'], 'webp' => $image['webp'],
+                'width' => $image['width'], 'height' => $image['height'],
+                'srcset' => '', 'webp_srcset' => ''];
+    }
+
+    $webp = contract_srcset_top((string)$image['webp_srcset']);
+
+    return [
+        'src'    => $top['src'],
+        'webp'   => $webp['width'] === $top['width'] ? $webp['src'] : '',
+        'width'  => $top['width'],
+        'height' => (int)round((int)$image['height'] * $top['width'] / (int)$image['width']),
+        'srcset' => '',
+        'webp_srcset' => '',
+    ];
+}
+
+/**
+ * The colour tokens for one theme, as name => '#rrggbb'.
+ *
+ * Always the full set: settings_normalise() fills any token a document is
+ * missing from the shipped value, so a caller writing a stylesheet never has
+ * to decide what to do about a gap.
+ */
+function settings_colours(array $settings, string $mode = 'light'): array
+{
+    $mode = $mode === 'dark' ? 'dark' : 'light';
+
+    return is_array($settings['colours'][$mode] ?? null)
+        ? $settings['colours'][$mode]
+        : SETTINGS_COLOURS[$mode];
+}
+
+/**
+ * True when the logo has been replaced but the icons have not.
+ *
+ * The favicon is generated from its own square master and NOT from the logo,
+ * because a wordmark three times as wide as it is tall becomes an illegible
+ * smear at sixteen pixels. So changing the logo cannot change the tab icon,
+ * and somebody who has just replaced their mark will expect it to have. The
+ * screen says which is which rather than leaving them to notice.
+ */
+function settings_icon_is_stale(array $settings): bool
+{
+    return settings_logo_is_uploaded($settings)
+        && trim((string)($settings['icon']['master']['src'] ?? '')) === '';
+}
+
+/** True when the light mark is an upload rather than the one that ships. */
+function settings_logo_is_uploaded(array $settings): bool
+{
+    return str_starts_with(
+        trim((string)($settings['logo']['light']['src'] ?? '')),
+        SETTINGS_UPLOAD_ROOT
+    );
 }
 
 /** Every picture this document points at, as web paths, without duplicates. */

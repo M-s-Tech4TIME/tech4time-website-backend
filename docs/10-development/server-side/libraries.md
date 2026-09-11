@@ -534,6 +534,12 @@ section describes, a second time, from listing a document in the wrong arm rathe
 listing it at all. `contact_images()` exists now, and `test_upload.py` asks **every** name in
 `CONTRACT_DOCUMENTS` for an answer rather than trusting that each was placed correctly.
 
+**The panel wears the company's mark too.** `admin_brand_logo()` draws the rail's lockup and the
+sign-in page's from `content/settings.json`, through `admin_preview_src()` — so an uploaded mark is
+served from *this* host, which holds the canonical copy, and shows without waiting for a publish to
+have succeeded. It was four committed files with their paths written out twice, once in each place,
+so a company that replaced its logo got a new website and an editor still wearing the old one.
+
 **A picture's record survives a save that uploaded nothing, and for a while it did not.** The
 record travels through its screen as hidden inputs and is rebuilt from them on every save.
 `admin_image_fields()` listed four field names there and four screens each had their own copy of the
@@ -595,8 +601,7 @@ would differ by construction). It is never created on demand — see
 **Backend only** — the writing half. The renderer's half is
 `tech4time-website-frontend/lib/settings.php`.
 
-`settings_load()` · `settings_edit()` · `settings_validate()` ·
-`settings_logo_is_shared()` · `settings_logo_is_uploaded()` · `settings_icon_is_stale()`
+`settings_load()` · `settings_edit()` · `settings_validate()`
 
 One document, `content/settings.json`, holding the four things every page depends on and no page
 owns: the logo, the square mark the favicons are made from, the colour tokens the site is drawn
@@ -614,6 +619,16 @@ What stays in the chrome is the **alt text**, which is genuinely the chrome's: t
 footer's are different sentences about the same picture. `identity.logo` on the SEO screen stays as
 an **override** — empty means the site's mark, filled wins — because Google renders
 `Organization.logo` in a near-square slot and this lockup is nearly three to one.
+
+**Reading the identity is in [`contract.php`](#contractphp), not here, and that is a correction.**
+`settings_logo()` (which mark for which theme, falling back to the light one), `settings_logo_largest()`,
+`settings_logo_is_shared()`, `settings_logo_is_uploaded()`, `settings_icon_is_stale()` and
+`settings_colours()` are pure functions of the document — none reads a file, emits markup or knows
+which host it is on — and **both halves render the mark**: the public site draws it in the header,
+the footer and the About row; the editor draws it in its own rail and on its sign-in page. Putting
+them on the renderer's side got `settings_logo_is_shared()` written out twice within the hour, which
+is the drift the shared file exists to prevent. What is left in each half is that half's own
+business: the file path and the read here, plus the save, the validation and the screens over there.
 
 `settings_edit()` is `chrome_edit()` line for line, and it locks for the same reason: each screen
 holds one **part** of this document — the colour screen never sees the logo — so a save merges the

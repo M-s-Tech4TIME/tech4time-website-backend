@@ -234,6 +234,15 @@ class Browser:
     def text(self, css):
         return rq("GET", self.s + f"/element/{self._one(css)}/text")["value"]
 
+    def displayed(self, css):
+        """Whether the browser is actually painting it.
+
+        Asked of the driver, not of script: this is used in the half of this
+        file that runs with JavaScript switched off, where a measurement taken
+        by script could not happen at all.
+        """
+        return rq("GET", self.s + f"/element/{self._one(css)}/displayed")["value"]
+
     def _one(self, css):
         found = rq("POST", self.s + "/elements",
                    {"using": "css selector", "value": css})["value"]
@@ -1350,6 +1359,114 @@ def improvements(b: Browser, base: str, r: Results) -> None:
     b.js("Tech4Time.theme.toggle(); return true;")
 
 
+def password_switches(b: Browser, base: str, r: Results) -> None:
+    """The show/hide switch, on the one screen whose markup is replaced under it.
+
+    WHY THIS IS HERE AND NOT IN check_admin_a11y.py. That file sweeps the
+    signed-in screens for focus rings and target sizes and sees these buttons
+    for free. What it cannot see is the thing most likely to
+    break them: sections/account.php renders inside #admin-main, which
+    admin-swap.js replaces on every move between screens and admin-forms.js
+    replaces after every save -- so adminPassword.init() runs again each time,
+    and a module that wired a button twice would give it two click listeners,
+    flip the type twice per press, and leave a switch that visibly does
+    nothing while every static check passed.
+
+    So: press it after arriving, press it again after a swap, and press it
+    again after a save. A double-wired switch reads as "still hidden" at each
+    of those three points and nowhere else.
+    """
+    r.section("the password switches, and the markup that is replaced under them")
+
+    b.go(base + "/?s=account")
+    wired = b.js("""
+    var all = document.querySelectorAll('[data-password-toggle]');
+    var bad = [];
+    all.forEach(function (el) {
+      var target = document.getElementById(el.getAttribute('data-password-toggle'));
+      if (el.hidden || !target || target.type !== 'password' ||
+          el.getAttribute('aria-pressed') !== 'false') {
+        bad.push(el.getAttribute('data-password-toggle'));
+      }
+    });
+    return {count: all.length, bad: bad};""")
+    # SIX, NOT SEVEN. sections/account.php holds seven password fields but
+    # renders six: totp-current and totp-begin-pw are the two arms of one
+    # if/else -- the first is the confirmation while an authenticator is being
+    # paired, the second is the button that starts the pairing, and the screen
+    # is never in both states at once. check_password_fields.py reads the
+    # source and counts seven; this reads a page and counts six. Both are
+    # right, and this check found the mistake of assuming they would agree.
+    r.check("every password field on the screen has a live switch",
+            wired["count"] == 6 and not wired["bad"],
+            f"{wired['count']} switches, unwired: {wired['bad']}")
+
+    def press_and_read(which):
+        b.click(f'[data-password-toggle="{which}"]')
+        return b.js(f"""
+        var input = document.getElementById({json.dumps(which)});
+        var others = [];
+        document.querySelectorAll('input[type=text]').forEach(function (el) {{
+          if (el.id !== {json.dumps(which)} && el.classList.contains('admin__input')) {{
+            others.push(el.id);
+          }}
+        }});
+        return {{type: input.type, others: others,
+                pressed: document.querySelector('[data-password-toggle=' +
+                  JSON.stringify({json.dumps(which)}) + ']').getAttribute('aria-pressed')}};""")
+
+    shown = press_and_read("pw-new")
+    r.check("pressing one reveals it", shown["type"] == "text",
+            "the type did not flip -- two click listeners on one button flip "
+            "it twice, which is what wiring the same switch a second time does")
+    r.check("and reveals ONLY it", shown["others"] == [],
+            f"these came unmasked as well: {shown['others']} -- the new "
+            f"password and its confirmation each have their own switch")
+    r.check("and says so as a toggle", shown["pressed"] == "true")
+
+    # ---- after a move between screens, which throws the markup away --------
+    # Away and back. Back rather than a second click, because the link to the
+    # account screen lives inside the rail's <details> account menu and is not
+    # scrollable into view while it is shut -- and popstate goes through
+    # admin-swap.js exactly as a click does, which is what is being tested.
+    b.click('.rail__item[href="?s=contact"]')
+    rq("POST", b.s + "/back", {})
+    time.sleep(2.0)
+    again = b.js("""
+    var el = document.querySelector('[data-password-toggle="pw-new"]');
+    return {there: !!el, hidden: el ? el.hidden : null};""")
+    r.check("the switches come back after a move between screens",
+            again["there"] and again["hidden"] is False,
+            "admin-swap.js replaced #admin-main and nothing re-wired them")
+    after_swap = press_and_read("pw-new")
+    r.check("and one press still reveals the field, not two",
+            after_swap["type"] == "text",
+            "THE REGRESSION THIS SECTION EXISTS FOR: init() ran again over a "
+            "button it had already wired, so the press flipped the type twice")
+
+    # ---- after a save, which replaces the same region a different way -----
+    b.js("""
+    var f = document.querySelector('input[name="do"][value="password"]').form;
+    f.querySelector('#pw-current').value = 'not-the-current-password';
+    f.querySelector('#pw-new').value = 'correct horse battery staple';
+    f.querySelector('#pw-again').value = 'correct horse battery staple';
+    f.querySelector('.admin__actions button[type=submit]').click();
+    return true;""")
+    time.sleep(2.5)
+    saved = b.js("""
+    var el = document.querySelector('[data-password-toggle="pw-new"]');
+    return {there: !!el, hidden: el ? el.hidden : null,
+            refused: !!document.querySelector('.admin__notice, .admin__error, [role=alert]')};""")
+    r.check("the wrong password was refused, so the screen really did come back",
+            saved["refused"] is True,
+            "no notice -- the form may not have posted, which would make the "
+            "check below prove nothing")
+    r.check("the switches survive a save replacing the screen",
+            saved["there"] and saved["hidden"] is False)
+    after_save = press_and_read("pw-new")
+    r.check("and one press still reveals the field", after_save["type"] == "text")
+
+
 def run_without_script(b: Browser, base: str, r: Results) -> None:
     """The same edits, with JavaScript switched off in the browser."""
     r.section("with JavaScript off")
@@ -1372,6 +1489,27 @@ def run_without_script(b: Browser, base: str, r: Results) -> None:
     r.check("the account menu still opens",
             _count(b, "details.account > summary") == 1,
             "there is nothing to press, and no way to sign out")
+
+    r.section("the password switches with JavaScript off")
+
+    # There is a switch in the markup of every password field, and with no
+    # script to work it there must be no switch on the screen. .admin__password
+    # -toggle sets `display: flex`, which beats the browser's own [hidden]
+    # rule, so this passes only because admin.css carries an explicit one --
+    # it did not, and shipped a control that did nothing for a whole release
+    # of the sign-in page.
+    b.go(base + "/?s=account")
+    # Six, for the reason password_switches() sets out above: the account
+    # screen's seventh password field is the other arm of an if/else.
+    marked = _count(b, "[data-password-toggle]")
+    r.check("the switches are in the markup", marked == 6, f"{marked} found")
+    dead = [css for css in ('[data-password-toggle="pw-current"]',
+                            '[data-password-toggle="pw-new"]',
+                            '[data-password-toggle="so-current"]')
+            if b.displayed(css)]
+    r.check("but not one of them is on the screen", not dead,
+            f"{dead} are visible with no script to work them -- a dead "
+            f"control is worse than an absent one")
 
     r.section("moving between screens with JavaScript off")
 
@@ -1460,6 +1598,7 @@ def main() -> None:
         run(scripted, base, r)
         navigate(scripted, base, r)
         improvements(scripted, base, r)
+        password_switches(scripted, base, r)
         scripted.quit()
         scripted = None
 

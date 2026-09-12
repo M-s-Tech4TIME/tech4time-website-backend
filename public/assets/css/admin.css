@@ -1037,6 +1037,99 @@
   border-color: var(--accent-text);
 }
 
+/* --------------------------------------------------------------------------
+   The show/hide switch on a password field.
+
+   The room on the input's trailing edge is reserved HERE, not by the script,
+   so it exists before first paint. With no script the button stays hidden and
+   the only difference is a little more space to the right of a field whose
+   text starts on the left -- invisible, and no caret moving under anybody's
+   hands when a late script adds a control.
+
+   The button sits over the input rather than beside it because a field and its
+   switch are one control to look at; putting it in the flow would give the row
+   two focus rings side by side and break the field's full width.
+   -------------------------------------------------------------------------- */
+
+.admin__password {
+  position: relative;
+  display: flex;
+}
+
+.admin__password .admin__input {
+  /* The button's width plus the gap either side of it. */
+  padding-inline-end: 2.5rem;
+}
+
+.admin__password-toggle {
+  position: absolute;
+  inset-block: var(--border-width);
+  inset-inline-end: var(--border-width);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  padding: 0;
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+/* WITHOUT THIS THE SWITCH SHIPS WITH NO SCRIPT TO WORK IT. The rule above sets
+   `display: flex`, and a class selector in this sheet beats the user agent's
+   own `[hidden] { display: none }` -- so the `hidden` attribute the markup
+   carries would have no effect at all, and a control that does nothing would
+   sit in the corner of the field for anybody with JavaScript off. That is the
+   exact outcome the comment at the top of this block claims to prevent, and it
+   took a browser with scripting switched off to notice. */
+.admin__password-toggle[hidden] {
+  display: none;
+}
+
+.admin__password-toggle:hover {
+  color: var(--text-primary);
+}
+
+.admin__password-toggle:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+  color: var(--text-primary);
+}
+
+/* Both marks are in the DOM and CSS shows whichever matches the state -- so the
+   script sets one attribute and never touches a style, which is what
+   style-src 'self' requires of it.
+
+   KEYED ON aria-pressed, WHICH IS THE SAME ATTRIBUTE THE SCREEN READER USES.
+   This block first keyed on a data-shown of its own, on the argument that a
+   changing name and aria-pressed together can be read as contradictory --
+   "Hide password, pressed" leaving a listener to work out whether the password
+   is visible or the hiding is. That argument is fine in the abstract and wrong
+   here: the theme switch in admin_head() already carries a changing aria-label
+   AND aria-pressed, so writing this one differently would have made it the odd
+   control in the panel for a distinction nobody using it would draw.
+
+   One attribute now carries the state to the assistive technology and to this
+   sheet at once, so the two cannot drift apart -- which a second, private
+   attribute makes possible by construction.
+
+   The theme switch keys ITS swap off :root[data-theme] instead, and that is not
+   an inconsistency: its state belongs to the document. This one belongs to the
+   button. */
+.admin__password-toggle .admin__password-icon--hide {
+  display: none;
+}
+
+.admin__password-toggle[aria-pressed="true"] .admin__password-icon--show {
+  display: none;
+}
+
+.admin__password-toggle[aria-pressed="true"] .admin__password-icon--hide {
+  display: block;
+}
+
 /* Monospace, because these fields are line-per-bullet: a fixed pitch makes it
    obvious where one bullet ends and the next begins. */
 .admin__textarea {

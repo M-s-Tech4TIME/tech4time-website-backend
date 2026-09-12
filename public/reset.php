@@ -256,8 +256,11 @@ admin_shell_note($error === '' ? $note : '');
 
   <div class="admin__field">
     <label class="admin__label" for="password">New password</label>
-    <input class="admin__input" id="password" name="password" type="password"
-           autocomplete="new-password" required minlength="12" autofocus>
+    <div class="admin__password">
+      <input class="admin__input" id="password" name="password" type="password"
+             autocomplete="new-password" required minlength="12" autofocus>
+      <?= admin_password_toggle('password') ?>
+    </div>
     <p class="admin__hint">
       At least 12 characters. Three or four unrelated words beat one clever word.
     </p>
@@ -265,8 +268,11 @@ admin_shell_note($error === '' ? $note : '');
 
   <div class="admin__field">
     <label class="admin__label" for="password2">New password again</label>
-    <input class="admin__input" id="password2" name="password2" type="password"
-           autocomplete="new-password" required minlength="12">
+    <div class="admin__password">
+      <input class="admin__input" id="password2" name="password2" type="password"
+             autocomplete="new-password" required minlength="12">
+      <?= admin_password_toggle('password2') ?>
+    </div>
   </div>
 
   <button class="btn btn--primary btn--block" type="submit">Continue</button>

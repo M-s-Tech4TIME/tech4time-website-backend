@@ -73,6 +73,14 @@ jobs:
       - run: python3 tools/check_shared_facts.py
       - run: python3 tools/check_form_dom.py
 
+      # A password field with no show/hide switch beside it looks exactly
+      # like a password field that never had one: no error, no blank box,
+      # nothing in the console. Twelve of them across four files, three of
+      # which are pages a person meets once and never returns to. A hand
+      # count missed the seventh on the account screen while this was
+      # being planned, which is the whole argument for the check.
+      - run: python3 tools/check_password_fields.py
+
       # And the thing the line above structurally cannot see: whether the OTHER
       # half still holds the same bytes. A per-repo digest passes happily while
       # the two sanitisers differ. This clones the sibling and compares them.

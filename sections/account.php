@@ -261,21 +261,30 @@ admin_notices($errors);
 
       <div class="admin__field">
         <label class="admin__label" for="pw-current">Your current password</label>
-        <input class="admin__input" id="pw-current" name="current" type="password"
-               autocomplete="current-password" required>
+        <div class="admin__password">
+          <input class="admin__input" id="pw-current" name="current" type="password"
+                 autocomplete="current-password" required>
+          <?= admin_password_toggle('pw-current') ?>
+        </div>
       </div>
 
       <div class="admin__field">
         <label class="admin__label" for="pw-new">New password</label>
-        <input class="admin__input" id="pw-new" name="password" type="password"
-               autocomplete="new-password" required minlength="12">
+        <div class="admin__password">
+          <input class="admin__input" id="pw-new" name="password" type="password"
+                 autocomplete="new-password" required minlength="12">
+          <?= admin_password_toggle('pw-new') ?>
+        </div>
         <p class="admin__hint">At least 12 characters.</p>
       </div>
 
       <div class="admin__field">
         <label class="admin__label" for="pw-again">New password again</label>
-        <input class="admin__input" id="pw-again" name="password2" type="password"
-               autocomplete="new-password" required minlength="12">
+        <div class="admin__password">
+          <input class="admin__input" id="pw-again" name="password2" type="password"
+                 autocomplete="new-password" required minlength="12">
+          <?= admin_password_toggle('pw-again') ?>
+        </div>
       </div>
 
       <div class="admin__actions">
@@ -326,8 +335,11 @@ admin_notices($errors);
 
       <div class="admin__field">
         <label class="admin__label" for="totp-current">Your password</label>
-        <input class="admin__input" id="totp-current" name="current" type="password"
-               autocomplete="current-password" required>
+        <div class="admin__password">
+          <input class="admin__input" id="totp-current" name="current" type="password"
+                 autocomplete="current-password" required>
+          <?= admin_password_toggle('totp-current') ?>
+        </div>
       </div>
 
       <div class="admin__actions">
@@ -353,8 +365,11 @@ admin_notices($errors);
 
       <div class="admin__field">
         <label class="admin__label" for="totp-begin-pw">Your password</label>
-        <input class="admin__input" id="totp-begin-pw" name="current" type="password"
-               autocomplete="current-password" required>
+        <div class="admin__password">
+          <input class="admin__input" id="totp-begin-pw" name="current" type="password"
+                 autocomplete="current-password" required>
+          <?= admin_password_toggle('totp-begin-pw') ?>
+        </div>
       </div>
 
       <div class="admin__actions">
@@ -393,8 +408,11 @@ admin_notices($errors);
 
       <div class="admin__field">
         <label class="admin__label" for="rec-current">Your password</label>
-        <input class="admin__input" id="rec-current" name="current" type="password"
-               autocomplete="current-password" required>
+        <div class="admin__password">
+          <input class="admin__input" id="rec-current" name="current" type="password"
+                 autocomplete="current-password" required>
+          <?= admin_password_toggle('rec-current') ?>
+        </div>
       </div>
 
       <div class="admin__actions">
@@ -424,8 +442,11 @@ admin_notices($errors);
 
       <div class="admin__field">
         <label class="admin__label" for="so-current">Your password</label>
-        <input class="admin__input" id="so-current" name="current" type="password"
-               autocomplete="current-password" required>
+        <div class="admin__password">
+          <input class="admin__input" id="so-current" name="current" type="password"
+                 autocomplete="current-password" required>
+          <?= admin_password_toggle('so-current') ?>
+        </div>
       </div>
 
       <div class="admin__actions">

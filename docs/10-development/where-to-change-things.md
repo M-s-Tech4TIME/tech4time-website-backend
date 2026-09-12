@@ -78,6 +78,7 @@ The public site's palette, layout, motion, JavaScript modules and page markup ar
 | The "On this page" column, and its marker | `admin_foot()` in `lib/admin.php`; `public/assets/js/admin-outline.js` |
 | A band's heading and its "Add a …" button | `admin_band_head()` in `lib/admin.php` — **not** per section |
 | The theme switch | `public/assets/js/theme-init.js`, `theme-toggle.js` |
+| The show/hide switch on a password field | `admin_password_toggle()` in `lib/admin.php` for the markup, `public/assets/js/admin-password.js` for the behaviour, `.admin__password` in `admin.css` for the room it sits in. **Every** password field carries one and `tools/check_password_fields.py` refuses a commit where one does not |
 | An icon the editor offers | `CONTACT_ICONS` in `lib/contract.php` — **and the other repository** |
 | The icon artwork itself | `public/assets/icons/sprite.svg` — **shared; rebuild it in tech4time-website-frontend and copy it here** |
 

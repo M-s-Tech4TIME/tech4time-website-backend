@@ -206,6 +206,11 @@ const ADMIN_ICONS = [
     'home', 'th-large', 'briefcase', 'envelope', 'sun', 'moon', 'chevron-left',
     'chevron-right', 'arrow-up', 'arrow-down', 'arrow-right', 'link', 'user',
     'times', 'check', 'eye', 'lock', 'cogs', 'info-circle',
+    /* The show/hide switch that every password field carries -- the sign-in,
+       the first-run setup, the reset and the six on the account screen.
+       'eye' above was already here; a toggle needs the struck-through one as
+       well, or it cannot say which state it is in. */
+    'eye-slash',
     /* The Settings rail row and its Overview tile. It was named in
        ADMIN_SECTIONS without ever being in the sprite or in this list, and a
        name that is in neither fails SILENTLY -- <use href="#cog"> draws
@@ -562,6 +567,54 @@ function admin_icon(string $name, string $class = 'icon'): string
 {
     return '<svg class="' . h($class) . '" aria-hidden="true" focusable="false">'
          . '<use href="#' . h($name) . '"></use></svg>';
+}
+
+/* ---------------------------------------------------- the password switch */
+
+/**
+ * The show/hide switch that belongs beside a password field.
+ *
+ * Goes INSIDE a <div class="admin__password"> wrapper, immediately after the
+ * input whose id it is given:
+ *
+ *     <div class="admin__password">
+ *       <input class="admin__input" id="pw-new" name="password" type="password"
+ *              autocomplete="new-password" required minlength="12">
+ *       <?= admin_password_toggle('pw-new') ?>
+ *     </div>
+ *
+ * Every password field on this site carries one, and
+ * tools/check_password_fields.py refuses a commit where one does not — a field
+ * with no switch looks exactly like a field that never had one, so nothing
+ * else would ever say a word about it.
+ *
+ * RENDERED HIDDEN, AND admin-password.js UNHIDES IT.
+ * Not built in JavaScript, because the space it occupies has to be reserved
+ * before first paint — .admin__password reserves the room on the input's
+ * trailing edge either way, and a button that appeared afterwards would push
+ * the caret sideways in front of somebody already typing.
+ *
+ * Not left visible either: with no script it does nothing, and a dead control
+ * is worse than an absent one. Script off, the field is an ordinary password
+ * box, which is the bargain everywhere here. (.admin__password-toggle sets
+ * `display: flex`, which beats the browser's own [hidden] rule, so admin.css
+ * carries an explicit one — without it this comment would be describing
+ * something that does not happen.)
+ *
+ * The name changes and aria-pressed carries the state, which is what the theme
+ * switch in admin_head() does. Both marks ship and the stylesheet shows
+ * whichever matches, so the script sets attributes and never a style.
+ */
+function admin_password_toggle(string $for): string
+{
+    return '<button class="admin__password-toggle" type="button"'
+         . ' data-password-toggle="' . h($for) . '"'
+         . ' aria-controls="' . h($for) . '"'
+         . ' aria-label="Show password" title="Show password"'
+         . ' aria-pressed="false" hidden>'
+         . admin_icon('eye', 'icon icon--sm admin__password-icon--show')
+         . admin_icon('eye-slash', 'icon icon--sm admin__password-icon--hide')
+         . '</button>';
 }
 
 /* --------------------------------------------------------- cache-busting */
@@ -1728,6 +1781,7 @@ function admin_foot(string $note = ''): void
 <script src="<?= h(admin_asset('/assets/js/admin-dialog.js')) ?>" defer></script>
 <script src="<?= h(admin_asset('/assets/js/admin-swap.js')) ?>" defer></script>
 <script src="<?= h(admin_asset('/assets/js/admin-forms.js')) ?>" defer></script>
+<script src="<?= h(admin_asset('/assets/js/admin-password.js')) ?>" defer></script>
 <script src="<?= h(admin_asset('/assets/js/admin-init.js')) ?>" defer></script>
 </body>
 </html>
@@ -1803,6 +1857,7 @@ function admin_shell_foot(string $note = ''): void
 </main>
 
 <script src="<?= h(admin_asset('/assets/js/theme-toggle.js')) ?>" defer></script>
+<script src="<?= h(admin_asset('/assets/js/admin-password.js')) ?>" defer></script>
 <script src="<?= h(admin_asset('/assets/js/admin-init.js')) ?>" defer></script>
 </body>
 </html>

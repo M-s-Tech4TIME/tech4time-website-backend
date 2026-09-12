@@ -199,7 +199,10 @@ repository in front: `tech4time-website-frontend/pages/careers/index.php`. `chec
 
 ## Status
 
-Work happens on `dev`; pull requests to `main` need explicit approval.
+Work happens on `dev`; pull requests to `main` need explicit approval, are merged with **Create a
+merge commit**, and are followed by merging `main` back into `dev` -- which fast-forwards, so the two
+branches end a release on the same commit instead of drifting one apart each time.
+[ci-cd.md](docs/20-deployment/ci-cd.md)
 
 **A push to `main` deploys it** to `/home/USER/admin.tech4time.bd/`, with `admin.tech4time.bd` pointed at
 `admin.tech4time.bd/public/`. Checks run, rsync over SSH, and the host is asked afterwards whether `lib/`,

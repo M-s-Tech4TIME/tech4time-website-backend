@@ -126,9 +126,11 @@ failures, and both say exactly what is wrong.
 python3 tools/check_contrast.py        python3 tools/check_css.py        python3 tools/check_content_model.py
 python3 tools/check_secrets.py         python3 tools/check_docs.py
 python3 tools/build_deploy_set.py --check
+python3 tools/check_icons.py
 python3 tools/check_shared_lib.py
 python3 tools/check_shared_repos.py
 python3 tools/check_form_dom.py
+python3 tools/check_password_fields.py
 ```
 
 Touched the admin, auth or an editor? Also `test_admin_auth.py`, `test_careers_admin.py`,
@@ -156,6 +158,14 @@ Touched `lib/qr.php` or authenticator enrolment? Also `test_qr.py` — it needs 
 Touched `lib/store.php`? Also `test_store.py`. Touched the rich-text editor? Also `test_editor.py`
 — needs Firefox and geckodriver, and leaves processes behind if interrupted
 (`pkill firefox geckodriver`).
+
+Touched a password field, `admin-password.js` or `admin_password_toggle()`? Also
+**`python3 tools/check_password_fields.py`**, which refuses a `type="password"` input with no
+show/hide switch naming its own id — twelve of them across four files, and a field without one
+looks exactly like a field that never had one. And `test_admin_forms.py`, which is the only thing
+that presses a switch after `#admin-main` has been replaced under it: the account screen's seven
+live inside it, so `adminPassword.init()` runs again on every move and every save, and a module
+that wired a button twice would leave a switch that visibly does nothing.
 
 Touched the shell, a form, a link between screens, `admin-forms.js`, `admin-swap.js` or
 `admin-nav.js`? Also `test_admin_forms.py` — it drives the editors in a browser, moves between
@@ -189,7 +199,10 @@ repository in front: `tech4time-website-frontend/pages/careers/index.php`. `chec
 
 ## Status
 
-Work happens on `dev`; pull requests to `main` need explicit approval.
+Work happens on `dev`; pull requests to `main` need explicit approval, are merged with **Create a
+merge commit**, and are followed by merging `main` back into `dev` -- which fast-forwards, so the two
+branches end a release on the same commit instead of drifting one apart each time.
+[ci-cd.md](docs/20-deployment/ci-cd.md)
 
 **A push to `main` deploys it** to `/home/USER/admin.tech4time.bd/`, with `admin.tech4time.bd` pointed at
 `admin.tech4time.bd/public/`. Checks run, rsync over SSH, and the host is asked afterwards whether `lib/`,

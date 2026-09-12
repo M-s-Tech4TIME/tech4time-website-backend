@@ -282,6 +282,7 @@ admin-toast.js    ← lifts what the server said into the corner of the page
 admin-dialog.js   ← the admin's own question box, instead of window.confirm()
 admin-forms.js    ← posts the editors without navigating, and puts the answer back
 theme-toggle.js   ← the theme switch
+admin-password.js ← the show/hide switch on a password field
 admin-init.js     ← runs last, calls each init() in a try/catch
 ```
 
@@ -292,6 +293,17 @@ in the rich-text editor left the forms and the links unwired and every one of
 them a full page load, with nothing on screen to say why. Each `init()` is
 called in its own `try` now, and a failure is reported to the console and
 stepped over.
+
+`admin-password.js` is the odd one in that list: it loads in **both** shells, because the sign-in,
+the first-run setup and the password reset are outside the signed-in one and have password fields of
+their own. Twelve fields across four files, and `tools/check_password_fields.py` refuses a commit
+where one of them has no switch.
+
+It is also one of the two modules whose `init()` is called again after a screen is swapped in — the
+account screen's seven fields live inside `#admin-main`, so their switches are thrown away and
+rebuilt with the markup. It stays safe to call twice by asking only for buttons that still carry
+the `hidden` attribute its own wiring removes, the same trick `editor.js` plays with
+`:not(.rte__source)`.
 
 Without JavaScript the rail stays wide and fully labelled — at whatever width the cookie says, see
 below — the account menu is a `<details>` the browser opens by itself, every form navigates and

@@ -160,6 +160,27 @@ Mozilla's tarball and symlinked, rather than from apt.
 `.github/workflows/deploy.yml` runs on push to `main`, and on demand. Merging `dev` into `main` is
 the approval step; there is no staging site.
 
+**Then merge `main` back into `dev` and push it.** That step is not optional tidying and it is not
+what it looks like: the merge commit a pull request creates is created on `main` ALONE, so without
+this `dev` falls exactly one commit behind per release. It carries no change of its own -- every
+real commit and every file is already on `dev` -- but the counter climbs, and "21 commits behind
+main" reads like released work that never came home. 21 releases are how it got there.
+
+```bash
+git checkout dev && git fetch origin
+git merge origin/main     # FAST-FORWARDS, if nothing landed on dev meanwhile
+git push origin dev
+```
+
+It fast-forwards because `dev`'s tip is a PARENT of the merge commit `main` just received, so there
+is nothing to join -- `dev` simply moves onto the same commit and the two branches become identical,
+0 ahead and 0 behind. If somebody committed to `dev` in between it makes an ordinary merge instead
+and `dev` reads 1 ahead, which is the normal resting state and not a fault.
+
+**Use "Create a merge commit" on the pull request, never "Rebase and merge".** Rebasing writes the
+commits onto `main` with NEW hashes while the originals stay on `dev` for ever, which manufactures
+the same drift permanently and cannot be reconciled by the merge above.
+
 ```
 test       .github/workflows/test.yml, called as a reusable workflow
 build      python3 tools/build_deploy_set.py --out _deploy

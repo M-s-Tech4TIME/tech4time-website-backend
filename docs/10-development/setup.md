@@ -68,6 +68,8 @@ git checkout dev
 ```
 
 Work happens on `dev`. `main` is what gets deployed, and pull requests to it need explicit approval.
+Afterwards `main` is merged back into `dev`, which fast-forwards and leaves the two branches
+identical -- see [ci-cd.md](../20-deployment/ci-cd.md#the-deploy-workflow).
 
 ---
 

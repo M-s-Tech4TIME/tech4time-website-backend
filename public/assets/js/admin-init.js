@@ -47,6 +47,9 @@
     /* theme-init.js has already set data-theme before first paint; this wires
        up the button that changes it. */
     begin("theme", api.theme);
+    /* Owns one field and nothing depends on it, so it sits outside the chain
+       below: if it throws, the rail and the editors still start. */
+    begin("adminPassword", api.adminPassword);
     begin("adminNav", api.adminNav);
     begin("editor", api.editor);
     begin("adminOutline", api.adminOutline);

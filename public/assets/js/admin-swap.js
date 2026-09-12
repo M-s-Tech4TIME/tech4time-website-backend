@@ -319,6 +319,11 @@
     if (api && api.adminOutline) {
       api.adminOutline.init();
     }
+    /* The account screen's seven password fields are in here too, and their
+       switches went away with the markup that held them. */
+    if (api && api.adminPassword) {
+      api.adminPassword.init();
+    }
 
     /* Whatever was working is finished, and whatever the server said about it
        comes out of the page and into the corner. */

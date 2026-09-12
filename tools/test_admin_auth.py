@@ -396,6 +396,48 @@ def test_login(c: Client, r: Results, secret: str):
         r.check(f"{path} opens", status == 200 and want.lower() in page.lower())
 
 
+def test_password_switches(c: Client, r: Results) -> None:
+    """The sign-in page's show/hide switch, as the server actually sends it.
+
+    tools/check_password_fields.py reads the same requirement out of the
+    source, and this is the half it structurally cannot see: what comes down
+    the wire. The markup is built by admin_password_toggle(), which inlines two
+    sprite symbols -- so a renamed icon, a sprite that failed to load, or a
+    helper that threw would leave every source file correct and the page bare.
+
+    ONLY THE SIGN-IN PAGE IS ASKED HERE, and deliberately. setup.php stops
+    working the moment an account exists, and reset.php only reaches its
+    password stage at the end of an emailed-code flow -- test_reset() below
+    walks that flow for its own reasons and this would be a poor passenger on
+    it. Their markup is covered by check_password_fields.py, which is the check
+    written for exactly that: fields on pages that are hard to get back to.
+
+    MUST RUN SIGNED OUT. /login.php redirects when a session is live, and the
+    first version of this ran straight after test_login() and reported the
+    switch missing from a page it was never served.
+    """
+    r.section("the show/hide switch, as the server sends it")
+
+    status, _, page = c.get("/login.php")
+    r.check("the sign-in page is what came back",
+            status == 200 and 'class="signin__form"' in page,
+            f"status {status} -- signed in, this redirects, and every check "
+            f"below would be reading the wrong page")
+
+    found = re.findall(r'data-password-toggle="([^"]+)"', page)
+    r.check("the password field has a switch, and it names that field",
+            found == ["password"], f"found {found}")
+    r.check("which ships both marks, so it can say which state it is in",
+            page.count("admin__password-icon--show") == 1
+            and page.count("admin__password-icon--hide") == 1)
+    r.check("it is a button, so it cannot submit the form by accident",
+            'class="admin__password-toggle" type="button"' in page)
+    r.check("it starts unpressed and hidden, so no script means no dead control",
+            'aria-pressed="false" hidden>' in page)
+    r.check("and the field has the room reserved for it before first paint",
+            '<div class="admin__password">' in page)
+
+
 def test_signout(c: Client, r: Results, secret: str):
     r.section("signing out")
 
@@ -1145,6 +1187,9 @@ def main() -> None:
         secret, codes = test_setup(c, r, private)
         test_login(c, r, secret)
         test_signout(c, r, secret)
+        # After the sign-out, because /login.php redirects while a session is
+        # live and this would be reading the admin instead.
+        test_password_switches(c, r)
         test_totp_replay(c, r, secret, private)
         test_csrf_and_redirect(c, r)
         test_lockout(c, r, secret, private)

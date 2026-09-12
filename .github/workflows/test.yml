@@ -38,7 +38,7 @@ jobs:
     name: checks
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Printed, not asserted. The host runs PHP 8.2.33 and the runner will
       # drift ahead of it; that is worth seeing in the log rather than
@@ -53,6 +53,12 @@ jobs:
       - run: python3 tools/check_content_model.py
       - run: python3 tools/check_secrets.py
       - run: python3 tools/check_docs.py
+
+      # An icon name the sprite does not carry paints NOTHING, with no error and
+      # no console line, so a blank box ships and reads as a design choice. That
+      # is how the admin's Settings row and its Overview tile were empty for a
+      # release: ADMIN_SECTIONS named 'cog' and the sprite had only 'cogs'.
+      - run: python3 tools/check_icons.py
       - run: python3 tools/build_deploy_set.py --check
       # The four files both repositories hold identically -- including the icon
       # sprite, because CONTACT_ICONS is in the contract and an icon this side
@@ -67,6 +73,14 @@ jobs:
       - run: python3 tools/check_shared_facts.py
       - run: python3 tools/check_form_dom.py
 
+      # A password field with no show/hide switch beside it looks exactly
+      # like a password field that never had one: no error, no blank box,
+      # nothing in the console. Twelve of them across four files, three of
+      # which are pages a person meets once and never returns to. A hand
+      # count missed the seventh on the account screen while this was
+      # being planned, which is the whole argument for the check.
+      - run: python3 tools/check_password_fields.py
+
       # And the thing the line above structurally cannot see: whether the OTHER
       # half still holds the same bytes. A per-repo digest passes happily while
       # the two sanitisers differ. This clones the sibling and compares them.
@@ -77,7 +91,7 @@ jobs:
     name: php
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # These drive a real PHP server and a real sign-in, served from public/
       # exactly as the host serves it, with the private store beside the
@@ -202,7 +216,7 @@ jobs:
     name: both halves
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The uploader decodes and re-encodes every picture, so without GD this
       # job would skip the only part of itself that matters. Same bargain as
@@ -220,7 +234,7 @@ jobs:
     name: firefox
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # From Mozilla's tarball rather than apt. On Ubuntu 24.04 `apt install
       # firefox` is a transitional package that pulls the snap, which does not

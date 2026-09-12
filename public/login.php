@@ -232,8 +232,11 @@ admin_shell_note($error === '' ? $note : '');
 
   <div class="admin__field">
     <label class="admin__label" for="password">Password</label>
-    <input class="admin__input" id="password" name="password" type="password"
-           autocomplete="current-password" required>
+    <div class="admin__password">
+      <input class="admin__input" id="password" name="password" type="password"
+             autocomplete="current-password" required>
+      <?= admin_password_toggle('password') ?>
+    </div>
   </div>
 
   <button class="btn btn--primary btn--block" type="submit">Continue</button>

@@ -196,8 +196,8 @@ $facts = [
         'title' => 'About Us',
         'lines' => [
             $about_rows . ' entr' . ($about_rows === 1 ? 'y' : 'ies') . ' shown across '
-                . count(ABOUT_LISTS) . ' lists — the sections, the specialities '
-                . 'and the why-us cards',
+                . count(ABOUT_LISTS) . ' lists — the sections, the specialities, '
+                . 'the why-us cards and the accreditations',
             overview_bands_line($about_hidden),
         ],
         'saved' => (string)($about['updated'] ?? ''),

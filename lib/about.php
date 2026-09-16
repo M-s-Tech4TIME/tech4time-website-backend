@@ -169,6 +169,22 @@ function about_validate(array $data): array
         }
     }
 
+    /* The accreditations. A badge is a picture and nothing else, so the name
+       is the only thing that says what it certifies -- printed under it, or
+       read aloud as the picture's description when the caption is hidden.
+       Neither of those works with nothing in the field, which is why it is
+       required whichever way the caption is set. */
+    foreach ($data['accreditations']['items'] as $i => $row) {
+        $where = 'Accreditation ' . ($i + 1);
+
+        if (trim((string)$row['name']) === '') {
+            $errors[] = "$where has no name. The name is what a screen reader "
+                      . 'announces, so it cannot be blank.';
+        }
+
+        $errors = array_merge($errors, about_validate_image($row['image'], $where));
+    }
+
     /* The button. Either it is complete or it is not there. */
     $label = trim((string)$data['cta']['label']);
     $href  = trim((string)$data['cta']['href']);

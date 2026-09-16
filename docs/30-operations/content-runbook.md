@@ -243,7 +243,7 @@ card off the light plate.
 ## The about page
 
 `https://admin.tech4time.bd/?s=about` — the banner, the five image-and-prose sections, the
-specialities slideshow, the why-us cards and the closing band.
+specialities slideshow, the why-us cards, the accreditations and the closing band.
 
 One long form again, and the same rules: **nothing reaches the site until you press Save**, the
 add / remove / reorder buttons deliberately do not save, and every row and every section has a
@@ -281,6 +281,37 @@ you choose.
 The light and shaded backgrounds alternate down the page **by position**. Reordering keeps the
 stripe, so a section you move changes its background — expect the page to look rearranged rather
 than only changed.
+
+### The accreditations
+
+The wall of certification badges — ISO 27001, SOC 2 Type II and the like — sitting just above the
+closing band. **It starts switched off**, because a heading over an empty grid is a gap rather than
+a section. Add the badges first, then set the band to *Shown*.
+
+Each badge is two things: a **picture** you upload, and a **name**. Press *Add an accreditation*,
+choose the file, type the standard as it should read — "ISO/IEC 27001:2022" — and set the row to
+*Shown*. Both are required: a badge with no name cannot be saved, because the name is what somebody
+using a screen reader hears in place of the picture.
+
+**Name under the badge — Shown or Hidden.** This is a separate control from the row's own
+Shown / Hidden, and they do different jobs:
+
+| | |
+|---|---|
+| *Shown on the page* → Hidden | the badge is gone from the page entirely |
+| *Name under the badge* → Hidden | the badge is still there; the words under it are not |
+
+Hide the name when the badge artwork already spells the standard out, and the tile would otherwise
+say it twice. **Hiding it never loses it** — the name is still read aloud to anybody who cannot see
+the picture, so it is worth typing carefully either way.
+
+The badges sit on a white plate in both light and dark mode, the same as the client logos on the
+company profile. That is deliberate: certification marks are usually dark ink on a transparent
+background and would disappear on a dark page.
+
+**This is not the Certifications screen.** That one (`?s=certifications`) is the Resource
+Certifications page and lists the qualifications *your people* hold, by role. This band is the
+accreditations the *company* holds.
 
 ### The text of a section
 

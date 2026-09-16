@@ -143,6 +143,7 @@ numbers had two of them reachable on the page and invisible to a search engine.
   "story":       { "status": "shown", "items": [] },
   "specialties": { "status": "shown", "title": "…", "interval": 10000, "items": [] },
   "whyus":       { "status": "shown", "title": "…", "items": [] },
+  "accreditations": { "status": "hidden", "title": "…", "items": [] },
   "cta":         { "status": "shown", "title": "…", "label": "…", "href": "…", "icon": "…" }
 }
 ```
@@ -155,6 +156,7 @@ numbers had two of them reachable on the page and invisible to a search engine.
 | `story` | the image-and-prose sections. `status` switches the whole run of them off |
 | `specialties` | the slideshow. `interval` is milliseconds, clamped 2000–60000 |
 | `whyus` | the grid of short reasons |
+| `accreditations` | the wall of certification badges. **The only band that ships `hidden`** — it has no shipped copy behind it, and a heading over an empty grid is a gap rather than a section |
 | `cta` | the closing band and its one button |
 
 **`story` has no `title` of its own.** Every heading on that part of the page belongs to a row,
@@ -216,6 +218,35 @@ The same shape.
 `/pages/services/`.** Neither of those has a content source yet, so this document is not the owner
 of that taxonomy — it is the first place it was written down. To be reconciled when the services
 page comes under management.
+
+### An accreditation
+
+The same shape as a client logo on the company profile, with one field more. Edited in the
+**Accreditations** band of `/?s=about`.
+
+| Field | |
+|---|---|
+| `id` | minted from the name |
+| `name` | the standard as it should read — `ISO/IEC 27001:2022`. **Never optional**, whichever way `caption` is set: it is either printed under the badge or it is the badge's `alt`. `about_validate()` refuses a row without one |
+| `image` | `{ src, webp, width, height, srcset, webp_srcset }`, stored at the `about.accreditations` slot |
+| `caption` | `shown` or `hidden` — whether the name is **printed** under the badge |
+| `status` | `shown` or `hidden` — whether the badge appears at all |
+
+**The badge tile is capped at 14rem above `23.5em`, and fills the row below it.** That is what
+gives the slot a single honest `width`: `auto-fit` collapses the tracks nothing sits in, so without
+a ceiling three badges drew at 318px and one at about 1200px, and a width that depends on how many
+rows the editor has added cannot be written in a table. Hence the two-arm `sizes=`.
+
+**Two switches, because they answer different questions.** A badge whose artwork already reads
+"ISO/IEC 27001" does not want the words repeated beneath it, and that is not the same wish as
+wanting the badge gone. Hiding the caption never removes the name: the frontend moves it into the
+`<img>`'s `alt`, so a screen reader hears it either way — and hears it only once, because a badge
+with a printed name beside it takes `alt=""`.
+
+**This is not the `/?s=certifications` screen.** That one is the Resource Certifications page and
+lists the qualifications *people* hold, by role. This band is the accreditations the *company*
+holds. Separate documents, separate pages, and the reason the band is called accreditations rather
+than certifications in the code.
 
 **About's why-us cards and the company profile's `principles` express overlapping ideas** — Robust
 Security and Security First, Client-Centric Approach and Client Partnership — and are deliberately
@@ -436,6 +467,7 @@ rung, so every phone would download the 3× file.
 | `company.journey` | `?s=company` | 480 | yes |
 | `home.destinations` | `?s=home` | 400 | yes |
 | `branding.asset` | `?s=branding` | 360 | yes |
+| `about.accreditations` | `?s=about` | 282 | yes |
 | `company.clients` | `?s=company` | 250 | yes |
 | `company.technology` | `?s=company` | 120 | yes |
 | `contact.offices` | `?s=contact` | 56 | yes |

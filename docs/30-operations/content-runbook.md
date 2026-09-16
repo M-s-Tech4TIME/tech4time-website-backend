@@ -305,8 +305,9 @@ Hide the name when the badge artwork already spells the standard out, and the ti
 say it twice. **Hiding it never loses it** — the name is still read aloud to anybody who cannot see
 the picture, so it is worth typing carefully either way.
 
-The badges sit on a white plate in both light and dark mode, the same as the client logos on the
-company profile. That is deliberate: certification marks are usually dark ink on a transparent
+The badges sit on a **square** white plate in both light and dark mode — four across a desktop, three
+on a tablet, two on a phone — and the mark fills its square, so a certification reads at a glance
+rather than sitting small in the middle of a wide box. That is deliberate: certification marks are usually dark ink on a transparent
 background and would disappear on a dark page.
 
 **This is not the Certifications screen.** That one (`?s=certifications`) is the Resource

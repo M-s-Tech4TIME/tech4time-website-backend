@@ -232,10 +232,12 @@ The same shape as a client logo on the company profile, with one field more. Edi
 | `caption` | `shown` or `hidden` — whether the name is **printed** under the badge |
 | `status` | `shown` or `hidden` — whether the badge appears at all |
 
-**The badge tile is capped at 14rem above `23.5em`, and fills the row below it.** That is what
-gives the slot a single honest `width`: `auto-fit` collapses the tracks nothing sits in, so without
-a ceiling three badges drew at 318px and one at about 1200px, and a width that depends on how many
-rows the editor has added cannot be written in a table. Hence the two-arm `sizes=`.
+**The plate is square and the mark fills it**, and the grid counts its columns — two, then three at
+`48em`, then four at `64em` — rather than fitting them with `auto-fit`. That is what gives the slot
+an honest `width`: an explicit `repeat(N, 1fr)` creates all N tracks whether or not there are badges
+for them, so one badge is one track wide. With `auto-fit`'s collapsing, three badges drew at 318px
+and one at about 1200px, and a width that depends on how many rows the editor has added cannot be
+written in a table.
 
 **Two switches, because they answer different questions.** A badge whose artwork already reads
 "ISO/IEC 27001" does not want the words repeated beneath it, and that is not the same wish as
@@ -467,7 +469,7 @@ rung, so every phone would download the 3× file.
 | `company.journey` | `?s=company` | 480 | yes |
 | `home.destinations` | `?s=home` | 400 | yes |
 | `branding.asset` | `?s=branding` | 360 | yes |
-| `about.accreditations` | `?s=about` | 282 | yes |
+| `about.accreditations` | `?s=about` | 289 | yes |
 | `company.clients` | `?s=company` | 250 | yes |
 | `company.technology` | `?s=company` | 120 | yes |
 | `contact.offices` | `?s=contact` | 56 | yes |

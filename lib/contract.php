@@ -1133,20 +1133,19 @@ const CONTRACT_IMAGE_ROOTS = ['/assets/images/', '/uploads/'];
  *     picture is ever drawn; at 1280 it is 534.
  *   - company.clients is widest at 360 (249px), also not on a desktop. The
  *     grid drops to one column, so a phone draws the biggest logo tile.
- *   - about.accreditations is widest at 376 (282px), for about.story's reason
- *     one breakpoint lower: it is the last width at which one badge fills the
- *     row. From 380 up the tile is capped at 14rem and the badge never passes
- *     174, which is why the sizes= has two arms rather than one number.
+ *   - about.accreditations is widest at 767 (289px), for about.story's reason
+ *     exactly: its grid goes two, three, four columns at 48em and 64em, and
+ *     767 is the last width before the three-column breakpoint takes the badge
+ *     out of a half-width tile. It is 222 on a 1440 desktop -- less than on a
+ *     tablet -- which is why the sizes= has three arms rather than one number.
  *
- *     THAT CAP IS WHY THIS SLOT HAS A WIDTH AT ALL. The tile is capped, not
- *     the track: auto-fit collapses the tracks nothing sits in and divides the
- *     row between what is left, so without a ceiling the badge came back 318px
- *     on a desktop holding three and about 1200px holding one. A width that
- *     depends on how many rows the editor has added cannot be written here.
- *     Capping the TRACK instead was measured too and is worse -- auto-fit
- *     counts the tracks that fit from the track's MAXIMUM, so a 14rem ceiling
- *     also delays every column: one badge per row until 480, four across a
- *     1440 desktop where seven fit.
+ *     ITS GRID COUNTS ITS COLUMNS rather than fitting them, and that is what
+ *     makes the width a fact at all. auto-fit collapses the tracks nothing
+ *     sits in and divides the row between what is left, so the badge came back
+ *     318px on a desktop holding three and about 1200px holding one: a width
+ *     that depends on how many rows the editor has added cannot be written
+ *     here. repeat(N, 1fr) creates all N tracks whether or not there are
+ *     badges for them, so one badge is one track wide.
  *
  * Guessing either would have shipped a picture too small on the width that
  * needed it most, and nothing in this repository would have said so.
@@ -1179,8 +1178,9 @@ const CONTRACT_IMAGE_SLOTS = [
                             'sizes' => '(min-width: 415px) 360px, 90vw'],
     'company.clients'   => ['width' => 250,
                             'sizes' => '(max-width: 414px) 90vw, 132px'],
-    'about.accreditations' => ['width' => 282,
-                            'sizes' => '(max-width: 23.5em) calc(100vw - 5rem), 174px'],
+    'about.accreditations' => ['width' => 289,
+                            'sizes' => '(max-width: 47.999em) calc(46vw - 3.5rem),'
+                                     . ' (max-width: 63.999em) calc(33.3vw - 5rem), 222px'],
     'company.technology'=> ['width' => 120,
                             'sizes' => '(max-width: 414px) 33vw, 80px'],
     'contact.offices'   => ['width' => 56,  'sizes' => '56px'],

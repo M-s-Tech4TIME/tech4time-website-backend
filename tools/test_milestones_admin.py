@@ -238,8 +238,17 @@ def run(client, r, site):
             and "Milestones" in html[html.index('aria-current="page"'):][:300])
 
     print("\nthe read-through, before anything has been saved")
-    r.check("content/milestones.json does not exist yet", not DATA.exists(),
-            "this suite is about the state BEFORE the first save")
+    # NOT "the file does not exist". It did not, when this was written, and
+    # then content/milestones.json was committed like the other twelve
+    # documents -- so the check was asserting a fact about my working tree on
+    # one afternoon, and CI told me so on the first push. The read-through
+    # fires on revision 0, which is what "nobody has ever saved this" actually
+    # means, and a seeded file carries exactly that.
+    held = json.loads(DATA.read_text()) if DATA.exists() else {"revision": 0}
+    r.check("the milestones document has never been saved",
+            int(held.get("revision", 0)) == 0,
+            f"revision {held.get('revision')} — this suite is about the state "
+            f"BEFORE the first save")
     r.check("the form holds every entry the company document does",
             html.count('name="timeline[items][') > 0
             and html.count(f'name="timeline[items][{len(before) - 1}][id]"') == 1

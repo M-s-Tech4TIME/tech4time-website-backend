@@ -82,8 +82,13 @@ EXPECT = [
     # to noindex, and one reachable without signing in is the worst reachable
     # file on this host.
     ("/sections/seo.php",     (404,),      "including the one that controls indexing"),
+    ("/sections/milestones.php", (404,),   "and the newest screen, which is the one a "
+                                           "docroot change would strand first"),
     ("/content/careers.json", (404,),      "and the system of record"),
     ("/content/seo.json",     (404,),      "including the site-wide SEO document"),
+    ("/content/milestones.json", (404,),   "and the newest one — a document added after "
+                                           "these rules were written is the case worth "
+                                           "asking about"),
     # And the identity document, named for a reason of its own: it holds the
     # address the public site's enquiry form delivers to. Every other file in
     # here is content somebody meant to publish; that one line is the company's

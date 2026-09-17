@@ -24,7 +24,7 @@ Trouble getting in: [secrets-recovery.md](secrets-recovery.md).
 
 | Where | What is there |
 |---|---|
-| Down the left | the pages you can edit, in the order they appear on the site: Overview, Home, About Us, Services, Company Profile, Careers, Contact, Resource Certifications, Branding & Advertisement, Privacy Policy, and **SEO Management** last |
+| Down the left | the pages you can edit, in the order they appear on the site: Overview, Home, About Us, Services, Company Profile, Milestones, Careers, Contact, Resource Certifications, Branding & Advertisement, Privacy Policy, and **SEO Management** last |
 | The round `‹` at the top of that column | narrows it to icons. It remembers, so it stays that way |
 | Your name at the **bottom** of that column | your account, and **Sign out**. **Your account is not in the list above** — it is about you rather than about a page, so it lives here |
 | **Down the right**, under *On this page* | **every section of the page you are editing** — click a name to jump straight to it. On a narrower screen it sits above the form instead |
@@ -143,8 +143,12 @@ true and stopped being true with
 
 ## The company profile
 
-`https://admin.tech4time.bd/?s=company` — the milestones, the figures, the client logos, the
-photographs, the technology list, the principles, and every heading and paragraph around them.
+`https://admin.tech4time.bd/?s=company` — the figures, the client logos, the photographs, the
+technology list, the principles, and every heading and paragraph around them.
+
+**The milestones are not here any more.** They have a screen of their own — see *The milestones*
+below — because the timeline is the one list that grows forever, and because the page now shows
+only the five most recent years of it.
 
 It is one long form, like the contact page. **Nothing reaches the site until you press Save**, and
 the buttons that add, remove and reorder deliberately do not save — so you can move three things
@@ -177,10 +181,20 @@ is what a search engine reads.
 
 ### The order matters more than it looks
 
-The **milestones** alternate left and right down the page, so inserting one moves every entry after
-it to the other side. The **technology** logos are placed on a rotating sphere by their position,
-so reordering or adding one redistributes all of them. Neither is a problem — just expect the page
-to look rearranged rather than only changed.
+The **technology** logos are placed on a rotating sphere by their position, so reordering or adding
+one redistributes all of them. Not a problem — just expect the page to look rearranged rather than
+only changed.
+
+### Long lists do not make a long page any more
+
+The **clients** wall shows twelve logos and puts the rest behind a *See all N clients* button. The
+**technology** list does the same with eighteen, on a phone or a small tablet; on a larger screen
+there is no button because the logos are on the sphere, which is the same size whether it is
+holding nine of them or ninety.
+
+Nothing is hidden from a search engine by this: every logo is in the page, and a visitor with
+JavaScript switched off can still open the button. It only stops fifty logos being eight screens of
+scrolling on a phone.
 
 ### Figures must start with a number
 
@@ -192,6 +206,48 @@ the number off the front, and a figure it cannot read just sits there.
 At the bottom is a count of the pictures held and how many no rows are using. Replacing a picture
 leaves the old one behind, which is normal. Nothing is ever deleted on its own — press the button
 when you want the unused ones gone, and only when you have saved.
+
+## The milestones
+
+`https://admin.tech4time.bd/?s=milestones` — the company timeline: a heading, an introduction, and
+one dated entry per thing that happened.
+
+**Two pages show what you edit here**, and they do not show the same thing. The
+[milestones page](https://tech4time.bd/pages/milestones/) shows the whole history. The
+[company profile](https://tech4time.bd/pages/company-profile/) shows the **five most recent years**
+and a *See all N milestones* link to the other one. So an older entry is on the milestones page
+alone — which is the point: the company profile was growing by a box and a margin for every year
+added, on every screen size, with nothing to stop it.
+
+Hiding the whole section takes the timeline off **both** pages.
+
+### Adding an entry
+
+Press **Add a milestone**. The new entry arrives **Hidden**, because a blank entry appearing on two
+live pages the moment you press Add is not what pressing Add means. Fill it in, switch it to Shown,
+and save.
+
+### The year has to be a year
+
+`2024`, or `2024–2025` for something that spanned two. Anything else is refused, and the editor
+says which entry. That is stricter than it looks for a reason: the five-year window on the company
+profile is worked out by reading the year, and an entry it cannot read is always kept — so a
+misspelled year would quietly pin itself to the company profile forever.
+
+### The order matters more than it looks
+
+Entries alternate left and right down the page, so inserting one moves every entry after it to the
+other side. Not a problem — expect the page to look rearranged rather than only changed.
+
+### Where it used to be
+
+On the Company Profile form, as one band among six. It moved out for two reasons: so there is one
+place to edit a milestone rather than two, and because that form was posting around 550 fields at
+once against a server limit of 1000. The timeline was the band with no ceiling on it.
+
+The first time you save this screen, it takes over from the old copy for good. Until then it shows
+you exactly what the company profile is showing — nothing is lost in between, and there is nothing
+to migrate by hand.
 
 ## The home page
 

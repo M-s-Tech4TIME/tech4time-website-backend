@@ -67,7 +67,8 @@ DOCROOT = ROOT / "public"
 # meta band lives in that page's own document, so saving the About screen
 # writes content/about.json. All of them are backed up and restored.
 DATA = [ROOT / "content" / f"{name}.json"
-        for name in ("seo", "about", "services", "careers", "certifications")]
+        for name in ("seo", "about", "services", "careers", "certifications",
+                     "milestones")]
 
 ADMIN = "/?s=seo"
 
@@ -624,8 +625,13 @@ def run(client, r, site):
     def kept(before: dict, after: dict) -> list[str]:
         return [k for k, v in before.items() if after.get(k, "\0GONE") != v]
 
+    # The milestones screen is here because it is the newest, and a new editor
+    # is exactly the one most likely to iterate *_TEXT_FIELDS whole rather than
+    # contract_page_bands() of it — the mistake this block exists to catch, made
+    # by somebody copying an older screen that gets it right.
     for screen, document in (("/?s=about", "about"),
                              ("/?s=certifications", "certifications"),
+                             ("/?s=milestones", "milestones"),
                              ("/?s=services", "services")):
         before = stored(document)["meta"]
         page, fields = open_screen(client, r, screen, f"the {document} editor")
@@ -651,7 +657,12 @@ def run(client, r, site):
 
 
 def main():
-    backup = {p: p.read_bytes() for p in DATA if p.is_file()}
+    # None for a file that is not there. A document whose editor has never been
+    # saved has no file yet — content/milestones.json is in exactly that state
+    # until somebody uses that screen — and "restore" then has to mean DELETE
+    # IT AGAIN. Skipping absent files, which is what this did, left one behind
+    # in the working tree after every run.
+    backup = {p: (p.read_bytes() if p.is_file() else None) for p in DATA}
     port = free_port()
 
     # The accounts, sessions and counters go somewhere disposable, so this run
@@ -692,7 +703,10 @@ def main():
             stop(server)
             shutil.rmtree(work, ignore_errors=True)
             for path, bytes_ in backup.items():
-                path.write_bytes(bytes_)
+                if bytes_ is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    path.write_bytes(bytes_)
                 for stray in (path.with_suffix(".json.bak"),
                               path.with_suffix(".json.moved")):
                     stray.unlink(missing_ok=True)

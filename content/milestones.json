@@ -1,0 +1,34 @@
+{
+    "updated": "",
+    "revision": 0,
+    "meta": {
+        "title": "Milestones | Tech4TIME",
+        "description": "Every milestone in the story of Tech4TIME, year by year: the partnerships, projects and capabilities the company has been built on since its first year.",
+        "share_title": "Our Milestones, Year by Year",
+        "breadcrumb": "Milestones",
+        "keywords": "Tech4TIME milestones, company history, IT company Bangladesh, technology timeline, company journey",
+        "robots": "index",
+        "changefreq": "yearly",
+        "priority": "0.5",
+        "share": {
+            "src": "",
+            "webp": "",
+            "width": 0,
+            "height": 0,
+            "srcset": "",
+            "webp_srcset": ""
+        },
+        "share_alt": ""
+    },
+    "hero": {
+        "title": "Milestones",
+        "subtitle": "The Full Story, Year by Year"
+    },
+    "timeline": {
+        "status": "shown",
+        "eyebrow": "Our Journey",
+        "title": "Milestones in Technological Excellence",
+        "lead": "",
+        "items": []
+    }
+}

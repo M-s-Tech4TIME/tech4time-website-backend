@@ -307,6 +307,16 @@ def main() -> None:
         # Reconciling a document that has never been published SAVES it here
         # before sending it — a revision minted, the shape brought up to date.
         # These files are committed, so putting them back is not tidiness.
+        #
+        # AND DELETING THE ONES THAT WERE NOT THERE, which this did not do, and
+        # which the uploads loop below has always done. A document that has
+        # never been saved has no file at all — content/milestones.json is in
+        # that state on a fresh checkout — so the never-published branch above
+        # CREATES one, and every run left it in the working tree afterwards.
+        # Silent, and exactly the kind of thing `git add -A` then commits.
+        for p in list(CONTENT.glob("*.json")):
+            if p.name not in content:
+                p.unlink()
         for name, blob in content.items():
             (CONTENT / name).write_bytes(blob)
         for p in list(UPLOADS.iterdir()):

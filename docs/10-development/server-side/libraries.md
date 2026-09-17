@@ -19,6 +19,7 @@ store they read from is outside the document root entirely.
 | [`careers.php`](#careersphp) | what this side does with a job post | `contract`, `store` |
 | [`contact.php`](#contactphp) | what this side does with the contact page | `contract`, `store` |
 | [`company.php`](#companyphp) | what this side does with the company profile | `contract`, `store` |
+| [`milestones.php`](#milestonesphp) | what this side does with the timeline | `contract`, `store`, `company` |
 | [`about.php`](#aboutphp) | what this side does with the about page | `contract`, `store` |
 | [`certifications.php`](#certificationsphp) | what this side does with the certifications page | `contract`, `store` |
 | [`branding.php`](#brandingphp) | what this side does with the branding page | `contract`, `store` |
@@ -233,6 +234,20 @@ one carrying artwork. Six repeatable lists live in `contract.php`: milestones, f
 photographs, technology and principles, each row with a `status` so it can be **hidden without
 being deleted**.
 
+**Five of the six are edited here.** The milestones moved to `milestones.php` and a screen of their
+own, which is what takes about 140 fields off a form that was posting around 550 against a default
+`max_input_vars` of 1000. The band stays in the contract, deprecated, because
+`milestones_load()` reads through to it until the new document has been saved once.
+
+**`COMPANY_MOVED_BANDS` and `company_here()` are what make that safe**, and they are not tidiness.
+Every `*_from_post()` starts from the stored document and rebuilds each band it **names** from
+`$_POST`. A band nothing renders but everything still names reads as absent, `?? ''` supplies an
+empty string, and the band is blanked on every save — silently, because empty is a valid value and
+nothing throws. That is the same failure `contract_page_bands()` prevents for the `meta` band, with
+a different band's name on it. `company_validate()` stops short of that band for the related
+reason: a fault the operator cannot fix on the screen they are looking at is a dead end, not a
+warning.
+
 Two rules in `company_validate()` are worth knowing before changing either half:
 
 **A figure must start with a digit.** `animations.js` counts it up by reading the number off the
@@ -243,6 +258,33 @@ find out.
 against `COMPANY_IMAGE_ROOTS`. The editor checks it because a hidden input is a text field with the
 label taken off; the frontend checks it again on receipt, because a signature proves where a
 document came from and not what is in it.
+
+### `milestones.php`
+
+`milestones_load()` · `milestones_save()` · `milestones_validate()`
+
+The company's timeline, and the one document **two public pages read**: `/pages/milestones/`
+renders all of it and `/pages/company-profile/` renders the most recent `MILESTONES_WINDOW` years
+and links there for the rest. Which is why the blurbs on `sections/milestones.php` say so — it is
+the one thing about that screen that is not obvious from looking at it, and hiding the band takes
+the timeline off **both** pages.
+
+**The read-through is the same one the frontend has, deliberately.** Both halves have to agree about
+what the timeline is before the first save, or the editor would come up empty over a page still
+showing seven entries — and one press of Save would publish the empty one over it. That has happened
+on this project once already, to the company profile, and the note in `contract_path()` records it.
+
+It keys on **`revision === 0`**, not on a missing file and not on an empty list. A fresh host is
+seeded with `content/milestones.json`, so the file exists from the first day; and an operator who
+deliberately removed every entry must not be handed them all back on the next request. The whole
+band moves, not just the rows: the heading, the eyebrow and the introduction are part of the
+timeline and are edited on this screen now.
+
+**`milestones_validate()` refuses a year that is not one** — `2024`, or `2024–2025`. That rule came
+from `company_validate()` and matters more here than it did there:
+`milestones_recent()` sorts the company profile's window by reading a four-digit year out of the
+field, and keeps a row it cannot read rather than dropping it. Refusing the unreadable ones where
+somebody types them is what stops that fallback from being the thing holding the page together.
 
 ### `home.php`
 

@@ -55,7 +55,7 @@ its record before acting.
 | | |
 |---|---|
 | `public/` | **the document root** — six entry points, `robots.txt`, `.htaccess`, and the assets a browser fetches |
-| `sections/` | the fourteen screens, included by `public/index.php` |
+| `sections/` | the fifteen screens, included by `public/index.php` |
 | `lib/` | the sign-in, the contract, the publish client, the store |
 | `content/` | the JSON the editors write — **the system of record** |
 | `tools/` | build, audit and test scripts — never deployed |
@@ -76,6 +76,7 @@ Full table: [docs/10-development/where-to-change-things.md](docs/10-development/
 | A job post or contact detail | **the editor** — not a file |
 | **The shape of editable content** | `lib/contract.php` — **and the same file in the frontend** |
 | Validation, the flag picker, the save | `lib/careers.php`, `lib/contact.php` |
+| **A milestone** | `sections/milestones.php` — its own screen and its own document, **not** `sections/company.php`, which no longer renders that band. The company profile shows the most recent `MILESTONES_WINDOW` years and `/pages/milestones/` shows the rest |
 | The sign-in, sessions, hashing | `lib/auth.php` — read [authentication.md](docs/10-development/server-side/authentication.md) first |
 | Add an editor | [adding-an-editor.md](docs/10-development/server-side/adding-an-editor.md) |
 | **A page's title, description, share card or crawl setting** | `sections/seo.php` — and **not** that page's own editor, which no longer renders those fields |
@@ -134,8 +135,14 @@ python3 tools/check_password_fields.py
 ```
 
 Touched the admin, auth or an editor? Also `test_admin_auth.py`, `test_careers_admin.py`,
-`test_contact_admin.py`, `test_company_admin.py`, `test_about_admin.py`,
-`test_home_admin.py`, `test_chrome_admin.py`, `test_settings_admin.py`, `test_publish_client.py`.
+`test_contact_admin.py`, `test_company_admin.py`, `test_milestones_admin.py`,
+`test_about_admin.py`, `test_home_admin.py`, `test_chrome_admin.py`, `test_settings_admin.py`,
+`test_publish_client.py`.
+
+Touched `sections/company.php` or `lib/company.php`? Also **`test_milestones_admin.py`**, not only
+`test_company_admin.py`. The timeline is `content/milestones.json` now and the company document's
+`milestones` band is deprecated but still in the contract — `COMPANY_MOVED_BANDS` is what stops the
+company form posting an empty string over a band it no longer draws, and that failure is silent.
 
 Touched the logo, the icons, the colours or the mail address — `sections/settings.php`,
 `lib/settings.php`, or the settings half of `lib/contract.php`? Also

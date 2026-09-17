@@ -22,6 +22,37 @@ require_once __DIR__ . '/publish_client.php';
 
 const COMPANY_FILE = __DIR__ . '/../content/company.json';
 
+/**
+ * Bands of the company document THIS SIDE NO LONGER EDITS OR COUNTS.
+ *
+ * ONE ENTRY, AND IT IS LOAD-BEARING. The milestones moved to their own screen
+ * and their own document — sections/milestones.php, lib/milestones.php — and
+ * the fieldset that used to edit them on the company form is gone. The band is still in COMPANY_TEXT_FIELDS,
+ * COMPANY_RICH_FIELDS, COMPANY_BANDS and COMPANY_LISTS, deliberately: removing
+ * it from the contract would change the meaning of every company.json already
+ * written, and lib/milestones.php reads through to it until the new document
+ * has been saved once.
+ *
+ * So every loop over COMPANY_BANDS, COMPANY_LISTS, COMPANY_TEXT_FIELDS or
+ * COMPANY_RICH_FIELDS on this side has to skip it, and this is why. Every *_from_post()
+ * starts from the stored document and overwrites each band it names from
+ * $_POST. A band nothing renders but everything still names reads as absent,
+ * ?? '' supplies an empty string, and the band is BLANKED on every save —
+ * silently, because empty is a valid value and nothing throws. That is exactly
+ * the failure contract_page_bands() exists to prevent for the meta band; this
+ * is the same failure with a different band's name on it.
+ */
+const COMPANY_MOVED_BANDS = ['milestones'];
+
+/** A by-band list with the moved bands taken out. */
+function company_here(array $by_band): array
+{
+    foreach (COMPANY_MOVED_BANDS as $band) {
+        unset($by_band[$band]);
+    }
+    return $by_band;
+}
+
 /* ------------------------------------------------------------------- read */
 
 /**
@@ -100,18 +131,15 @@ function company_validate(array $data): array
         }
     }
 
-    /* Each list, by its own rules. */
-    foreach ($data['milestones']['items'] as $i => $row) {
-        $where = 'Milestone ' . ($i + 1);
-        if (trim((string)$row['title']) === '' && trim((string)$row['year']) === '') {
-            $errors[] = "$where has neither a year nor a title. Give it one, or remove it.";
-        }
-        $year = trim((string)$row['year']);
-        if ($year !== '' && !preg_match('/^[0-9]{4}(\s*[–—-]\s*[0-9]{4})?$/u', $year)) {
-            $errors[] = "$where: “{$year}” is not a year. Use 2024, or 2024–2025.";
-        }
-    }
+    /* NOTHING ABOUT THE milestones BAND IS CHECKED HERE ANY MORE, and the
+       argument is contract_page_bands()' one about the meta band: the company
+       form does not render it, so a fault in it is one the operator cannot
+       fix on this screen — and refusing their save for it would be a dead end
+       rather than a warning. The timeline is sections/milestones.php, and
+       milestones_validate() carries the same year rule it used to carry here.
+       See COMPANY_MOVED_BANDS. */
 
+    /* Each list, by its own rules. */
     foreach ($data['experience']['items'] as $i => $row) {
         $where  = 'Figure ' . ($i + 1);
         $figure = trim((string)$row['figure']);

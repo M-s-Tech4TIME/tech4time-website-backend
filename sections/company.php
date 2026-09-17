@@ -3,9 +3,14 @@
  * Tech4TIME — company profile editor.
  *
  * Everything on /pages/company-profile/ that is words or pictures rather than
- * structure: the banner, the milestone timeline, the figures, the client
- * logos, the photographs, the technology list, the principles, and the copy
- * around all of them. Stored in content/company.json; there is no database.
+ * structure: the banner, the figures, the client logos, the photographs, the
+ * technology list, the principles, and the copy around all of them. Stored in
+ * content/company.json; there is no database.
+ *
+ * NOT THE TIMELINE. The milestones are sections/milestones.php, editing
+ * content/milestones.json, and the company profile renders the most recent
+ * five years of it. See COMPANY_MOVED_BANDS in lib/company.php, which keeps this
+ * form from blanking a band it no longer draws.
  *
  * ONE FORM, NOT A LIST AND AN EDIT SCREEN — the same call sections/contact.php
  * makes, for the same reason. This page is a lot of short fields that are
@@ -14,7 +19,7 @@
  * on the way.
  *
  * WHY SO MUCH OF THIS IS A LOOP
- * The page has six repeatable lists. Written out one at a time this file would
+ * The page has five repeatable lists here. Written out one at a time this file would
  * be four times the length and the fifth copy would be the one that forgot the
  * hidden id field. So the lists are driven from COMPANY_LISTS in the contract,
  * and each row SHAPE has one function that draws it.
@@ -51,19 +56,22 @@ function company_from_post(array $current): array
 {
     $data = $current;
 
-    foreach (contract_page_bands(COMPANY_TEXT_FIELDS) as $band => $fields) {
+    foreach (company_here(contract_page_bands(COMPANY_TEXT_FIELDS)) as $band => $fields) {
         foreach ($fields as $field) {
             $data[$band][$field] = trim((string)($_POST[$band][$field] ?? ''));
         }
     }
 
-    foreach (COMPANY_RICH_FIELDS as $band => $fields) {
+    foreach (company_here(COMPANY_RICH_FIELDS) as $band => $fields) {
         foreach ($fields as $field) {
             $data[$band][$field] = rt_sanitise_html((string)($_POST[$band][$field] ?? ''));
         }
     }
 
     foreach (COMPANY_BANDS as $band) {
+        if (in_array($band, COMPANY_MOVED_BANDS, true)) {
+            continue;
+        }
         $data[$band]['status'] =
             ($_POST[$band]['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown';
     }
@@ -72,7 +80,7 @@ function company_from_post(array $current): array
 
     /* Rows arrive keyed by their position in the form. Removing one leaves a
        hole in those keys, so they are renumbered rather than trusted. */
-    foreach (COMPANY_LISTS as $band => $filler) {
+    foreach (company_here(COMPANY_LISTS) as $band => $filler) {
         $data[$band]['items'] = [];
         foreach (array_values((array)($_POST[$band]['items'] ?? [])) as $row) {
             if (is_array($row)) {
@@ -94,12 +102,10 @@ function company_row_from_post(string $band, array $row): array
         'status' => ($row['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown',
     ];
 
+    /* No 'milestones' arm. company_here() takes that band out of the loop
+       that reaches this, so an arm for it would be unreachable code claiming
+       this form still edits the timeline. */
     return match ($band) {
-        'milestones' => $common + [
-            'year'  => trim((string)($row['year'] ?? '')),
-            'title' => trim((string)($row['title'] ?? '')),
-            'text'  => trim((string)($row['text'] ?? '')),
-        ],
         'experience' => $common + [
             'figure' => trim((string)($row['figure'] ?? '')),
             'label'  => trim((string)($row['label'] ?? '')),
@@ -221,10 +227,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
  */
 function company_take_uploads(array $data, array &$errors): array
 {
-    /* Which CONTRACT_IMAGE_SLOTS row each band's pictures fill. Three of the
-       six bands are missing on purpose: a milestone, a statistic and a
-       principle carry no picture. One arriving anyway stores a single file,
-       which is what every band did before slots existed. */
+    /* Which CONTRACT_IMAGE_SLOTS row each band's pictures fill. Two of the
+       five bands here are missing on purpose: a statistic and a principle
+       carry no picture. One arriving anyway stores a single file, which is
+       what every band did before slots existed. */
     $slots = [
         'journey'    => 'company.journey',
         'clients'    => 'company.clients',
@@ -270,7 +276,7 @@ function company_apply_row_action(array $data, string $do): ?array
     [$verb, $index] = array_pad(explode(':', $do, 2), 2, '');
     $index = (int)$index;
 
-    foreach (COMPANY_LISTS as $band => $filler) {
+    foreach (company_here(COMPANY_LISTS) as $band => $filler) {
         if (!str_starts_with($verb, $band . '-')) {
             continue;
         }
@@ -347,7 +353,8 @@ function company_band_header(array $data, string $band, string $legend,
    with no way to see what is in it. Add a band, add a line here. */
 const COMPANY_OUTLINE = [
     'band-hero'        => 'The banner',
-    'band-milestones'  => 'Milestones',
+    /* No 'band-milestones'. The timeline is sections/milestones.php now — its
+       own screen, its own rail row and its own document. */
     'band-background'  => 'Our Background',
     'band-experience'  => 'The figures',
     'band-clients'     => 'Proud Clients',
@@ -408,79 +415,6 @@ if (!$errors && $pending !== '') {
         <span class="admin__hint">Leave empty to show nothing under the heading.</span>
       </label>
     </div>
-  </fieldset>
-
-  <!-- ========================= milestones ========================= -->
-  <fieldset class="admin__block" id="band-milestones">
-    <?php company_band_header($data, 'milestones', 'Milestones',
-        'The timeline. Entries alternate left and right down the page, so the '
-        . 'order decides which side each one lands on.',
-        'Add a milestone'); ?>
-
-    <div class="admin__grid">
-      <label class="admin__field">
-        <span class="admin__label">Eyebrow</span>
-        <input class="admin__input" type="text" name="milestones[eyebrow]"
-               value="<?= h($data['milestones']['eyebrow']) ?>">
-        <span class="admin__hint">The small line above the heading.</span>
-      </label>
-
-      <label class="admin__field">
-        <span class="admin__label">Heading</span>
-        <input class="admin__input" type="text" name="milestones[title]"
-               value="<?= h($data['milestones']['title']) ?>">
-      </label>
-    </div>
-
-    <?php /* A <div>, not a <label>, and deliberately: a <label> forwards a
-             click from anywhere inside it to its first labelable descendant,
-             and editor.js puts its toolbar BEFORE the textarea — so every
-             click in the text would press Bold. The plain fields above wrap
-             their input in a <label> because there the forwarding is exactly
-             what you want; here it is a trap. */ ?>
-    <div class="admin__field admin__field--wide">
-      <label class="admin__label" for="milestones-lead">Introduction</label>
-      <textarea class="admin__input admin__textarea" id="milestones-lead"
-                name="milestones[lead]" rows="3" data-editor><?= h($data['milestones']['lead']) ?></textarea>
-      <span class="admin__hint">Leave empty to show nothing under the heading.</span>
-    </div>
-
-<?php $rows = $data['milestones']['items']; $total = count($rows); ?>
-<?php foreach ($rows as $i => $row): ?>
-    <div class="admin-card<?= $row['status'] === 'hidden' ? ' admin-card--hidden' : '' ?>">
-      <input type="hidden" name="milestones[items][<?= $i ?>][id]" value="<?= h($row['id']) ?>">
-      <?php admin_card_head('milestones', $i, $total, [
-          'label'  => $row['title'],
-          'noun'   => 'entry',
-          'detail' => $row['year'],
-          'status' => $row['status'],
-      ]); ?>
-
-      <div class="admin__grid">
-        <label class="admin__field">
-          <span class="admin__label">Year</span>
-          <input class="admin__input" type="text" name="milestones[items][<?= $i ?>][year]"
-                 value="<?= h($row['year']) ?>" placeholder="2024">
-        </label>
-
-        <label class="admin__field">
-          <span class="admin__label">What happened</span>
-          <input class="admin__input" type="text" name="milestones[items][<?= $i ?>][title]"
-                 value="<?= h($row['title']) ?>">
-        </label>
-
-        <label class="admin__field admin__field--wide">
-          <span class="admin__label">In a sentence</span>
-          <input class="admin__input" type="text" name="milestones[items][<?= $i ?>][text]"
-                 value="<?= h($row['text']) ?>">
-        </label>
-      </div>
-
-      <?php admin_status_field("milestones[items][$i][status]",
-          (string)$row['status'], 'this entry'); ?>
-    </div>
-<?php endforeach; ?>
-
   </fieldset>
 
   <!-- ===================== the background band ===================== -->

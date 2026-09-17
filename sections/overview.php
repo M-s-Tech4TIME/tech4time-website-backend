@@ -36,6 +36,7 @@ if (!defined('T4T_ADMIN')) {
 require_once __DIR__ . '/../lib/careers.php';
 require_once __DIR__ . '/../lib/contact.php';
 require_once __DIR__ . '/../lib/company.php';
+require_once __DIR__ . '/../lib/milestones.php';
 require_once __DIR__ . '/../lib/about.php';
 require_once __DIR__ . '/../lib/home.php';
 require_once __DIR__ . '/../lib/services.php';
@@ -87,6 +88,7 @@ function overview_when(string $iso): string
 $careers        = careers_load();
 $contact        = contact_load();
 $company        = company_load();
+$milestones     = milestones_load();
 $about          = about_load();
 $home           = home_load();
 $services       = services_load();
@@ -129,8 +131,23 @@ function overview_bands_line(int $hidden): string
    the page is empty. Four documents answer it the same way, so they are asked
    the same way -- the same walk written out four times is four places for the
    next list to be forgotten. */
-$company_rows   = overview_rows($company, COMPANY_LISTS, 'company_shown');
-$company_hidden = overview_hidden($company, COMPANY_BANDS, 'company_band_shown');
+/* company_here(), because the timeline is a band of this document that this
+   side no longer edits — it has a screen and a card of its own below. Counting
+   it here would report the same seven entries on two cards and say the company
+   profile has six lists when its form offers five. */
+$company_rows   = overview_rows($company, company_here(COMPANY_LISTS), 'company_shown');
+$company_hidden = overview_hidden($company,
+                                     array_values(array_diff(COMPANY_BANDS,
+                                                             COMPANY_MOVED_BANDS)),
+                                     'company_band_shown');
+
+$milestones_rows   = overview_rows($milestones, MILESTONES_LISTS, 'milestones_shown');
+$milestones_hidden = overview_hidden($milestones, MILESTONES_BANDS,
+                                        'milestones_band_shown');
+/* How many of them the COMPANY PROFILE shows, which is the number somebody
+   reading this card actually wants: the milestones page has all of them and
+   the company profile has a window onto it. */
+$milestones_window = count(milestones_recent(milestones_shown($milestones, 'timeline')));
 
 $about_rows   = overview_rows($about, ABOUT_LISTS, 'about_shown');
 $about_hidden = overview_hidden($about, ABOUT_BANDS, 'about_band_shown');
@@ -220,12 +237,24 @@ $facts = [
         'title' => 'Company profile',
         'lines' => [
             $company_rows . ' entr' . ($company_rows === 1 ? 'y' : 'ies') . ' shown across '
-                . count(COMPANY_LISTS) . ' lists — milestones, statistics, clients, '
+                . count(company_here(COMPANY_LISTS)) . ' lists — statistics, clients, '
                 . 'photographs, technology and principles',
             overview_bands_line($company_hidden),
         ],
         'saved' => (string)($company['updated'] ?? ''),
         'file'  => 'content/company.json',
+    ],
+    'milestones' => [
+        'title' => 'Milestones',
+        'lines' => [
+            $milestones_rows . ' entr' . ($milestones_rows === 1 ? 'y' : 'ies')
+                . ' shown, ' . $milestones_window . ' of them also on the company '
+                . 'profile — it shows the ' . MILESTONES_WINDOW
+                . ' most recent years and links here for the rest',
+            overview_bands_line($milestones_hidden),
+        ],
+        'saved' => (string)($milestones['updated'] ?? ''),
+        'file'  => 'content/milestones.json',
     ],
     'careers' => [
         'title' => 'Job posts',

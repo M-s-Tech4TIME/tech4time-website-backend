@@ -81,8 +81,21 @@ const ADMIN_SECTIONS = [
     'company' => [
         'label' => 'Company Profile',
         'icon'  => 'building',
-        'desc'  => 'Milestones, clients, technology',
+        /* Not "Milestones, clients, technology" any more. The timeline is its
+           own row below, and a rail that offers to edit it in two places is a
+           rail that will be used to edit it in the wrong one. */
+        'desc'  => 'The figures, the clients, the photographs and the technology',
         'view'  => '/pages/company-profile/',
+    ],
+    'milestones' => [
+        'label' => 'Milestones',
+        /* The timeline is a run of dated entries, and 'calendar-alt' is the
+           one glyph in the sprite that says "dated" without already being
+           somebody else's row — 'building' is the Company Profile and
+           'clock' belongs to the contact page's opening hours. */
+        'icon'  => 'calendar-alt',
+        'desc'  => 'The company timeline, and the page that holds all of it',
+        'view'  => '/pages/milestones/',
     ],
     'careers' => [
         'label' => 'Careers',
@@ -170,8 +183,8 @@ const ADMIN_SECTIONS = [
  * the assertion in tools/check_admin_a11y.py.
  */
 const ADMIN_RAIL_SECTIONS = ['overview', 'home', 'about', 'services', 'company',
-                             'careers', 'contact', 'certifications', 'branding',
-                             'privacy', 'chrome', 'seo', 'settings'];
+                             'milestones', 'careers', 'contact', 'certifications',
+                             'branding', 'privacy', 'chrome', 'seo', 'settings'];
 
 /**
  * Sections that edit a page of the website, in rail order.
@@ -180,8 +193,9 @@ const ADMIN_RAIL_SECTIONS = ['overview', 'home', 'about', 'services', 'company',
  * account — so anything counting or listing "the pages you can edit" asks here
  * rather than filtering the registry by hand in three places.
  */
-const ADMIN_PAGE_SECTIONS = ['home', 'about', 'services', 'company', 'careers',
-                             'contact', 'certifications', 'branding', 'privacy'];
+const ADMIN_PAGE_SECTIONS = ['home', 'about', 'services', 'company', 'milestones',
+                             'careers', 'contact', 'certifications', 'branding',
+                             'privacy'];
 
 /* THREE RAIL ROWS ARE NOT IN THAT LIST, and none of them is an omission. The
    chrome is on every page, the SEO screen edits every page's metadata, and the

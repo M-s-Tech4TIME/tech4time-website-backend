@@ -381,6 +381,7 @@ def run(r: Results, gd: bool) -> None:
     for doc, seat in (
             ("about",    "$d['story']['items'][0]['image']"),
             ("about",    "$d['story']['items'][0]['image_dark']"),
+            ("about",    "$d['accreditations']['items'][0]['image']"),
             ("home",     "$d['destinations']['items'][0]['image']"),
             ("home",     "$d['destinations']['items'][0]['image_dark']"),
             ("company",  "$d['journey']['items'][0]['image']"),

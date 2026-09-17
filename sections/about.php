@@ -98,6 +98,14 @@ function about_row_from_post(string $band, array $row): array
         ];
     }
 
+    if ($band === 'accreditations') {
+        return $common + [
+            'name'    => trim((string)($row['name'] ?? '')),
+            'caption' => ($row['caption'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown',
+            'image'   => about_image_from_post($row['image'] ?? []),
+        ];
+    }
+
     /* Specialities and why-us are the same shape: an icon, a title, a line. */
     return $common + [
         'icon'  => isset(ABOUT_ICONS[$row['icon'] ?? '']) ? (string)$row['icon'] : '',
@@ -202,21 +210,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
  */
 function about_take_uploads(array $data, array &$errors): array
 {
-    /* Two file inputs can land on one row: every row has a light half and a
-       dark one, whichever layout it uses. admin_uploaded_files() keys them by
-       the name the input was given, so they arrive as two pseudo-bands and land
-       in two fields. */
-    $slots = ['story' => 'image', 'story_dark' => 'image_dark'];
+    /* One row of this table per FILE INPUT on the screen, which is not the
+       same as one per band: a story row has a light half and a dark one, so it
+       has two. admin_uploaded_files() keys what it found by the name the input
+       was given, and this says where each of those names puts its picture.
 
-    foreach (admin_uploaded_files() as [$band, $index, $file]) {
-        if (!isset($slots[$band]) || !isset($data['story']['items'][$index])) {
+         input name  ->  [ list, field on the row, image slot, what to call it ]
+
+       The SLOT is the half that is easy to get wrong and impossible to see
+       afterwards. It decides the ladder of widths the file is stored at, and a
+       badge stored at the story slot's 700px is a 250px badge carrying five
+       times the bytes it needs on every phone. tools/test_upload.py audits
+       these literals against CONTRACT_IMAGE_SLOTS in both directions. */
+    $inputs = [
+        'story'          => ['story',          'image',      'about.story',          'Section'],
+        'story_dark'     => ['story',          'image_dark', 'about.story',          'Section'],
+        'accreditations' => ['accreditations', 'image',      'about.accreditations', 'Accreditation'],
+    ];
+
+    foreach (admin_uploaded_files() as [$input, $index, $file]) {
+        if (!isset($inputs[$input])) {
             continue;
         }
 
-        $where = 'Section ' . ($index + 1)
-               . ($band === 'story_dark' ? ' (dark mode)' : '');
+        [$list, $field, $slot, $noun] = $inputs[$input];
 
-        $stored = upload_accept($file, 'about.story');
+        if (!isset($data[$list]['items'][$index])) {
+            continue;
+        }
+
+        $where = $noun . ' ' . ($index + 1)
+               . ($input === 'story_dark' ? ' (dark mode)' : '');
+
+        $stored = upload_accept($file, $slot);
 
         if (isset($stored['error'])) {
             $errors[] = $where . ': ' . $stored['error'];
@@ -229,7 +255,7 @@ function about_take_uploads(array $data, array &$errors): array
             continue;
         }
 
-        $data['story']['items'][$index][$slots[$band]] = contract_image_defaults($stored);
+        $data[$list]['items'][$index][$field] = contract_image_defaults($stored);
     }
 
     return $data;
@@ -333,6 +359,34 @@ function about_icon_field(string $name, string $value): void
     <?php
 }
 
+/**
+ * Whether a row's name is PRINTED under its badge.
+ *
+ * Not admin_status_field(): that component's label is the fixed string "Shown
+ * on the page", and an accreditation card already carries one of those for the
+ * row itself. Two selects with the same label in one card is a card nobody can
+ * read. This one says what it actually governs.
+ *
+ * Hiding the name never removes it. It is still what the badge is announced
+ * as -- see the note beside about_picture() in the frontend's page -- which is
+ * why the field next to this one is required either way.
+ */
+function about_caption_field(string $name, string $value): void
+{
+    ?>
+        <label class="admin__field">
+          <span class="admin__label">Name under the badge</span>
+          <select class="admin__input" name="<?= h($name) ?>">
+            <option value="shown"<?= $value !== 'hidden' ? ' selected' : '' ?>>Shown — printed under the badge</option>
+            <option value="hidden"<?= $value === 'hidden' ? ' selected' : '' ?>>Hidden — the badge alone</option>
+          </select>
+          <span class="admin__hint">Hide it when the badge artwork already
+            spells the standard out. Either way the name is read aloud to
+            somebody who cannot see the picture.</span>
+        </label>
+    <?php
+}
+
 /* What the rail lists under "About Us". The keys are the ids on the
    <fieldset>s below and the order is the order of the page, so this doubles as
    the table of contents for a form that is otherwise several screens of
@@ -342,6 +396,7 @@ const ABOUT_OUTLINE = [
     'band-story'       => 'The sections',
     'band-specialties' => 'Our Specialities',
     'band-whyus'       => 'Why Us?',
+    'band-accreditations' => 'Accreditations',
     'band-cta'         => 'The closing band',
     'band-uploads'     => 'Stored pictures',
     'band-meta'        => 'Search and sharing',
@@ -654,6 +709,54 @@ if (!$errors && $pending !== '') {
 
       <?php admin_status_field("whyus[items][$i][status]",
           (string)$row['status'], 'this reason'); ?>
+    </div>
+<?php endforeach; ?>
+
+  </fieldset>
+
+  <!-- ======================= accreditations ======================= -->
+  <fieldset class="admin__block" id="band-accreditations">
+    <?php about_band_header($data, 'accreditations', 'Accreditations',
+        'The wall of certification badges above the closing band — ISO 27001, '
+        . 'SOC 2 and the like. This section ships hidden: show it once there '
+        . 'is something on it.',
+        'Add an accreditation'); ?>
+
+    <label class="admin__field admin__field--wide">
+      <span class="admin__label">Block heading</span>
+      <input class="admin__input" type="text" name="accreditations[title]"
+             value="<?= h($data['accreditations']['title']) ?>">
+    </label>
+
+<?php $rows = $data['accreditations']['items']; $total = count($rows); ?>
+<?php foreach ($rows as $i => $row): ?>
+    <div class="admin-card<?= $row['status'] === 'hidden' ? ' admin-card--hidden' : '' ?>">
+      <input type="hidden" name="accreditations[items][<?= $i ?>][id]" value="<?= h($row['id']) ?>">
+      <?php admin_card_head('accreditations', $i, $total, [
+          'label'  => $row['name'],
+          'noun'   => 'accreditation',
+          'status' => $row['status'],
+      ]); ?>
+
+      <?php admin_image_fields("accreditations[items][$i][image]",
+                                "upload[accreditations][$i]",
+                                $row['image'], 'badge'); ?>
+
+      <label class="admin__field admin__field--wide">
+        <span class="admin__label">Name</span>
+        <input class="admin__input" type="text" name="accreditations[items][<?= $i ?>][name]"
+               value="<?= h($row['name']) ?>">
+        <span class="admin__hint">The standard as it should read — "ISO/IEC 27001:2022",
+          "SOC 2 Type II". It is what a screen reader announces, so it cannot be blank.</span>
+      </label>
+
+      <div class="admin__grid">
+        <?php about_caption_field("accreditations[items][$i][caption]",
+                                  (string)$row['caption']); ?>
+
+        <?php admin_status_field("accreditations[items][$i][status]",
+            (string)$row['status'], 'this accreditation'); ?>
+      </div>
     </div>
 <?php endforeach; ?>
 

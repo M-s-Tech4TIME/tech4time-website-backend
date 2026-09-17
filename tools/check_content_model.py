@@ -166,9 +166,9 @@ COVERED_ELSEWHERE = {
     "about": (
         "tools/test_about_admin.py" if SIDE in ("backend", "both")
         else "tools/test_publish.py",
-        "The about page is three repeatable lists — the story sections, the "
-        "specialities and the why-us cards — and both the editor and the "
-        "renderer walk them. The editor names its inputs "
+        "The about page is four repeatable lists — the story sections, the "
+        "specialities, the why-us cards and the accreditations — and both the "
+        "editor and the renderer walk them. The editor names its inputs "
         "\"<?= $band ?>[items][<?= $i ?>][title]\" and the page renders each "
         "list with foreach over about_shown(), so the regexes below read the "
         "loop variables rather than the fields. The same argument as the "
@@ -176,7 +176,7 @@ COVERED_ELSEWHERE = {
         "exempt nearly the whole model and would then report a pass on a model "
         "it had not looked at. Proved by round trip instead — every field set "
         "through the editor and read back off the wire, plus add, remove, hide "
-        "and reorder on all three lists.",
+        "and reorder on all four lists.",
     ),
     "certifications": (
         "tools/test_certifications_admin.py" if SIDE in ("backend", "both")

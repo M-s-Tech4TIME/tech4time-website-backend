@@ -25,6 +25,7 @@ breath**.
 | An office address, phone number, email | `/?s=contact` |
 | The contact page's headings and copy | `/?s=contact` |
 | The about page's sections, specialities and why-us cards | `/?s=about` |
+| An accreditation badge — ISO 27001, SOC 2 and the like | `/?s=about`, the Accreditations band. Ships hidden; switch it on once a badge is on it. **Not** `/?s=certifications`, which is the Resource Certifications page and lists people's qualifications |
 | The home page's hero, badges, tags, terminal and cards | `/?s=home` |
 | What the enquiry form says | `/?s=contact` |
 | Anything the privacy policy says — a clause, the retention table, the effective date | `/?s=privacy` |

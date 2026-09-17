@@ -1133,6 +1133,19 @@ const CONTRACT_IMAGE_ROOTS = ['/assets/images/', '/uploads/'];
  *     picture is ever drawn; at 1280 it is 534.
  *   - company.clients is widest at 360 (249px), also not on a desktop. The
  *     grid drops to one column, so a phone draws the biggest logo tile.
+ *   - about.accreditations is widest at 767 (289px), for about.story's reason
+ *     exactly: its grid goes two, three, four columns at 48em and 64em, and
+ *     767 is the last width before the three-column breakpoint takes the badge
+ *     out of a half-width tile. It is 222 on a 1440 desktop -- less than on a
+ *     tablet -- which is why the sizes= has three arms rather than one number.
+ *
+ *     ITS GRID COUNTS ITS COLUMNS rather than fitting them, and that is what
+ *     makes the width a fact at all. auto-fit collapses the tracks nothing
+ *     sits in and divides the row between what is left, so the badge came back
+ *     318px on a desktop holding three and about 1200px holding one: a width
+ *     that depends on how many rows the editor has added cannot be written
+ *     here. repeat(N, 1fr) creates all N tracks whether or not there are
+ *     badges for them, so one badge is one track wide.
  *
  * Guessing either would have shipped a picture too small on the width that
  * needed it most, and nothing in this repository would have said so.
@@ -1165,6 +1178,9 @@ const CONTRACT_IMAGE_SLOTS = [
                             'sizes' => '(min-width: 415px) 360px, 90vw'],
     'company.clients'   => ['width' => 250,
                             'sizes' => '(max-width: 414px) 90vw, 132px'],
+    'about.accreditations' => ['width' => 289,
+                            'sizes' => '(max-width: 47.999em) calc(46vw - 3.5rem),'
+                                     . ' (max-width: 63.999em) calc(33.3vw - 5rem), 222px'],
     'company.technology'=> ['width' => 120,
                             'sizes' => '(max-width: 414px) 33vw, 80px'],
     'contact.offices'   => ['width' => 56,  'sizes' => '56px'],
@@ -1864,11 +1880,12 @@ const ABOUT_SIDES = [
 /* Free-text single-line fields, by band. The story band has none: every
    heading on that part of the page belongs to a row, not to the band. */
 const ABOUT_TEXT_FIELDS = [
-    'meta'        => CONTRACT_META_TEXT,
-    'hero'        => ['title', 'subtitle'],
-    'specialties' => ['title'],
-    'whyus'       => ['title'],
-    'cta'         => ['title', 'label', 'href', 'icon'],
+    'meta'           => CONTRACT_META_TEXT,
+    'hero'           => ['title', 'subtitle'],
+    'specialties'    => ['title'],
+    'whyus'          => ['title'],
+    'accreditations' => ['title'],
+    'cta'            => ['title', 'label', 'href', 'icon'],
 ];
 
 /**
@@ -1885,7 +1902,7 @@ const ABOUT_ROW_RICH_FIELDS = ['story' => ['body']];
    The hero is not here, for the reason the contact page's hero is not in
    CONTACT_BANDS: a page with no title is not a page with a section switched
    off, it is a broken page. */
-const ABOUT_BANDS = ['story', 'specialties', 'whyus', 'cta'];
+const ABOUT_BANDS = ['story', 'specialties', 'whyus', 'accreditations', 'cta'];
 
 /**
  * The bands that hold a list, and the function that fills one of its rows.
@@ -1895,9 +1912,10 @@ const ABOUT_BANDS = ['story', 'specialties', 'whyus', 'cta'];
  * here rather than by somebody also remembering a line further down.
  */
 const ABOUT_LISTS = [
-    'story'       => 'about_story_defaults',
-    'specialties' => 'about_specialty_defaults',
-    'whyus'       => 'about_reason_defaults',
+    'story'          => 'about_story_defaults',
+    'specialties'    => 'about_specialty_defaults',
+    'whyus'          => 'about_reason_defaults',
+    'accreditations' => 'about_accreditation_defaults',
 ];
 
 /* What a row is called before it is called anything. Deliberately the same
@@ -1950,6 +1968,17 @@ function about_defaults(): array
         'whyus' => [
             'status' => 'shown',
             'title'  => 'Why Us?',
+            'items'  => [],
+        ],
+        /* THE ONLY BAND THAT SHIPS HIDDEN. The others have shipped copy behind
+           them, so a document that has never been edited still renders a whole
+           page. This one has nothing: a heading over an empty grid is not a
+           section, it is a gap. It shows itself the moment somebody adds a
+           badge and switches it on, and until then the page is exactly what it
+           was before this band existed. */
+        'accreditations' => [
+            'status' => 'hidden',
+            'title'  => 'Our Certifications',
             'items'  => [],
         ],
         'cta' => [
@@ -2046,8 +2075,9 @@ function about_identify(array $data): array
 function about_row_name(string $band, array $row): string
 {
     return trim((string)match ($band) {
-        'story' => $row['heading'] ?? '',
-        default => $row['title'] ?? '',
+        'story'          => $row['heading'] ?? '',
+        'accreditations' => $row['name'] ?? '',
+        default          => $row['title'] ?? '',
     });
 }
 
@@ -2101,6 +2131,33 @@ function about_reason_defaults(array $row): array
     ];
 }
 
+/**
+ * One accreditation: a badge, and the name of the standard it certifies.
+ *
+ * The same shape as company_logo_defaults() with one field more. 'caption'
+ * decides whether the name is PRINTED under the badge; it is not 'status',
+ * which decides whether the row appears at all. Both are needed because they
+ * answer different questions: a badge whose artwork already reads
+ * "ISO/IEC 27001" does not want the words repeated beneath it, and that is not
+ * the same wish as wanting the badge gone.
+ *
+ * The name is never optional whichever way the caption is set -- it is what
+ * the <img> is announced as when the caption is hidden, so a row without one
+ * is a picture a screen reader cannot describe. about_validate() refuses it.
+ */
+function about_accreditation_defaults(array $row): array
+{
+    $row += ['id' => '', 'name' => '', 'caption' => 'shown', 'status' => 'shown'];
+
+    /* Anything that is not the word 'hidden' means shown, which is the rule
+       every other show/hide field in the contract follows -- a value arriving
+       from a hand-edited file or a forged form cannot invent a third state. */
+    $row['caption'] = $row['caption'] === 'hidden' ? 'hidden' : 'shown';
+    $row['image']   = contract_image_defaults($row['image'] ?? []);
+
+    return $row;
+}
+
 /** Only the rows of a list a visitor should see. */
 function about_shown(array $data, string $band): array
 {
@@ -2126,21 +2183,42 @@ function about_find(array $data, string $band, string $id): ?array
 }
 
 /**
+ * Which lists on this page hold pictures, and in which fields.
+ *
+ * Named here for the reason ABOUT_LISTS is: about_images() drives itself off
+ * this, so a band that holds artwork is counted by being added here rather
+ * than by somebody also remembering a loop further down. It was that loop, and
+ * it named one list.
+ *
+ * GETTING THIS WRONG DELETES FILES. upload_in_use() asks every document what
+ * it is pointing at, and the "Stored pictures" sweep -- on ANY screen, not
+ * just this page's -- offers to delete whatever no document claims. A band
+ * missing from here is a band whose badges are reported unused the moment
+ * somebody opens another editor. tools/test_upload.py holds a seat per field.
+ */
+const ABOUT_IMAGE_FIELDS = [
+    'story'          => ['image', 'image_dark'],
+    'accreditations' => ['image'],
+];
+
+/**
  * Every picture the document points at, as web paths, without duplicates.
  *
- * Both halves of every row, whichever layout it uses. A row laid out as the
- * logo lockup still has its picture record counted: the layout can be switched
- * back, and a sweep that deleted the file the moment somebody chose 'logo'
- * would lose it for good.
+ * Both halves of every story row, whichever layout it uses. A row laid out as
+ * the logo lockup still has its picture record counted: the layout can be
+ * switched back, and a sweep that deleted the file the moment somebody chose
+ * 'logo' would lose it for good.
  */
 function about_images(array $data): array
 {
     $seen = [];
 
-    foreach ($data['story']['items'] ?? [] as $row) {
-        foreach (['image', 'image_dark'] as $half) {
-            foreach (contract_image_paths($row[$half] ?? []) as $path) {
-                $seen[$path] = true;
+    foreach (ABOUT_IMAGE_FIELDS as $band => $fields) {
+        foreach ($data[$band]['items'] ?? [] as $row) {
+            foreach ($fields as $field) {
+                foreach (contract_image_paths($row[$field] ?? []) as $path) {
+                    $seen[$path] = true;
+                }
             }
         }
     }

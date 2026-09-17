@@ -204,6 +204,7 @@ def run(client, r, site):
         ("specialities", 'name="specialties[title]"'),
         ("the slideshow timing", 'name="specialties[interval]"'),
         ("why us", 'name="whyus[title]"'),
+        ("accreditations", 'name="accreditations[title]"'),
         ("closing band", 'name="cta[label]"'),
         # NOT a field any more: the meta band is a link to the SEO screen,
         # which edits every page's title and description in one place. What is
@@ -238,9 +239,11 @@ def run(client, r, site):
     r.check("every band the outline names has a fieldset",
             all(f'id="{a}"' in html for a in
                 ("band-hero", "band-story", "band-specialties", "band-whyus",
-                 "band-cta", "band-uploads", "band-meta")))
+                 "band-accreditations", "band-cta", "band-uploads",
+                 "band-meta")))
     r.check("the row buttons are named for their band",
-            'value="story-add:0"' in html and 'value="whyus-add:0"' in html,
+            'value="story-add:0"' in html and 'value="whyus-add:0"' in html
+            and 'value="accreditations-add:0"' in html,
             "admin-forms.js finds a new row by matching this prefix to the field names")
 
     # ------------------------------------------------------------ saving
@@ -452,6 +455,93 @@ def run(client, r, site):
             row["image"]["src"] != "" and row["image_dark"]["src"] == "",
             str([row["image"], row["image_dark"]]))
 
+    # ------------------------------------------------------ accreditations
+    print("\nthe accreditations wall")
+    _, html = client.get(ADMIN)
+    r.check("ships hidden, so it is not on the live page until somebody says so",
+            'value="hidden" selected' in select_named(html, "accreditations[status]"),
+            "a heading over an empty grid is not a section")
+    r.check("and starts with no badges on it",
+            'name="accreditations[items][0][id]"' not in html)
+
+    fields = dict(form_fields(html), csrf=token, do="accreditations-add:0")
+    status, _, body = client.post(ADMIN, fields)
+    r.check("adding a badge re-renders rather than redirecting",
+            status == 200, f"status {status}")
+    r.check("the new row is in the form",
+            'name="accreditations[items][0][name]"' in body)
+    r.check("it arrives hidden like every other new row",
+            'value="hidden" selected' in
+            select_named(body, "accreditations[items][0][status]"))
+    r.check("and it offers the caption switch",
+            'name="accreditations[items][0][caption]"' in body,
+            "the name under the badge is shown or hidden per badge")
+
+    print("\nwhat a badge must have before it can be saved")
+    blank = dict(form_fields(body), csrf=token, do="save")
+    status, _, refused = client.post(ADMIN, blank)
+    r.check("a badge with no name is refused",
+            status == 200 and "Accreditation 1 has no name" in refused,
+            f"status {status}")
+
+    named = dict(form_fields(body), csrf=token, do="save")
+    named["accreditations[items][0][name]"] = "ISO/IEC 27001:2022"
+    status, _, refused = client.post(ADMIN, named)
+    r.check("and one with a name but no badge is refused too",
+            status == 200 and "Accreditation 1 has no picture" in refused,
+            f"status {status}")
+
+    print("\nand what it does once it has both")
+    whole = dict(form_fields(body), csrf=token, do="save")
+    whole["accreditations[status]"] = "shown"
+    whole["accreditations[items][0][name]"] = "ISO/IEC 27001:2022"
+    whole["accreditations[items][0][status]"] = "shown"
+    whole["accreditations[items][0][caption]"] = "shown"
+    whole["accreditations[items][0][image][src]"] = "/uploads/1111111111111111.png"
+    whole["accreditations[items][0][image][webp]"] = ""
+    whole["accreditations[items][0][image][width]"] = "240"
+    whole["accreditations[items][0][image][height]"] = "174"
+    status, _, _ = client.post(ADMIN, whole)
+    r.check("it saves", status == 302, f"status {status}")
+    sent = rows_sent(site, "accreditations")
+    r.check("and reaches the live site", len(sent) == 1, str(len(sent)))
+    r.check("carrying the name that was typed",
+            sent and sent[0]["name"] == "ISO/IEC 27001:2022", str(sent[:1]))
+    r.check("and an id minted from it rather than the placeholder",
+            sent and sent[0]["id"] == "iso-iec-27001-2022", str(sent[:1]))
+    r.check("and the badge it was given",
+            sent and sent[0]["image"]["src"] == "/uploads/1111111111111111.png")
+    r.check("the band is switched on now it has something on it",
+            band_status(site, "accreditations") == "shown",
+            band_status(site, "accreditations"))
+
+    print("\nthe caption is its own switch, not the row's")
+    _, html = client.get(ADMIN)
+    off = dict(form_fields(html), csrf=token, do="save")
+    off["accreditations[items][0][caption]"] = "hidden"
+    client.post(ADMIN, off)
+    sent = rows_sent(site, "accreditations")
+    r.check("hiding the name publishes caption=hidden",
+            sent and sent[0]["caption"] == "hidden", str(sent[:1]))
+    r.check("and leaves the badge itself shown",
+            sent and sent[0]["status"] == "shown", str(sent[:1]))
+    r.check("and does not take the name away",
+            sent and sent[0]["name"] == "ISO/IEC 27001:2022", str(sent[:1]))
+
+    print("\nwhat a badge may point at for a picture")
+    _, html = client.get(ADMIN)
+    for name, sent_src in [
+        ("another origin", "https://evil.example/badge.png"),
+        ("a protocol-relative URL", "//evil.example/badge.png"),
+        ("a path climbing out of the site", "/assets/images/../../../etc/passwd"),
+        ("somewhere that is not artwork", "/lib/contract.php"),
+    ]:
+        fields = dict(form_fields(html), csrf=token, do="save")
+        fields["accreditations[items][0][image][src]"] = sent_src
+        client.post(ADMIN, fields)
+        got = rows_sent(site, "accreditations")[0]["image"]["src"]
+        r.check(f"{name} is refused", got != sent_src, got)
+
     print("\nwhat it refuses to save")
     for case, field, value, expect in [
         ("an empty banner title", "hero[title]", "", "banner title cannot be empty"),
@@ -599,13 +689,13 @@ def run(client, r, site):
     empty = dict(form_fields(html), csrf=token, do="save")
     removed = 0
     for key in list(empty):
-        if re.match(r"(story|specialties|whyus)\[items\]", key):
+        if re.match(r"(story|specialties|whyus|accreditations)\[items\]", key):
             del empty[key]
             removed += 1
     r.check("there were rows in the form to remove", removed > 40, f"{removed} fields")
     status, _, _ = client.post(ADMIN, empty)
     r.check("removing every row is allowed", status == 302, f"status {status}")
-    for band in ("story", "specialties", "whyus"):
+    for band in ("story", "specialties", "whyus", "accreditations"):
         r.check(f"{band} publishes as empty", rows_sent(site, band) == [])
     r.check("and the page's own copy survives, so the live site still has a page",
             published(site)["hero"]["title"] != "", str(published(site)["hero"]))

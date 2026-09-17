@@ -228,6 +228,22 @@ COVERED_ELSEWHERE = {
         "that a section which has been named keeps its fragment when a section "
         "with the same heading is added above it.",
     ),
+    "milestones": (
+        "tools/test_milestones_admin.py" if SIDE in ("backend", "both")
+        else "tools/test_publish.py",
+        "The milestones document is one repeatable list and both halves walk "
+        "it. The editor names its inputs "
+        "\"timeline[items][<?= $i ?>][year]\" and the two pages that render "
+        "it — the milestones page and the company profile's five-year window — "
+        "use foreach over milestones_shown(), so the regexes below read the "
+        "loop variable rather than the fields. A SUBJECTS entry could not be "
+        "made to work anyway: model_fields() reads contact_defaults() and its "
+        "two row fillers by name, so the model half of this check only knows "
+        "how to read one document. Proved by round trip instead — every field "
+        "set through the editor and read back off the wire, add, remove, hide "
+        "and reorder, the year rule, and the read-through from the company "
+        "document firing exactly until the first save.",
+    ),
     "home": (
         "tools/test_home_admin.py" if SIDE in ("backend", "both")
         else "tools/test_publish.py",

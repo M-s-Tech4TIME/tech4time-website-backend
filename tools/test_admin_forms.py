@@ -292,7 +292,20 @@ function vals(sel) {
 return {
   y: Math.round(window.scrollY),
   clients: document.querySelectorAll('input[name^="clients[items]["][name$="[name]"]').length,
-  years: vals('input[name^="milestones[items]["][name$="[year]"]'),
+  /* THE FIGURES, NOT THE MILESTONES. The timeline moved to a screen of its own,
+     so the company form has no milestone rows to drag any more.
+
+     Not just any list will do, which cost a run to learn: the check below wants
+     the scroll position UNCHANGED across a move, and focus lands on the button
+     that moved -- so a list with tall cards carries that button out of the
+     viewport and the page scrolls to it, legitimately, and the check fails on
+     movement it caused itself. The principles are tall enough to do that by
+     584px. The figures are a figure, a label and a status switch, which is the
+     shape the milestone rows had.
+
+     LABELS and not figures, because two of the four figures are both "7+" and
+     an order assertion needs to tell its rows apart. */
+  order: vals('input[name^="experience[items]["][name$="[label]"]'),
   focus: (document.activeElement.getAttribute('value') ||
           document.activeElement.getAttribute('name') || ''),
   marked: window.__stillHere === true
@@ -380,7 +393,8 @@ def run(b: Browser, base: str, r: Results) -> None:
     # there is nothing on the page worth preserving and a new document is the
     # correct answer.
     for screen in ("/?s=overview", "/?s=careers", "/?s=careers&action=new",
-                   "/?s=contact", "/?s=company", "/?s=about", "/?s=home",
+                   "/?s=contact", "/?s=company", "/?s=milestones",
+                   "/?s=about", "/?s=home",
                    "/?s=services", "/?s=services&service=cybersecurity",
                    "/?s=certifications", "/?s=branding", "/?s=privacy",
                    # Every shape the SEO editor takes: the index, a page
@@ -506,7 +520,8 @@ def run(b: Browser, base: str, r: Results) -> None:
                 f"does not serve is a 404 toast for every press")
 
     r.section("every form in the shell asks to be sent this way")
-    for screen in ("/?s=careers", "/?s=contact", "/?s=company", "/?s=about",
+    for screen in ("/?s=careers", "/?s=contact", "/?s=company",
+                   "/?s=milestones", "/?s=about",
                    "/?s=home", "/?s=services",
                    "/?s=services&service=cybersecurity",
                    "/?s=certifications", "/?s=branding", "/?s=privacy",
@@ -623,30 +638,51 @@ def run(b: Browser, base: str, r: Results) -> None:
             f"focus went to {after['focus']!r}")
 
     r.section("moving a row, twice")
+    # One name for the button, used to scroll to it and to press it, so those
+    # two can never drift onto different bands again.
+    MOVE = "experience-down:0"
+    # SCROLLED TO THE BUTTON, not to a pixel. It was a literal 1200, which sat
+    # beside the milestones band until that moved out -- and a button pressed
+    # far below the viewport pulls the page to it when focus lands there, so
+    # "the scroll position is kept" failed on the scroll the test itself caused.
     # base.css sets scroll-behavior: smooth, so this has to be told not to
     # animate — otherwise the read below gets the position it is leaving.
-    b.js("window.scrollTo({top: 1200, behavior: 'instant'});")
+    # THE SAME BUTTON THAT IS ABOUT TO BE PRESSED, at the TOP of the viewport.
+    #
+    # Both halves of that were learned the hard way. It named a different band's
+    # button for one run -- scrolled to the principles at 45291px, pressed the
+    # figures near the top, and the swap moved focus there and the page with it.
+    # And 'center' put the button half a screen down, while the swap's focus
+    # restoration scrolls it to the top: 447px of movement, on a check whose
+    # tolerance is 4px.
+    #
+    # 'start' is where focus is going to leave it anyway, so the two agree and
+    # the check measures the SWAP rather than the difference between two ways
+    # of scrolling. The original passed at a hardcoded 1200px only because the
+    # milestones band's first button happened to sit there.
+    b.js("document.querySelector('button[name=\"do\"][value=\"" + MOVE + "\"]')"
+         ".scrollIntoView({block: 'start', behavior: 'instant'});")
     time.sleep(0.4)
     start = b.js(STATE)
-    b.click('button[name="do"][value="milestones-down:0"]')
+    b.click(f'button[name="do"][value="{MOVE}"]')
     once = b.js(STATE)
 
-    r.check("the row moved", once["years"][:2] == start["years"][:2][::-1],
-            f"{start['years'][:3]} -> {once['years'][:3]}")
+    r.check("the row moved", once["order"][:2] == start["order"][:2][::-1],
+            f"{start['order'][:3]} -> {once['order'][:3]}")
     r.check("the scroll position is kept", abs(once["y"] - start["y"]) <= 4,
             f"was at {start['y']}, now at {once['y']}")
     r.check("focus follows the row that moved",
-            once["focus"] == "milestones-down:1",
+            once["focus"] == "experience-down:1",
             f"focus is on {once['focus']!r}, so a second press would move a "
             f"different row")
 
     # The point of following it: press again without touching the mouse.
-    b.click('button[name="do"][value="milestones-down:1"]')
+    b.click('button[name="do"][value="experience-down:1"]')
     twice = b.js(STATE)
     r.check("pressing again moves the same row again",
-            twice["years"][:3] == [start["years"][1], start["years"][2],
-                                   start["years"][0]],
-            f"{start['years'][:3]} -> {twice['years'][:3]}")
+            twice["order"][:3] == [start["order"][1], start["order"][2],
+                                   start["order"][0]],
+            f"{start['order'][:3]} -> {twice['order'][:3]}")
 
     r.section("removing a row")
     b.click(f'button[name="do"][value="clients-remove:{after["clients"] - 1}"]')
@@ -720,7 +756,8 @@ def navigate(b: Browser, base: str, r: Results) -> None:
 
     r.section("every link on every screen is one the swap will answer")
     for screen in ("/?s=overview", "/?s=careers", "/?s=careers&action=new",
-                   "/?s=contact", "/?s=company", "/?s=about", "/?s=home",
+                   "/?s=contact", "/?s=company", "/?s=milestones",
+                   "/?s=about", "/?s=home",
                    "/?s=services", "/?s=services&service=cybersecurity",
                    "/?s=certifications", "/?s=branding", "/?s=privacy",
                    # Every shape the SEO editor takes: the index, a page
@@ -764,7 +801,8 @@ def navigate(b: Browser, base: str, r: Results) -> None:
 
     r.section("every screen can say what it is doing")
     for screen in ("/?s=overview", "/?s=careers", "/?s=contact",
-                   "/?s=company", "/?s=about", "/?s=home", "/?s=services",
+                   "/?s=company", "/?s=milestones",
+                   "/?s=about", "/?s=home", "/?s=services",
                    "/?s=services&service=cybersecurity",
                    "/?s=certifications", "/?s=branding", "/?s=privacy",
                    # Every shape the SEO editor takes: the index, a page
@@ -890,7 +928,8 @@ def navigate(b: Browser, base: str, r: Results) -> None:
             "reach the browser untouched")
 
     r.section("leaving a screen with something unsaved")
-    YEAR = 'input[name="milestones[items][0][year]"]'
+    # A field on the company form -- which no longer has a milestone row on it.
+    YEAR = 'input[name="experience[items][0][label]"]'
 
     b.go(base + "/?s=careers")
     b.click('.rail__item[href="?s=contact"]')
@@ -1217,10 +1256,19 @@ def improvements(b: Browser, base: str, r: Results) -> None:
     r.check("and the column marks where you are", b.js(marked) == "Technology",
             f"marked {b.js(marked)!r}")
 
+    # WHAT IS ASSERTED IS THAT IT MOVED, not which band it landed on. This named
+    # "Milestones" at 1500px, which was true until that band moved to a screen
+    # of its own -- and then the check failed for a reason that had nothing to
+    # do with the observer it exists to test. A band the company form happens to
+    # have at a given pixel is not the property; following the scroll is.
     b.js("window.scrollTo({top: 1500, behavior: 'instant'});")
     time.sleep(0.5)
-    r.check("the mark follows the scroll", b.js(marked) == "Milestones",
-            f"marked {b.js(marked)!r} at 1500px")
+    moved = b.js(marked)
+    r.check("the mark follows the scroll",
+            moved not in ("Technology", "(none)"),
+            f"marked {moved!r} at 1500px — scrolling away from the band that "
+            f"was clicked has to move the mark off it, and has to leave it on "
+            f"something")
     r.check("exactly one entry is ever marked",
             b.js("return document.querySelectorAll("
                  "'.outline__link[aria-current]').length;") == 1)

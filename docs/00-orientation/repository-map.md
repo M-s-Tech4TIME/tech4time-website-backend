@@ -85,6 +85,7 @@ sections/
 ├── careers.php         the job post editor      → content/careers.json
 ├── contact.php         the contact page editor  → content/contact.json
 ├── company.php         the company profile      → content/company.json
+├── milestones.php      the company timeline     → content/milestones.json
 ├── about.php           the about page editor    → content/about.json
 ├── home.php            the home page editor     → content/home.json
 ├── certifications.php  the certifications page  → content/certifications.json
@@ -183,7 +184,8 @@ Never reachable over HTTP: it is outside the document root.
 | `store.php` | reading and writing a JSON file atomically, with a lock |
 | `careers.php` | validation, and the save that publishes |
 | `contact.php` | the same, plus the flag picker |
-| `company.php` | the same again, for six repeatable lists and their artwork |
+| `company.php` | the same again, for five repeatable lists and their artwork |
+| `milestones.php` | the timeline, and the read-through to the company document until it has been saved once |
 | `about.php` `home.php` `services.php` | likewise, one editable page each — services holds the index and every detail page |
 | `certifications.php` `branding.php` `privacy.php` | likewise |
 | `chrome.php` | the header, footer and dock: what may be edited, and what the footer's rows are compared against |

@@ -194,7 +194,6 @@ def run(client, r, site):
     print("\nevery band of the page is in the form")
     for band, needle in [
         ("banner", 'name="hero[title]"'),
-        ("milestones", 'name="milestones[title]"'),
         ("background", 'name="background[title]"'),
         ("figures", 'name="experience[title]"'),
         ("clients", 'name="clients[title]"'),
@@ -218,7 +217,7 @@ def run(client, r, site):
         r.check(f"the {band} band", needle in html, needle)
 
     print("\nand every row of every list")
-    for band, count in [("milestones", 7), ("experience", 4), ("clients", 9),
+    for band, count in [("experience", 4), ("clients", 9),
                         ("journey", 3), ("technology", 50), ("principles", 4)]:
         n = html.count(f'name="{band}[items][')
         r.check(f"{band}: {count} rows are in the form",
@@ -235,54 +234,82 @@ def run(client, r, site):
 
     saved = dict(good)
     saved["hero[title]"] = "Who We Are"
-    saved["milestones[items][0][year]"] = "2017"
-    saved["milestones[items][0][title]"] = "It began"
+    saved["experience[items][0][label]"] = "Years in business"
     status, _, _ = client.post(ADMIN, saved)
     r.check("saving redirects rather than re-rendering", status == 302, f"status {status}")
 
     doc = published(site)
     r.check("the new banner reaches the live site", doc["hero"]["title"] == "Who We Are",
             str(doc["hero"]))
-    r.check("so does the edited milestone",
-            rows_sent(site, "milestones")[0]["year"] == "2017"
-            and rows_sent(site, "milestones")[0]["title"] == "It began",
-            str(rows_sent(site, "milestones")[0]))
+    r.check("so does the edited figure",
+            rows_sent(site, "experience")[0]["label"] == "Years in business",
+            str(rows_sent(site, "experience")[0]))
     r.check("and nothing else moved",
             len(rows_sent(site, "technology")) == 50)
     r.check("a revision was minted", doc["revision"] >= 1, str(doc.get("revision")))
 
+    # ------------------------------------------------- the band that moved
+    #
+    # THE TIMELINE IS NOT EDITED HERE ANY MORE. It is content/milestones.json
+    # and sections/milestones.php, and lib/milestones.php reads through to the
+    # band still sitting in this document until that one has been saved once.
+    #
+    # Which makes the second check below the important one, and it is the one
+    # this suite exists to keep. Every *_from_post() starts from the stored
+    # document and overwrites each band it NAMES from $_POST. A band nothing
+    # renders but everything still names reads as absent, ?? '' supplies an
+    # empty string, and the band is blanked on every save — silently, because
+    # empty is a valid value and nothing throws. COMPANY_MOVED_BANDS is what
+    # stops that, and nothing else would notice if it were removed: the
+    # milestones editor would go on working, reading a band this form had
+    # quietly emptied.
+    print("\nthe timeline, which this form no longer edits")
+    _, html = client.get(ADMIN)
+    r.check("no milestones fieldset", 'id="band-milestones"' not in html)
+    r.check("no milestones field of any kind", 'name="milestones[' not in html)
+    r.check("and the outline does not offer one", ">Milestones<" not in region(html, "outline"),
+            "a rail entry pointing at a fieldset that is not there is a dead link")
+    r.check("the rail sends you to its own screen instead",
+            "s=milestones" in html)
+
+    held = published(site).get("milestones", {})
+    r.check("a save leaves the deprecated band exactly as it found it",
+            held.get("items") and len(held["items"]) == 7
+            and held.get("title", "") != "",
+            "COMPANY_MOVED_BANDS is what keeps a form that stopped rendering a "
+            "band from posting an empty string over it — " + str(held)[:120])
+
     # ---------------------------------------------------------- add a row
     print("\nadding an entry")
     _, html = client.get(ADMIN)
-    fields = dict(form_fields(html), csrf=token, do="milestones-add:0")
+    fields = dict(form_fields(html), csrf=token, do="experience-add:0")
     status, _, body = client.post(ADMIN, fields)
     r.check("adding re-renders rather than redirecting", status == 200, f"status {status}")
-    r.check("the new row is in the form", body.count('name="milestones[items][') >
-            html.count('name="milestones[items]['))
+    r.check("the new row is in the form", body.count('name="experience[items][') >
+            html.count('name="experience[items]['))
     r.check("it arrives hidden, so a blank card never reaches the site",
-            'name="milestones[items][7][status]"' in body
+            'name="experience[items][4][status]"' in body
             and 'value="hidden" selected' in region(body, "admin-card--hidden"),
             "a row with nothing in it must not be shown by pressing Add")
     r.check("and nothing is published until the page is saved",
-            len(rows_sent(site, "milestones")) == 7,
-            str(len(rows_sent(site, "milestones"))))
+            len(rows_sent(site, "experience")) == 4,
+            str(len(rows_sent(site, "experience"))))
 
     print("\nfilling it in and saving")
     fields = dict(form_fields(body), csrf=token, do="save")
-    fields["milestones[items][7][year]"] = "2025"
-    fields["milestones[items][7][title]"] = "A new thing"
-    fields["milestones[items][7][text]"] = "It happened."
-    fields["milestones[items][7][status]"] = "shown"
+    fields["experience[items][4][figure]"] = "25+"
+    fields["experience[items][4][label]"] = "Countries served"
+    fields["experience[items][4][status]"] = "shown"
     status, _, _ = client.post(ADMIN, fields)
     r.check("it saves", status == 302, f"status {status}")
-    r.check("and reaches the live site", len(rows_sent(site, "milestones")) == 8,
-            str(len(rows_sent(site, "milestones"))))
+    r.check("and reaches the live site", len(rows_sent(site, "experience")) == 5,
+            str(len(rows_sent(site, "experience"))))
     r.check("carrying what was typed",
-            rows_sent(site, "milestones")[7]["title"] == "A new thing",
-            str(rows_sent(site, "milestones")[7]))
+            rows_sent(site, "experience")[4]["label"] == "Countries served",
+            str(rows_sent(site, "experience")[4]))
     r.check("and an id it was given rather than one it chose",
-            rows_sent(site, "milestones")[7]["id"] == "2025-a-new-thing",
-            str(rows_sent(site, "milestones")[7].get("id")))
+            rows_sent(site, "experience")[4]["id"] == "countries-served",
+            str(rows_sent(site, "experience")[4].get("id")))
 
     # ------------------------------------------------------------- hiding
     print("\nhiding, which is not deleting")
@@ -380,7 +407,6 @@ def run(client, r, site):
         ("an empty banner title", "hero[title]", "", "banner title cannot be empty"),
         ("a figure that does not start with a digit", "experience[items][0][figure]",
          "Over 100", "must start with a digit"),
-        ("a year that is not a year", "milestones[items][0][year]", "ages ago", "not a year"),
         ("a client with no name", "clients[items][2][name]", "", "has no name"),
         ("a photograph with no description", "journey[items][0][alt]", "", "no description"),
         ("a javascript: link on the button", "cta[href]", "javascript:alert(1)",
@@ -424,16 +450,20 @@ def run(client, r, site):
     empty = dict(form_fields(html), csrf=token, do="save")
     removed = 0
     for key in list(empty):
-        if re.match(r"(milestones|experience|clients|journey|technology|principles)"
+        if re.match(r"(experience|clients|journey|technology|principles)"
                     r"\[items\]", key):
             del empty[key]
             removed += 1
     r.check("there were rows in the form to remove", removed > 100, f"{removed} fields")
     status, _, _ = client.post(ADMIN, empty)
     r.check("removing every row is allowed", status == 302, f"status {status}")
-    for band in ("milestones", "experience", "clients", "journey",
-                 "technology", "principles"):
+    for band in ("experience", "clients", "journey", "technology", "principles"):
         r.check(f"{band} publishes as empty", rows_sent(site, band) == [])
+    # The timeline is the one list this form cannot empty, because it is the
+    # one list this form does not hold. See COMPANY_MOVED_BANDS.
+    r.check("and the moved band still has its rows",
+            len(rows_sent(site, "milestones")) == 7,
+            str(len(rows_sent(site, "milestones"))))
     r.check("and the page's own copy survives, so the live site still has a page",
             published(site)["hero"]["title"] != "", str(published(site)["hero"]))
 

@@ -207,7 +207,7 @@ def run(r: Results, gd: bool) -> None:
     r.check("a flag never stores a rung no screen can use",
             ladder.get("contact.offices@1600") == [56, 112, 168], str(ladder)[:200])
     r.check("nor does a large logo in a small tile",
-            ladder.get("company.clients@1200") == [250, 500, 750], str(ladder)[:200])
+            ladder.get("company.clients@1200") == [289, 578, 867], str(ladder)[:200])
     r.check("a download does not ladder", ladder.get("branding.file@3000") == [])
     r.check("nor does the share card", ladder.get("seo.share@1200") == [])
     r.check("nothing arrived, nothing stored", ladder.get("about.story@0") == [])
@@ -478,8 +478,14 @@ def run(r: Results, gd: bool) -> None:
             ("about.story",        2000, 1000, "",  1600, [700, 1400, 1600]),
             ("about.story",         900,  600, "",   900, [700, 900]),
             ("about.story",         500,  400, "",   500, []),
-            ("company.technology", 1200,  400, "",   360, [120, 240, 360]),
-            ("company.clients",     300,  300, "",   300, [250, 300]),
+            # 187 and 289, not 120 and 250. Both grids went from auto-fit to
+            # counted columns when the company profile's walls were capped,
+            # and that moved where each picture is widest -- a client tile was
+            # 249px on a 360px phone, where the grid used to drop to ONE
+            # column, and is 289px at 767 now. Re-measured, not adjusted until
+            # this passed: see the docblock on CONTRACT_IMAGE_SLOTS.
+            ("company.technology", 1200,  400, "",   561, [187, 374, 561]),
+            ("company.clients",     300,  300, "",   300, [289, 300]),
             # Portrait, and the point of it: the ladder is cut from the WIDTH,
             # which is what a sizes= attribute is about. Fitting is the longest
             # side; these are not the same number and this is where that shows.

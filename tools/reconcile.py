@@ -134,6 +134,7 @@ require_once 'lib/publish_client.php';
 require_once 'lib/careers.php';
 require_once 'lib/contact.php';
 require_once 'lib/company.php';
+require_once 'lib/milestones.php';
 require_once 'lib/about.php';
 require_once 'lib/home.php';
 require_once 'lib/services.php';
@@ -165,6 +166,7 @@ $models = [
     'careers'        => ['careers_load',        'careers_save'],
     'contact'        => ['contact_load',        'contact_save'],
     'company'        => ['company_load',        'company_save'],
+    'milestones'     => ['milestones_load',     'milestones_save'],
     'about'          => ['about_load',          'about_save'],
     'home'           => ['home_load',           'home_save'],
     'services'       => ['services_load',       'services_save'],

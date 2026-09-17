@@ -159,6 +159,14 @@ jobs:
       # forget. 230 checks that passed on a laptop and were asserted nowhere.
       # A suite absent from here rots and then gets deleted for being broken.
       #
+      # test_milestones_admin.py is beside test_company_admin.py because the
+      # two are one story: the timeline moved out of the company profile into
+      # a document of its own, and until the milestones document has been
+      # saved once lib/milestones.php reads through to the band still sitting
+      # in content/company.json. One suite proves the read-through fires and
+      # then stops; the other proves the company form leaves that deprecated
+      # band alone rather than blanking it. Neither alone would catch it.
+      #
       # test_seo_admin.py makes the one assertion no other suite here can:
       # saving one of the nine page editors leaves that document's meta band
       # exactly as it was. Those forms no longer RENDER the meta fields but
@@ -172,7 +180,8 @@ jobs:
           for s in test_svg test_store test_upload test_qr \
                    test_admin_auth test_publish_client test_reconcile \
                    test_careers_admin test_contact_admin test_company_admin \
-                   test_about_admin test_home_admin test_services_admin \
+                   test_milestones_admin test_about_admin test_home_admin \
+                   test_services_admin \
                    test_certifications_admin test_branding_admin \
                    test_privacy_admin test_seo_admin test_chrome_admin \
                    test_settings_admin; do

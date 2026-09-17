@@ -53,9 +53,9 @@ require_once __DIR__ . '/html.php';
 const CONTRACT_VERSION = 1;
 
 /** Every document that is published, by name. The endpoint refuses any other. */
-const CONTRACT_DOCUMENTS = ['careers', 'contact', 'company', 'about', 'home', 'services',
-                            'certifications', 'branding', 'privacy', 'seo', 'chrome',
-                            'settings'];
+const CONTRACT_DOCUMENTS = ['careers', 'contact', 'company', 'milestones', 'about',
+                            'home', 'services', 'certifications', 'branding',
+                            'privacy', 'seo', 'chrome', 'settings'];
 
 /**
  * Where a document's record lives, on either host.
@@ -889,6 +889,16 @@ function company_defaults(): array
             'title'    => 'Company Profile',
             'subtitle' => 'Milestones, Clients and the Technology We Work With',
         ],
+        /* DEPRECATED, AND DELIBERATELY STILL HERE. The timeline is its own
+           document now -- see section 4 -- and neither the company profile
+           nor the editor reads this band any more. It stays because
+           milestones_load() reads through to it until the milestones
+           document has been saved for the first time, and because removing
+           it would change the meaning of every company.json already written,
+           which is the one thing CONTRACT_VERSION exists to stop.
+
+           Once every host has saved the new screen once, this can go, and
+           the version has to be bumped when it does. */
         'milestones' => [
             'status'  => 'shown',
             'eyebrow' => 'Our Journey',
@@ -1131,8 +1141,17 @@ const CONTRACT_IMAGE_ROOTS = ['/assets/images/', '/uploads/'];
  *   - about.story is widest at 768 (693px), NOT on a desktop. One column up to
  *     768 and two above it, so the last single-column width is the largest the
  *     picture is ever drawn; at 1280 it is 534.
- *   - company.clients is widest at 360 (249px), also not on a desktop. The
- *     grid drops to one column, so a phone draws the biggest logo tile.
+ *   - company.clients and company.technology are BOTH widest at 767 (289px and
+ *     187px), which is neither a phone nor a desktop. Both grids count their
+ *     columns and both step up at 48em, so 767 is the last width before a
+ *     client tile goes from a half of the row to a quarter and a technology
+ *     plate from a third to a sixth. On a 1440 desktop they are 126 and 78.
+ *
+ *     THEY WERE 250 AND 120, AND BOTH WERE MEASURED AGAINST A LAYOUT THAT NO
+ *     LONGER EXISTS. Both grids were auto-fit, which on a 360px phone gave the
+ *     clients wall ONE column and a 249px tile -- the widest anywhere, and the
+ *     reason nine logos were 1,136px tall there. Counted columns fixed the
+ *     length and moved the widest point; re-measuring was not optional.
  *   - about.accreditations is widest at 767 (289px), for about.story's reason
  *     exactly: its grid goes two, three, four columns at 48em and 64em, and
  *     767 is the last width before the three-column breakpoint takes the badge
@@ -1176,13 +1195,25 @@ const CONTRACT_IMAGE_SLOTS = [
                             'sizes' => '(min-width: 415px) 400px, 90vw'],
     'branding.asset'    => ['width' => 360,
                             'sizes' => '(min-width: 415px) 360px, 90vw'],
-    'company.clients'   => ['width' => 250,
-                            'sizes' => '(max-width: 414px) 90vw, 132px'],
+    /* Two columns, four at 48em, six at 64em -- see .clients in
+       assets/css/pages/company-profile.css. Each arm is the tile's CONTENT
+       box: the row less its gaps, divided by the column count, less the
+       card's 1.5rem padding and its hairline on both sides. */
+    'company.clients'   => ['width' => 289,
+                            'sizes' => '(max-width: 47.999em) calc(46vw - 3.625rem),'
+                                     . ' (max-width: 63.999em) calc(25vw - 4.875rem), 126px'],
     'about.accreditations' => ['width' => 289,
                             'sizes' => '(max-width: 47.999em) calc(46vw - 3.5rem),'
                                      . ' (max-width: 63.999em) calc(33.3vw - 5rem), 222px'],
-    'company.technology'=> ['width' => 120,
-                            'sizes' => '(max-width: 414px) 33vw, 80px'],
+    /* Three columns, six at 48em, nine at 64em. THE GRID AND NOT THE SPHERE:
+       above 48em tech-sphere.js draws each mark about 40px, but only when it
+       is running -- with JavaScript off, or under prefers-reduced-motion, the
+       grid is what a visitor gets at every width, and it is the wider of the
+       two. Sizing for the sphere would ship a mark too small to read to
+       exactly the people who cannot see it turn. */
+    'company.technology'=> ['width' => 187,
+                            'sizes' => '(max-width: 47.999em) calc(30.6vw - 2.8rem),'
+                                     . ' (max-width: 63.999em) calc(16.667vw - 3.625rem), 78px'],
     'contact.offices'   => ['width' => 56,  'sizes' => '56px'],
 
     /* The company mark, and the one picture on this site drawn at three
@@ -1813,7 +1844,290 @@ function company_slug(string $name, array $taken = []): string
     return contract_slug($name, COMPANY_ID_PLACEHOLDER, $taken);}
 
 /* ==========================================================================
-   4. About page — the shape of the about page
+   4. Milestones — the full history the company profile links to
+   ========================================================================== */
+
+/*
+   WHY THE TIMELINE IS ITS OWN DOCUMENT AND NOT A BAND OF THE COMPANY PROFILE.
+
+   It was a band, company.milestones, and that band is still here — see the
+   note on it in company_defaults(). What changed is that the company profile
+   now shows a WINDOW onto the history rather than all of it, and the rest of
+   it is a page: /pages/milestones/.
+
+   A page needs a meta band, and a meta band is per DOCUMENT and not per route.
+   seo_route_meta() resolves a route's metadata as
+   contract_normalise($document, $raw)['meta'] — one band, hard-coded — so two
+   routes cannot share a document without sharing a title, which
+   tools/audit_pages.py refuses site-wide. That alone settles it.
+
+   A metadata-only stub would have satisfied that and still been wrong. The
+   sitemap's lastmod comes from seo_document_day($document), so a stub's date
+   would move when somebody edited the page's SEO fields and never when a
+   milestone was added — a date that is honest about the wrong thing. The rows
+   live here so that saving one moves it.
+
+   And it relieves a risk the admin already records: the company profile form
+   posts around 550 fields against a default max_input_vars of 1000, and a
+   truncated POST would look like rows having been removed. Milestones are the
+   band that grows forever. This is the same split sections/services.php made,
+   by a stable structural key rather than by "as many as fit".
+
+   CONTRACT_VERSION IS NOT BUMPED FOR THIS. Nothing is renamed and nothing
+   changes meaning: the document is additive, company.milestones is untouched,
+   and code holding the older version renders both sides correctly. See the
+   rule in the header.
+*/
+
+/* Free-text single-line fields, by band. The timeline's two are the same two
+   COMPANY_TEXT_FIELDS['milestones'] has, so the words move across verbatim. */
+const MILESTONES_TEXT_FIELDS = [
+    'meta'     => CONTRACT_META_TEXT,
+    'hero'     => ['title', 'subtitle'],
+    'timeline' => ['eyebrow', 'title'],
+];
+
+/* Stored as sanitised HTML, so the introduction can carry a link or an
+   emphasis — as COMPANY_RICH_FIELDS['milestones'] already could. */
+const MILESTONES_RICH_FIELDS = [
+    'timeline' => ['lead'],
+];
+
+/** Every band that can be hidden whole, in the order it renders. */
+const MILESTONES_BANDS = ['timeline'];
+
+/** The bands that hold a list, and the function that fills one of its rows. */
+const MILESTONES_LISTS = [
+    'timeline' => 'milestones_entry_defaults',
+];
+
+/** What a row with nothing to name it after is called. */
+const MILESTONES_ID_PLACEHOLDER = 'entry';
+
+/**
+ * How many distinct YEARS the company profile shows before it links here.
+ *
+ * Years and not rows: a year with three entries in it is one year of history,
+ * and cutting it in half to make a row count come out would leave the page
+ * saying less than it means. See milestones_recent().
+ */
+const MILESTONES_WINDOW = 5;
+
+/**
+ * The page as it ships, and the fallback for anything missing from the file.
+ *
+ * The timeline defaults to EMPTY rather than to the seven entries the company
+ * profile holds today. That is not a gap: milestones_load() reads through to
+ * the company document until this one has been saved for the first time, so
+ * the page has a history from the moment the route exists. The default here is
+ * what an emptied timeline looks like, and it is empty.
+ */
+function milestones_defaults(): array
+{
+    return [
+        'updated'  => '',
+        'revision' => 0,
+        'meta' => [
+            'title'       => 'Milestones | Tech4TIME',
+            'description' => 'Every milestone in the story of Tech4TIME, year by '
+                           . 'year: the partnerships, projects and capabilities '
+                           . 'the company has been built on since its first year.',
+            'share_title' => 'Our Milestones, Year by Year',
+            'breadcrumb'  => 'Milestones',
+            'keywords'    => 'Tech4TIME milestones, company history, IT company '
+                           . 'Bangladesh, technology timeline, company journey',
+            'robots'      => 'index',
+            /* A year is added a few times a year at most. Weekly or monthly
+               would be telling a crawler to come back for a page that has not
+               moved since it last did. */
+            'changefreq'  => 'yearly',
+            'priority'    => '0.5',
+            'share'       => ['src' => '', 'webp' => '', 'width' => 0, 'height' => 0],
+            'share_alt'   => '',
+        ],
+        'hero' => [
+            'title'    => 'Milestones',
+            'subtitle' => 'The Full Story, Year by Year',
+        ],
+        'timeline' => [
+            'status'  => 'shown',
+            'eyebrow' => 'Our Journey',
+            'title'   => 'Milestones in Technological Excellence',
+            'lead'    => '',
+            'items'   => [],
+        ],
+    ];
+}
+
+/**
+ * Bring a document to the current shape, whatever it arrived as.
+ *
+ * One level of merge per band, then the list through its row filler — the same
+ * walk company_normalise() makes, over a document with one band in it.
+ */
+function milestones_normalise(array $data): array
+{
+    $defaults = milestones_defaults();
+
+    foreach ($defaults as $key => $value) {
+        if ($key === 'revision') {
+            $data[$key] = max(0, (int)($data[$key] ?? 0));
+            continue;
+        }
+        if (!is_array($value)) {
+            $data[$key] = is_string($data[$key] ?? null) ? $data[$key] : $value;
+            continue;
+        }
+        $data[$key] = is_array($data[$key] ?? null) ? $data[$key] + $value : $value;
+    }
+
+    $data['meta'] = contract_meta_defaults($data['meta'] ?? [], $defaults['meta']);
+
+    foreach (MILESTONES_BANDS as $band) {
+        $data[$band]['status'] =
+            ($data[$band]['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown';
+    }
+
+    foreach (MILESTONES_LISTS as $band => $filler) {
+        $rows = is_array($data[$band]['items'] ?? null) ? $data[$band]['items'] : [];
+        $data[$band]['items'] = array_map(
+            $filler,
+            array_values(array_filter($rows, 'is_array'))
+        );
+    }
+
+    return milestones_identify($data);
+}
+
+/**
+ * One entry.
+ *
+ * THE SAME FIVE FIELDS company_milestone_defaults() has, in the same order and
+ * with the same names, because the rows move from there to here without being
+ * rewritten — milestones_load()'s read-through hands a company row straight to
+ * this function. A field added to one and not the other is a field lost on the
+ * way across.
+ */
+function milestones_entry_defaults(array $row): array
+{
+    return $row + [
+        'id' => '', 'year' => '', 'title' => '', 'text' => '', 'status' => 'shown',
+    ];
+}
+
+/** Give every row an id, unique within its list. See company_identify(). */
+function milestones_identify(array $data): array
+{
+    foreach (MILESTONES_LISTS as $band => $_filler) {
+        $taken = [];
+        foreach ($data[$band]['items'] as $i => $row) {
+            $id   = trim((string)($row['id'] ?? ''));
+            $name = trim(($row['year'] ?? '') . ' ' . ($row['title'] ?? ''));
+
+            $provisional = $id === ''
+                || preg_match('/^' . MILESTONES_ID_PLACEHOLDER . '(-\d+)?$/', $id) === 1;
+
+            if (($provisional && $name !== '') || in_array($id, $taken, true)) {
+                $id = milestones_slug($name, $taken);
+            } elseif ($id === '') {
+                $id = milestones_slug('', $taken);
+            }
+
+            $data[$band]['items'][$i]['id'] = $id;
+            $taken[] = $id;
+        }
+    }
+
+    return $data;
+}
+
+/** Only the rows of a list a visitor should see. */
+function milestones_shown(array $data, string $band): array
+{
+    return array_values(array_filter(
+        $data[$band]['items'] ?? [],
+        static fn(array $row): bool => ($row['status'] ?? 'shown') !== 'hidden'
+    ));
+}
+
+/** Whether a band of the page is shown at all. */
+function milestones_band_shown(array $data, string $band): bool
+{
+    return contract_band_shown($data, $band);}
+
+/**
+ * The most recent MILESTONES_WINDOW years of a list of entries.
+ *
+ * WHAT MAKES THIS AWKWARD IS THAT 'year' IS FREE TEXT. The editor asks for
+ * 2024 or 2024–2025 and refuses anything else, but this is the contract and
+ * the contract sees hand-edited files too — so the rule cannot be "parse it as
+ * an integer" without deciding what happens to the rows that do not.
+ *
+ * The rule is: a row whose year starts with four digits is placed in that
+ * year, the highest MILESTONES_WINDOW of those years are the window, and A ROW
+ * WHOSE YEAR CANNOT BE READ IS ALWAYS KEPT. Dropping a row nobody can sort is
+ * worse than showing one extra — the page is a summary, not a count.
+ *
+ * Order is preserved exactly. This filters; it never sorts. The editor decides
+ * which way down the page the timeline runs, and the alternating left/right of
+ * the rail is :nth-child, so reordering here would move entries across the
+ * page as well as down it.
+ */
+function milestones_recent(array $rows, int $years = MILESTONES_WINDOW): array
+{
+    $seen = [];
+    foreach ($rows as $row) {
+        $year = milestones_year($row);
+        if ($year !== null) {
+            $seen[$year] = true;
+        }
+    }
+
+    if (count($seen) <= $years) {
+        return array_values($rows);
+    }
+
+    $keep = array_slice(array_reverse(array_keys($seen)), 0, max(0, $years));
+
+    return array_values(array_filter($rows, static function (array $row) use ($keep): bool {
+        $year = milestones_year($row);
+        return $year === null || in_array($year, $keep, true);
+    }));
+}
+
+/**
+ * The year an entry belongs to, or null when nothing in it can be read as one.
+ *
+ * The FIRST four-digit run, so "2024–2025" is placed in 2024 and stays with
+ * the rest of that year rather than being pulled a year forward. Its own
+ * label still reads 2024–2025: this reads the row, it does not rewrite it.
+ */
+function milestones_year(array $row): ?int
+{
+    return preg_match('/\d{4}/', (string)($row['year'] ?? ''), $found) === 1
+        ? (int)$found[0]
+        : null;
+}
+
+/** Whether a list holds more than the company profile's window shows. */
+function milestones_withheld(array $rows): bool
+{
+    return count(milestones_recent($rows)) < count($rows);
+}
+
+/* THERE IS NO milestones_images(). An entry is a year, a heading and a
+   sentence: the one picture this document can point at is the meta band's
+   share-card override, and contract_images() supplies that itself for every
+   document. Said here rather than left to be wondered about, because an
+   unclaimed upload is one another screen's sweep offers to delete. */
+
+/** A URL-safe id from a name, unique against the ids already in use. */
+function milestones_slug(string $name, array $taken = []): string
+{
+    return contract_slug($name, MILESTONES_ID_PLACEHOLDER, $taken);}
+
+/* ==========================================================================
+   5. About page — the shape of the about page
    ========================================================================== */
 
 /**
@@ -2232,7 +2546,7 @@ function about_slug(string $name, array $taken = []): string
     return contract_slug($name, ABOUT_ID_PLACEHOLDER, $taken);}
 
 /* ==========================================================================
-   5. Home page — the shape of the home page
+   6. Home page — the shape of the home page
    ========================================================================== */
 
 /**
@@ -2701,7 +3015,7 @@ function home_slug(string $name, array $taken = []): string
     return contract_slug($name, HOME_ID_PLACEHOLDER, $taken);}
 
 /* ==========================================================================
-   6. Services — the shape of the services index AND its detail pages
+   7. Services — the shape of the services index AND its detail pages
    ========================================================================== */
 
 /**
@@ -3503,7 +3817,7 @@ function services_by_id(array $data, string $id): ?array
 }
 
 /* ==========================================================================
-   7. Resource certifications — the shape of the certifications page
+   8. Resource certifications — the shape of the certifications page
    ========================================================================== */
 
 /**
@@ -3978,7 +4292,7 @@ function certifications_fill(string $text, array $counts): string
 }
 
 /* ==========================================================================
-   8. Branding & advertisement — the shape of the branding page
+   9. Branding & advertisement — the shape of the branding page
    ========================================================================== */
 
 /**
@@ -4466,7 +4780,7 @@ function branding_download_label(array $file): string
 }
 
 /* ==========================================================================
-   9. Privacy policy — the shape of a legal document
+   10. Privacy policy — the shape of a legal document
    ========================================================================== */
 
 /**
@@ -5163,7 +5477,7 @@ function privacy_shared_facts(array $privacy, array $contact): array
 }
 
 /* ==========================================================================
-   10. SEO — the site-wide half, and the map of what a page is
+   11. SEO — the site-wide half, and the map of what a page is
    ========================================================================== */
 
 /*
@@ -5218,6 +5532,7 @@ const SEO_ROUTES = [
     'services'       => ['/pages/services/',                   'Services',                'services'],
     'about'          => ['/pages/about/',                      'About Us',                'about'],
     'company'        => ['/pages/company-profile/',            'Company Profile',         'company'],
+    'milestones'     => ['/pages/milestones/',                 'Milestones',              'milestones'],
     'careers'        => ['/pages/careers/',                    'Careers',                 'careers'],
     'contact'        => ['/pages/contact/',                    'Contact',                 'contact'],
     'certifications' => ['/pages/resource-certifications/',    'Resource Certifications', 'certifications'],
@@ -5655,7 +5970,7 @@ function seo_images(array $data): array
 }
 
 /* ==========================================================================
-   11. Chrome — the shape of the header, footer and dock
+   12. Chrome — the shape of the header, footer and dock
    ========================================================================== */
 
 /*
@@ -6307,7 +6622,7 @@ function chrome_row_name(string $band, array $row): string
 /**
  * Every destination a chrome link may point at, in nav order.
  *
- * The nine routes that resolve to an address, then every service -- so a
+ * The ten routes that resolve to an address, then every service -- so a
  * service added this morning is in the picker this afternoon, and the footer's
  * services column is built from the same enumeration that offers it.
  *
@@ -6513,7 +6828,7 @@ function chrome_drift_key(string $kind, string $value): string
 }
 
 /* ==========================================================================
-   12. Settings — the identity: the mark, the icons, the colours, the address
+   13. Settings — the identity: the mark, the icons, the colours, the address
    ========================================================================== */
 
 /*
@@ -7246,7 +7561,7 @@ function settings_images(array $data): array
 }
 
 /* ==========================================================================
-   13. Revisions
+   14. Revisions
    ========================================================================== */
 
 /**
@@ -7269,7 +7584,7 @@ function contract_next_revision(array $data): int
 }
 
 /* ==========================================================================
-   14. Normalising and re-sanitising on receipt
+   15. Normalising and re-sanitising on receipt
    ========================================================================== */
 
 /**
@@ -7293,6 +7608,7 @@ function contract_normalise(string $document, array $data): array
         'careers'  => careers_normalise($data),
         'contact'  => contact_normalise($data),
         'company'  => company_normalise($data),
+        'milestones' => milestones_normalise($data),
         'about'    => about_normalise($data),
         'home'     => home_normalise($data),
         'services' => services_normalise($data),
@@ -7339,7 +7655,9 @@ function contract_images(string $document, array $data): array
         'branding' => array_values(array_unique([...branding_images($data), ...$meta])),
         'services' => array_values(array_unique([...services_images($data), ...$meta])),
         'contact'  => array_values(array_unique([...contact_images($data), ...$meta])),
-        'careers', 'certifications', 'privacy' => $meta,
+        /* An entry on the timeline is a year, a heading and a sentence, so
+           the share-card override is the only picture this one has. */
+        'careers', 'certifications', 'privacy', 'milestones' => $meta,
         'seo'      => seo_images($data),
         /* No meta band: the chrome is not a page and has no <head> of its own.
            Its pictures are the two logo lockups, srcsets included. */
@@ -7359,8 +7677,8 @@ function contract_images(string $document, array $data): array
  * signature proves where something came from and not what is inside it. If the
  * backend is ever compromised, the public site should still not render script.
  *
- * Driven off CAREERS_RICH_FIELDS, CONTACT_RICH_FIELDS, COMPANY_RICH_FIELDS and
- * ABOUT_ROW_RICH_FIELDS rather than a list of
+ * Driven off CAREERS_RICH_FIELDS, CONTACT_RICH_FIELDS, COMPANY_RICH_FIELDS,
+ * MILESTONES_RICH_FIELDS and ABOUT_ROW_RICH_FIELDS rather than a list of
  * its own, so a rich field added to the contract is sanitised on receipt by
  * having been added — not by somebody also remembering to add it here. That is
  * the whole reason this lives in the contract and not in the endpoint.
@@ -7392,6 +7710,19 @@ function contract_sanitise(string $document, array $data): array
 
     if ($document === 'company') {
         foreach (COMPANY_RICH_FIELDS as $section => $fields) {
+            foreach ($fields as $field) {
+                $data[$section][$field] =
+                    rt_sanitise_html((string)($data[$section][$field] ?? ''));
+            }
+        }
+        return $data;
+    }
+
+    /* The same walk as the company profile's, over the one band that holds
+       markup. It is the company's 'milestones' lead, moved -- so it has to be
+       re-sanitised on receipt for the reason it always did. */
+    if ($document === 'milestones') {
+        foreach (MILESTONES_RICH_FIELDS as $section => $fields) {
             foreach ($fields as $field) {
                 $data[$section][$field] =
                     rt_sanitise_html((string)($data[$section][$field] ?? ''));

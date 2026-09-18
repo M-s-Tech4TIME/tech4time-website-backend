@@ -45,6 +45,10 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v7
+      # build_deploy_set.py lints every shipped .php file, and a syntax lint is
+      # exactly where a version difference shows -- so this job needs the host's
+      # PHP as much as the test jobs do.
+      - uses: ./.github/actions/php
 
       - name: build the upload set
         run: |

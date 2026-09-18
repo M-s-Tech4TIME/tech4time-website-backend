@@ -255,10 +255,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($screen === 'page') {
         $meta = seo_meta_from_post($page['meta'], $page['key'] === 'notfound');
 
+        /* The 404 has no share card of its own: it is served at every address
+           that does not exist, so there is no one link to it to preview. Its
+           screen draws no control for one either. */
+        if ($page['key'] !== 'notfound') {
+            $meta = seo_take_page_upload($meta, $errors);
+        }
+
+        /* THE WHOLE ROW, NOT JUST ITS META. A clash has to be reported by the
+           name a person would recognise, and the name is on the row. Passing
+           the meta alone left seo_validate_meta() with nothing but the key to
+           fall back on, so a clash with a service page read "already used by
+           service:cybersecurity" -- a record identifier, in a sentence written
+           for whoever is typing the title. */
         $others = [];
         foreach ($pages as $key => $row) {
             if ($key !== $page['key']) {
-                $others[$key] = $row['meta'];
+                $others[$key] = $row;
             }
         }
 
@@ -306,6 +319,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pending = $applied[1] ?? '';
         }
     }
+}
+
+/**
+ * The share card attached to ONE page, stored and sent on.
+ *
+ * The same slot as the site-wide card — seo.share, 1200x630, no ladder — for
+ * the same reason: a scraper wants one picture at one size and implements no
+ * srcset. What differs is where it lands: this one goes in the page's own meta
+ * band, so seo_share() prefers it over the site's.
+ *
+ * Nothing here can CLEAR a card, and that matches the identity screen exactly:
+ * an upload replaces, and the stored value carries forward otherwise. Worth
+ * knowing rather than discovering.
+ */
+function seo_take_page_upload(array $meta, array &$errors): array
+{
+    foreach (admin_uploaded_files() as [$band, $_index, $file]) {
+        if ($band !== 'share') {
+            continue;
+        }
+
+        $stored = upload_accept($file, 'seo.share');
+        if (isset($stored['error'])) {
+            $errors[] = 'The share card: ' . $stored['error'];
+            continue;
+        }
+
+        $sent = admin_send_picture($stored);
+        if ($sent !== '') {
+            $errors[] = 'The share card: ' . $sent;
+            continue;
+        }
+
+        $meta['share'] = contract_image_defaults($stored);
+    }
+
+    return $meta;
 }
 
 /**
@@ -562,7 +612,13 @@ if ($screen === 'page') {
     }
     ?>
 
+<?php /* multipart, because this screen accepts a file now. It did not, and that
+         was the whole of why meta.share could never be set: the field was in
+         every document, seo_share() read it, share_alt was offered beside it
+         with the hint "Only used when this page has a share card of its own" —
+         and there was no control anywhere that could give a page one. */ ?>
 <form class="admin__form" id="seo-page-form" method="post" data-async
+      enctype="multipart/form-data"
       action="<?= h(admin_url('seo', ['page' => $page['key']])) ?>">
   <?= admin_form_fields('seo') ?>
 
@@ -603,10 +659,24 @@ if ($screen === 'page') {
       <?php seo_text_field('meta[share_title]', 'Title on a shared link',
           (string)$meta['share_title'],
           'Empty means use the browser tab title.', true); ?>
+    </div>
 
-      <?php seo_text_field('meta[share_alt]', 'Description of the share picture',
-          (string)($meta['share_alt'] ?? ''),
-          'Only used when this page has a share card of its own.', true); ?>
+    <div class="admin-card">
+      <div class="admin-card__head">
+        <span class="admin-card__preview">
+          <strong>This page's own share card</strong>
+          <span class="admin-card__value">Leave it empty and the site-wide card is used, which is what every page did until now</span>
+        </span>
+      </div>
+      <?php admin_image_fields('meta[share]', 'upload[share][0]',
+          (array)($meta['share'] ?? []), 'share card',
+          'No card of its own — this page uses the site-wide one.'); ?>
+      <div class="admin__grid">
+        <?php seo_text_field('meta[share_alt]', 'Description of the share picture',
+            (string)($meta['share_alt'] ?? ''),
+            'Read aloud where the picture cannot be seen. Used only when this '
+            . 'page has a card of its own.', true); ?>
+      </div>
     </div>
   </fieldset>
 

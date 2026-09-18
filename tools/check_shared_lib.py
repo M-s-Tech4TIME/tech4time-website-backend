@@ -81,6 +81,18 @@ SHARED = {
     "publish.php":  ["lib/publish.php"],
     "svg.php":      ["lib/svg.php"],
     "sprite.svg":   ["assets/icons/sprite.svg", "public/assets/icons/sprite.svg"],
+    # THE THREE THAT WERE ALREADY IDENTICAL AND UNDECLARED. Each had been
+    # byte-identical in both halves since the split with nothing saying so, and
+    # the asymmetry was sharp: check_shared_repos.py compares every same-named
+    # TOOL, so tools/test_store.py was held together while lib/store.php, the
+    # file it tests, was free to drift. store.php is how every document is read
+    # and written atomically; throttle.php is generic -- every limit is passed
+    # in by the caller, so the contact form and the sign-in share one
+    # implementation and no policy; base.css is the reset and the tokens both
+    # halves are drawn on.
+    "store.php":    ["lib/store.php"],
+    "throttle.php": ["lib/throttle.php"],
+    "base.css":     ["assets/css/base.css", "public/assets/css/base.css"],
 }
 
 

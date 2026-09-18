@@ -115,6 +115,14 @@ jobs:
           P error_log
           P /.user.ini
           P /php.ini
+          # cPanel's Directory Privacy, which docs/20-deployment/admin-activation.md
+          # step 1 tells you to switch on AFTER the first deploy. The frontend's
+          # list has always carried this and this one did not -- an asymmetry
+          # between two files that are read as a pair, on the half that is the one
+          # actually documented to use the feature. Protecting a path the panel may
+          # keep outside the web root costs nothing; deleting one it does not would
+          # take the lock off mid-activation.
+          P .htpasswd
           RULES
           cat /tmp/protect.rules
 
@@ -150,7 +158,7 @@ jobs:
           # where pictures are AUTHORED. The public site holds a replica that a
           # reconcile can rebuild; these are the originals, and they are in no
           # repository.
-          if grep -E '^\*deleting[[:space:]]+(content/|public/uploads/|\.well-known/|public/\.well-known/|cgi-bin/|([^[:space:]]*/)?error_log|\.user\.ini|php\.ini)' /tmp/plan.txt; then
+          if grep -E '^\*deleting[[:space:]]+(content/|public/uploads/|\.well-known/|public/\.well-known/|cgi-bin/|([^[:space:]]*/)?error_log|\.user\.ini|php\.ini|([^[:space:]]*/)?\.htpasswd)' /tmp/plan.txt; then
             echo "::error::The deploy proposed deleting something the host owns. Refusing."
             echo "content/ here is the SYSTEM OF RECORD — every job post and contact"
             echo "detail the client has written. The public site holds a replica of it."

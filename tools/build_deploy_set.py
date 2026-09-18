@@ -93,26 +93,23 @@ DENY = [
 # the block on lib/ and content/ with it and leaving a site that looks fine.
 REQUIRED = [
     "public/.htaccess",              # headers, and the blanket noindex
-    "public/index.php",
-    "public/login.php",
-    "public/setup.php",
     "public/assets/css/admin.css",
     "public/assets/icons/sprite.svg",   # read from disk and inlined by lib/admin.php
-    # The scripts, named one by one rather than left to the walk over public/.
-    # Every one of them is an ENHANCEMENT, so the admin still works with any of
-    # them missing — which is exactly why nothing would fail if a deploy
-    # dropped one. Losing admin-swap.js puts every link back to a full page
-    # load and reports success.
-    "public/assets/js/theme-init.js",
-    "public/assets/js/theme-toggle.js",
-    "public/assets/js/admin-nav.js",
-    "public/assets/js/editor.js",
-    "public/assets/js/admin-outline.js",
-    "public/assets/js/admin-swap.js",
-    "public/assets/js/admin-toast.js",
-    "public/assets/js/admin-dialog.js",
-    "public/assets/js/admin-forms.js",
-    "public/assets/js/admin-init.js",
+    # NO public/*.php AND NO public/assets/js/* ENTRIES HERE ANY MORE, for the
+    # reason sections/ has none: both lists went silently incomplete. The
+    # scripts were named one by one and admin-password.js — the one that draws
+    # every show/hide switch on every password field, the thing
+    # check_password_fields.py exists to guarantee — was never added, so a
+    # deploy could drop it and all twelve switches would quietly do nothing.
+    # The entry points named index, login and setup and not forgot, reset or
+    # logout, so the whole password-reset path could go missing and the set
+    # would still report complete. Both are asked of the directory further
+    # down, which cannot fall behind.
+    #
+    # Every script is an ENHANCEMENT, so the admin still works with any of them
+    # missing — which is exactly why nothing would fail if a deploy dropped
+    # one. Losing admin-swap.js puts every link back to a full page load and
+    # reports success.
     "lib/private.php",
     "lib/auth.php",
     "lib/contract.php",              # the shape both halves agree on
@@ -293,8 +290,18 @@ def check(paths: list[str], out_dir: Path) -> tuple[int, int]:
         rel = php.relative_to(ROOT).as_posix()
         assert_(f"{rel} is in the upload set", rel in paths)
 
-    for php in sorted((ROOT / "admin").rglob("*.php")):
+    # EVERY ENTRY POINT AND EVERY SCRIPT, asked of the directory for the reason
+    # the libraries and the screens are. There is no admin/ walk here any more:
+    # one used to sit at this spot, over a directory that stopped existing when
+    # the backend moved to its own host (ADR 0018). It iterated zero times,
+    # asserted nothing, and raised no error — three lines that read as coverage
+    # between two loops that are.
+    for php in sorted((ROOT / "public").glob("*.php")):
         rel = php.relative_to(ROOT).as_posix()
+        assert_(f"{rel} is in the upload set", rel in paths)
+
+    for js in sorted((ROOT / "public" / "assets" / "js").glob("*.js")):
+        rel = js.relative_to(ROOT).as_posix()
         assert_(f"{rel} is in the upload set", rel in paths)
 
     # AND EVERY SCREEN, for the reason the libraries are asked for rather than

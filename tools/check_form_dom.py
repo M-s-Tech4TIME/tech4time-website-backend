@@ -212,6 +212,25 @@ def main() -> int:
         )
         return 1
 
+    # A FLOOR, BECAUSE AN EMPTY SCAN PASSES EVERYTHING. Every finding above is
+    # made about a read this run actually saw; a run that reads no scripts, or
+    # harvests no control names from any markup, makes no findings and then
+    # prints that no script reads a shadowed property off a form. That sentence
+    # is true of a repository with no scripts in it, and it is what this check
+    # would say if js_files() or markup_files() stopped matching -- a rename, a
+    # moved directory, a suffix. Both halves have scripts and both have forms,
+    # so finding neither is a broken scan and not a clean bill of health.
+    if not js_files() or not markup_files():
+        print("\n  FAIL  this check proved nothing.")
+        print(f"        {len(js_files())} script(s) and "
+              f"{len(markup_files())} markup file(s) were scanned.")
+        print("        A form property cannot be shadowed in a repository this "
+              "check cannot see.")
+        print("        Finding nothing to read means the scan lost the code, "
+              "not that the code")
+        print("        is safe. Fix js_files() / markup_files().")
+        return 1
+
     print(f"check_form_dom: no script reads a shadowed property off a form "
           f"({len(harmless)} safe reads, {len(loaded)} loaded names)")
     return 0

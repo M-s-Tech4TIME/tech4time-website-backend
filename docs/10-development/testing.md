@@ -11,23 +11,28 @@ non-zero on failure, and prints what failed rather than that something did.
 
 ## Before every commit
 
-Fast, no browser needed. Run all seven.
+Fast, no browser needed. **Twelve of them, and this is the list `.github/workflows/test.yml`
+runs** — the two agree on purpose, so a green commit here is a green run there.
 
 ```bash
 python3 tools/check_contrast.py        # WCAG AA in both colour modes
-python3 tools/inject_icons.py --check  # every page's inlined icon block is current
-python3 tools/check_shared_markup.py   # no page's copied markup has drifted  (frontend)
+python3 tools/check_css.py             # every var() declared, no hex outside the tokens
+python3 tools/check_icons.py           # every icon name resolves to a symbol in the sprite
 python3 tools/check_content_model.py   # model, form and renderer still agree
 python3 tools/check_secrets.py         # nothing secret committed; no protection removed
 python3 tools/check_docs.py            # the docs still describe the code
-python3 tools/audit_pages.py           # SEO, accessibility, structure, internal links
 python3 tools/build_deploy_set.py --check   # nothing secret or local is bound for the server
-python3 tools/check_shared_lib.py
+python3 tools/check_shared_lib.py      # the eight files both halves hold byte-identical
 python3 tools/check_shared_facts.py    # the offices, email and phone the policy repeats from the contact page
-python3 tools/check_shared_repos.py      # the four files both halves hold identically
+python3 tools/check_shared_repos.py    # the tools both halves hold identically, and the ones allowed to differ
 python3 tools/check_form_dom.py        # no script reads a property a form's own control hides
 python3 tools/check_password_fields.py # every password field has a show/hide switch
 ```
+
+**`inject_icons.py`, `audit_pages.py` and `check_shared_markup.py` are not in this repository.**
+This list named the first two for several releases and they have never existed here — running the
+block as written failed on a missing file rather than on a finding. They went with the pages they
+were written for; see the note below.
 
 > **Half the suite is in the other repository.** The public site's pages, its markup auditors, its
 > icon injection and the browser crawls over it went with the pages they were written for. Neither

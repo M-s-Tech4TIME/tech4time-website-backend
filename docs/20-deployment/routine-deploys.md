@@ -14,11 +14,13 @@ Pushing an update to an editor that is already live, without destroying anything
 
 ## The one rule
 
-> **The host's `content/` is the real data. Yours is test data.**
+> **The host's `content/` and `public/uploads/` are the real data. Yours is test data.**
 
-Job posts and contact details are written by people using this editor. They are not in your working
-copy. A deploy that includes `content/` destroys them, and the loss is silent — the admin keeps
-working, showing older content, until somebody notices their job post is gone.
+Job posts and contact details are written by people using this editor, and the pictures behind them
+are uploaded through it. Neither is in your working copy. A deploy that includes `content/` destroys
+the words; one that deletes `public/uploads/` destroys every picture ever accepted. Both losses are
+silent — the admin keeps working, showing older content, until somebody notices their job post is
+gone or a badge has turned into a broken image.
 
 That is doubly true here: this repository holds the **system of record**. The public site's copy is
 a replica it can be sent again; this one cannot be recovered from anywhere but a backup.
@@ -32,12 +34,17 @@ a replica it can be sent again; this one cannot be recovered from anywhere but a
 ```
 UPLOAD                            NEVER UPLOAD
   public/    ← the document root    content/          ← live data, system of record
-  lib/                              tools/            ← scripts, incl. admin-cli.php
-  sections/                         docs/
-                                    .git/
+  lib/                              public/uploads/   ← live pictures
+  sections/                         tools/            ← scripts, incl. admin-cli.php
+                                    docs/
+                                    .git/   .claude/
                                     *.md   *.py   *.key
                                     admins.json   setup-token.txt
 ```
+
+`public/uploads/` is inside a directory that *is* uploaded, which is what makes it the easy one to
+get wrong: `build_deploy_set.py` leaves it out of the set, and the protect list is what stops
+`--delete` removing the host's copy.
 
 **`lib/` and `sections/` go up, but not inside `public/`.** They sit beside it, outside the document
 root, which is the whole of how they are protected — [0018](../90-decisions/0018-the-backend-serves-from-a-subdirectory.md).
@@ -153,25 +160,51 @@ A push to `main` does all of this through `.github/workflows/deploy.yml`, with a
 gate that reads a dry run before anything is written — [ci-cd.md](ci-cd.md). Reach for the commands
 below only when that is broken or unavailable.
 
+**Type the protect list first, before either `rsync`.** `_deploy/site/` holds no `content/` and no
+`public/uploads/`, so a bare `--delete` into the live directory removes both — and `content/` here is
+the **system of record**, which is not a replica anybody can send again. These are the same rules
+`deploy.yml` merges; they are written out because this path has no pipeline to carry them.
+
 ```bash
 python3 tools/build_deploy_set.py --check     # what would go, and what must not
 python3 tools/build_deploy_set.py --out _deploy
 
-# ALWAYS dry-run first, and read the output for "deleting content/"
-rsync -avz --delete --dry-run _deploy/site/ user@tech4time.bd:~/admin.tech4time.bd/
+cat > /tmp/protect.rules <<'RULES'
+P /content/
+P /public/uploads/
+P /.well-known/
+P /public/.well-known/
+P /cgi-bin/
+P error_log
+P /.user.ini
+P /php.ini
+P .htpasswd
+RULES
 
-rsync -avz --delete _deploy/site/ user@tech4time.bd:~/admin.tech4time.bd/
+# ALWAYS dry-run first. Read every "deleting" line, not just content/.
+rsync -avz --delete --dry-run --filter='merge /tmp/protect.rules' \
+  _deploy/site/ user@tech4time.bd:~/admin.tech4time.bd/
+
+rsync -avz --delete --filter='merge /tmp/protect.rules' \
+  _deploy/site/ user@tech4time.bd:~/admin.tech4time.bd/
 rsync -av --ignore-existing _deploy/seed/ user@tech4time.bd:~/admin.tech4time.bd/content/
 ```
 
 The SSH host is still `tech4time.bd` — both halves share one cPanel account. **The directory is what
 differs, and it is the whole safety property.** `~/public_html/` is the public site.
 
-That second `rsync` is the content rule: `--ignore-existing` creates what is absent and overwrites
+`.well-known` is protected in both places on purpose: the subdomain's document root moved one level
+in, to `public/`, and which of the two AutoSSL writes to next depends on when it last read the
+configuration. Deleting a live ACME challenge fails a renewal months later with nothing to connect it
+to. `public/.htaccess` is deliberately **not** protected — this repository ships it, and a copy
+written by cPanel's Directory Privacy is a setting to switch off before deploying rather than a file
+to keep.
+
+That last `rsync` is the content rule: `--ignore-existing` creates what is absent and overwrites
 nothing, so a job post on the host always wins.
 
-These carry **none** of the pipeline's safeguards: no gate, and the protect list is whatever you
-remember to type. Then run the verification by hand:
+These still carry **none** of the pipeline's other safeguards — there is no gate reading the dry run
+back, so you are the gate. Then run the verification by hand:
 
 ```bash
 python3 tools/verify_live.py https://admin.tech4time.bd

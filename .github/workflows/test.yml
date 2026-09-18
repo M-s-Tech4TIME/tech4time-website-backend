@@ -49,44 +49,74 @@ jobs:
           python3 -V
           php -v | head -1
 
-      - run: python3 tools/check_contrast.py
-      - run: python3 tools/check_css.py
-      - run: python3 tools/check_content_model.py
-      - run: python3 tools/check_secrets.py
-      - run: python3 tools/check_docs.py
+      # EVERY CHECK, THEN A VERDICT — not one step per check, which stops at the
+      # first failure and hides the eleven behind it. The server and browser
+      # jobs below are already shaped this way; so, now, is the frontend's whole
+      # workflow. It was not when the comment further down claimed it was.
+      - name: static checks
+        run: |
+          set -uo pipefail
+          failed=""
+          run () {
+            name="$1"; shift
+            echo "::group::$name"
+            if python3 "tools/$name.py" "$@"; then
+              echo "-- $name passed"
+            else
+              echo "-- $name FAILED"
+              failed="$failed $name"
+            fi
+            echo "::endgroup::"
+          }
 
-      # An icon name the sprite does not carry paints NOTHING, with no error and
-      # no console line, so a blank box ships and reads as a design choice. That
-      # is how the admin's Settings row and its Overview tile were empty for a
-      # release: ADMIN_SECTIONS named 'cog' and the sprite had only 'cogs'.
-      - run: python3 tools/check_icons.py
-      - run: python3 tools/build_deploy_set.py --check
-      # The four files both repositories hold identically -- including the icon
-      # sprite, because CONTACT_ICONS is in the contract and an icon this side
-      # offers must be one the other side can draw. Hygiene, not a guarantee:
-      # the guarantee is CONTRACT_VERSION, checked at run time by the endpoint
-      # this half posts to.
-      - run: python3 tools/check_shared_lib.py
-      # A fact stated in two documents at once -- the offices, the email and the
-      # telephone are authored in BOTH the privacy policy and the contact page,
-      # on purpose. This asks whether they still agree. It can only see the
-      # committed seed: content edited in the admin never passes through git.
-      - run: python3 tools/check_shared_facts.py
-      - run: python3 tools/check_form_dom.py
+          run check_contrast
+          run check_css
+          run check_content_model
+          run check_secrets
+          run check_docs
 
-      # A password field with no show/hide switch beside it looks exactly
-      # like a password field that never had one: no error, no blank box,
-      # nothing in the console. Twelve of them across four files, three of
-      # which are pages a person meets once and never returns to. A hand
-      # count missed the seventh on the account screen while this was
-      # being planned, which is the whole argument for the check.
-      - run: python3 tools/check_password_fields.py
+          # An icon name the sprite does not carry paints NOTHING, with no error
+          # and no console line, so a blank box ships and reads as a design
+          # choice. That is how the admin's Settings row and its Overview tile
+          # were empty for a release: ADMIN_SECTIONS named 'cog' and the sprite
+          # had only 'cogs'.
+          run check_icons
+          run build_deploy_set --check
 
-      # And the thing the line above structurally cannot see: whether the OTHER
-      # half still holds the same bytes. A per-repo digest passes happily while
-      # the two sanitisers differ. This clones the sibling and compares them.
-      # It is the only place that check happens anywhere.
-      - run: python3 tools/check_shared_repos.py --clone
+          # The eight files both repositories hold identically -- including the
+          # icon sprite, because CONTACT_ICONS is in the contract and an icon
+          # this side offers must be one the other side can draw. Hygiene, not a
+          # guarantee: the guarantee is CONTRACT_VERSION, checked at run time by
+          # the endpoint this half posts to.
+          run check_shared_lib
+
+          # A fact stated in two documents at once -- the offices, the email and
+          # the telephone are authored in BOTH the privacy policy and the
+          # contact page, on purpose. This asks whether they still agree. It can
+          # only see the committed seed: content edited in the admin never
+          # passes through git.
+          run check_shared_facts
+          run check_form_dom
+
+          # A password field with no show/hide switch beside it looks exactly
+          # like a password field that never had one: no error, no blank box,
+          # nothing in the console. Twelve of them across four files, three of
+          # which are pages a person meets once and never returns to. A hand
+          # count missed the seventh on the account screen while this was being
+          # planned, which is the whole argument for the check.
+          run check_password_fields
+
+          # And the thing the line above structurally cannot see: whether the
+          # OTHER half still holds the same bytes. A per-repo digest passes
+          # happily while the two sanitisers differ. This clones the sibling and
+          # compares them. It is the only place that check happens anywhere.
+          run check_shared_repos --clone
+
+          if [ -n "$failed" ]; then
+            echo "::error::failing checks:$failed"
+            exit 1
+          fi
+          echo "all twelve static checks passed"
 
   server:
     name: php

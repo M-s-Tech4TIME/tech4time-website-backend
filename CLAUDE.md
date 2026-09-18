@@ -30,9 +30,12 @@ its record before acting.
 5. **Never commit anything from the private store** (`t4t-private-admin/`, `*.key`, `admins.json`).
 6. **`content/` is the system of record.** Never overwrite it on a live server; the deploy seeds it
    with `--ignore-existing` and never syncs it.
-7. **`lib/html.php`, `lib/contract.php`, `lib/publish.php`, `lib/svg.php` and the icon sprite
-   are byte-identical** with `tech4time-website-frontend`. Change one and you change both, in
-   the same breath, and bump `CONTRACT_VERSION` if the *shape* of a document changed.
+7. **Eight files are byte-identical** with `tech4time-website-frontend`: `lib/html.php`,
+   `lib/contract.php`, `lib/publish.php`, `lib/svg.php`, `lib/store.php`, `lib/throttle.php`,
+   `public/assets/icons/sprite.svg` and `public/assets/css/base.css`. Change one and you change
+   both, in the same breath, and bump `CONTRACT_VERSION` if the *shape* of a document changed.
+   **The list is `SHARED` in `tools/check_shared_lib.py`, not this sentence** — this one had been
+   short of the real set, so read the map rather than the prose.
 8. **Every save publishes.** The publish lives inside `careers_save()`, `contact_save()` and
    `company_save()`, not at the call sites — the careers editor alone has six of those.
 9. **`tools/` is never deployed.**
@@ -129,10 +132,15 @@ python3 tools/check_secrets.py         python3 tools/check_docs.py
 python3 tools/build_deploy_set.py --check
 python3 tools/check_icons.py
 python3 tools/check_shared_lib.py
+python3 tools/check_shared_facts.py
 python3 tools/check_shared_repos.py
 python3 tools/check_form_dom.py
 python3 tools/check_password_fields.py
 ```
+
+**These twelve are exactly what `.github/workflows/test.yml`'s `static` job runs**, and
+[testing.md](docs/10-development/testing.md) lists the same twelve. Three lists, one set — so a
+green commit here is a green run there.
 
 Touched the admin, auth or an editor? Also `test_admin_auth.py`, `test_careers_admin.py`,
 `test_contact_admin.py`, `test_company_admin.py`, `test_milestones_admin.py`,
@@ -181,9 +189,12 @@ proves all of it is still only an enhancement. Same browser requirements.
 
 Touched CSS, an admin screen or anything a keyboard reaches? Also
 `python3 tools/check_admin_a11y.py` — the focus ring, 320px, dark mode and hover across all
-twenty-six screens, signed in. Same Firefox and geckodriver, same clean-up.
+twenty-seven screens, signed in. Same Firefox and geckodriver, same clean-up. **A new rail entry
+does not add itself to that list** — `?s=milestones` shipped and went unvisited until a sweep
+found it.
 
-Touched `lib/contract.php`, `lib/publish.php`, `lib/html.php` or the sprite? Also
+Touched any of the eight files `SHARED` names in `tools/check_shared_lib.py` — `contract.php`,
+`publish.php`, `html.php`, `svg.php`, `store.php`, `throttle.php`, the sprite or `base.css`? Also
 **`check_shared_lib.py --update`, and copy the changed file and the manifest to the frontend.**
 
 [docs/10-development/testing.md](docs/10-development/testing.md)

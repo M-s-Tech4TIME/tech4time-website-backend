@@ -1,0 +1,73 @@
+name: PHP as the host runs it
+description: >
+  Install the PHP version the live host runs, with the extensions it has, and
+  refuse to continue if either is wrong.
+
+# WHY THIS EXISTS
+# ubuntu-24.04 ships PHP 8.3 and the host runs 8.2.33, so until this was added
+# NOTHING ANYWHERE ran the version production runs -- docs/40-reference/host-facts.md
+# records "Developed against 8.3 / On the host 8.2.33", and that is the whole of
+# it: local was 8.3, CI was 8.3, only the server was 8.2. Anything 8.3 accepts
+# and 8.2 does not would have passed every check and failed on the day.
+#
+# WHY A COMPOSITE ACTION AND NOT THE STEPS INLINE
+# Every job in this workflow runs PHP -- the checks shell out to it to read
+# constants, the suites drive a real server, the browser jobs start one. That is
+# three or four copies per repository of the same eight lines, and the fourth
+# copy is the one that gets forgotten and quietly tests 8.3.
+#
+# WHY NOT shivammathur/setup-php
+# It would be the first non-GitHub action in either repository. Both routes
+# install from the same place -- Ondrej Sury's PPA -- so the upstream trust is
+# identical, and this keeps the dependency surface exactly as it was.
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        # The runner image usually carries the PPA already; adding it costs
+        # thirty seconds and a network round trip, so it is only done when the
+        # package cannot be found without it.
+        if ! apt-cache show php8.2-cli >/dev/null 2>&1; then
+          sudo add-apt-repository -y ppa:ondrej/php
+          sudo apt-get update -qq
+        fi
+
+        # gd   re-encodes every uploaded picture -- the thing that makes an
+        #      upload safe is that it DECODES and RE-ENCODES rather than
+        #      inspecting and approving, and without gd the cases proving that
+        #      skip in the one place a regression would be caught.
+        # xml  gives DOMDocument, which lib/svg.php is built on. Without a
+        #      parser it refuses every vector file, which would make
+        #      tools/test_svg.py pass for the wrong reason.
+        # curl is what lib/publish_client.php sends a document with.
+        #
+        # NOT mbstring, deliberately. This code does not use mb_* anywhere --
+        # lib/html.php, lib/seo.php and lib/admin.php each say so where they
+        # chose strlen over mb_strlen -- and the tests have always run without
+        # it. Installing it here would retire that property silently: the code
+        # would be free to start depending on mbstring and nothing would notice.
+        sudo apt-get install -y -qq \
+          php8.2-cli php8.2-gd php8.2-xml php8.2-curl
+
+        sudo update-alternatives --set php /usr/bin/php8.2
+        php -v | head -1
+
+        # ASSERTED, NOT ASSUMED. A silent fallback to 8.3 would leave every job
+        # green and testing the wrong runtime, which is the state this action
+        # exists to end.
+        got=$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')
+        if [ "$got" != "8.2" ]; then
+          echo "::error::php is $got, and the host runs 8.2 — this is the only"
+          echo "place either repository meets the version production runs."
+          exit 1
+        fi
+
+        for ext in gd dom curl; do
+          php -r "exit(extension_loaded('$ext') ? 0 : 1);" \
+            || { echo "::error::php8.2-$ext did not load"; exit 1; }
+        done
+        echo "PHP $got with gd, dom and curl — as the host has it."

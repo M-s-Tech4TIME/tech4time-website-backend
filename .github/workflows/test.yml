@@ -39,6 +39,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+      - uses: ./.github/actions/php
 
       # Printed, not asserted. The host runs PHP 8.2.33 and the runner will
       # drift ahead of it; that is worth seeing in the log rather than
@@ -92,6 +93,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+      - uses: ./.github/actions/php
 
       # These drive a real PHP server and a real sign-in, served from public/
       # exactly as the host serves it, with the private store beside the
@@ -103,34 +105,6 @@ jobs:
       # would check the two halves against each other rather than against the
       # format they both implement.
       - run: php -v | head -1
-
-      # The host has GD; ubuntu-24.04's php-cli does not. lib/upload.php is the
-      # only code in either repository that takes a file from somebody's
-      # computer and puts it on a web server, and the thing that makes it safe
-      # is that it DECODES and RE-ENCODES rather than inspecting and approving.
-      # Without GD, tools/test_upload.py skips exactly the cases that prove it —
-      # so it is installed here rather than left to skip in the one place a
-      # regression would be caught.
-      - name: php-gd, so the uploader is actually tested
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq php-gd
-          php -r 'exit(extension_loaded("gd") ? 0 : 1);' \
-            || { echo "php-gd did not load"; exit 1; }
-
-      # The hosts have ext-dom; ubuntu-24.04's php-cli does not. lib/svg.php is
-      # the security boundary for every vector file this site publishes — it is
-      # what turns "an SVG is a document that can carry script" into something
-      # that can be served at all — and without a parser it refuses everything,
-      # which would make tools/test_svg.py pass for the wrong reason. Installed
-      # here rather than left to skip in the one place a regression would be
-      # caught. Same bargain as php-gd.
-      - name: php-xml, so the SVG sanitiser is actually tested
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq php-xml
-          php -r 'exit(class_exists("DOMDocument") ? 0 : 1);' \
-            || { echo "php-xml did not load"; exit 1; }
 
       # tools/test_qr.py proves lib/qr.php by encoding the same string with a
       # DIFFERENT implementation and comparing the modules -- which is the whole
@@ -226,6 +200,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+      - uses: ./.github/actions/php
 
       # The uploader decodes and re-encodes every picture, so without GD this
       # job would skip the only part of itself that matters. Same bargain as
@@ -244,6 +219,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+      - uses: ./.github/actions/php
 
       # From Mozilla's tarball rather than apt. On Ubuntu 24.04 `apt install
       # firefox` is a transitional package that pulls the snap, which does not

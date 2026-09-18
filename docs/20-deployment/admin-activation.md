@@ -27,16 +27,31 @@ Two things close it, and using both costs nothing:
 
 ## The order
 
-### 1. Deploy with Directory Privacy on
+### 1. Deploy, and only then switch Directory Privacy on
 
-If cPanel Directory Privacy is already protecting `/admin`, **leave it on**. If it is not, switch it
-on now: cPanel → Directory Privacy → `the backend's document root` → set a user and password.
+**In that order, and this page said the opposite until 2026-09-18.** It read *"Deploy with Directory
+Privacy on"*, which cannot work on this host: cPanel writes Directory Privacy's rules into the
+`.htaccess` of the directory it protects, that directory is the backend's document root, and **this
+repository ships `public/.htaccess` on every deploy**. So the deploy overwrites cPanel's file and
+removes the password — silently, and in the middle of the one window this page exists to close. The
+reasoning is in section 4 of `public/.htaccess`, which has always said to switch it off before the
+next deploy; the two documents disagreed and this one was wrong.
 
-It is no longer required — the application is the lock — but there is no reason to remove it before
-the replacement is proven.
+So: **deploy first.** Then, if you want the extra lock for the minutes before the first account
+exists, cPanel → Directory Privacy → the backend's document root → set a user and password. Switch
+it **off again before the next deploy**, because the next deploy will remove it whether or not you
+remember.
+
+There is **no `/admin` directory on this host** — that was the monolith's layout, and the frontend's
+`admin/` is the case ADR 0016 is about. What you protect here is the subdomain's document root,
+`public/`.
 
 > Directory Privacy protects **directories, not files**. There is no way to point it at `setup.php`
-> alone; protecting `/admin` is the way to express it.
+> alone; protecting the document root is the way to express it.
+>
+> **The setup key does not depend on any of this.** It is created and destroyed by the code, it
+> survives a deploy, and it is what actually closes the window. Directory Privacy is the second
+> lock, and it is the one that can quietly fall off.
 
 ### 2. Read the setup key off the server
 
@@ -114,7 +129,7 @@ Keep the old Directory Privacy credentials until step 6 has passed once.
 ## The checklist
 
 ```
-[ ] Deployed with Directory Privacy ON
+[ ] Deployed FIRST, then Directory Privacy switched on (a deploy removes it)
 [ ] Setup key read from ~/t4t-private-admin/setup-token.txt
 [ ] Account created; setup key auto-deleted
 [ ] Authenticator paired and proven

@@ -18,8 +18,10 @@ __pycache__/
 .venv/
 venv/
 
-# Screenshots from tools/shoot_pages.py — a look-at-it aid, regenerated on
-# demand and large. The script is tracked; its output is not.
+# Screenshots. tools/shoot_pages.py is the FRONTEND's tool and does not exist
+# in this repository — this rule arrived with the split and describes a script
+# that is not here. Kept because tools/preview.py writes here too, and an
+# accidental commit of a directory of PNGs is worth one line to prevent.
 tools/shots/
 
 # Runtime artefacts from the job post editor. careers.json itself IS tracked
@@ -47,6 +49,12 @@ t4t-private-admin/
 .dev-private/
 *.key
 setup-token.txt
+# The password hashes, by name as well as by directory. CLAUDE.md rule 5 names
+# it, tools/build_deploy_set.py denies it and tools/check_secrets.py asserts it
+# -- and it was in no .gitignore in either half, so a stray copy anywhere
+# outside the private store had nothing standing between it and a commit. Both
+# repositories carry this line now.
+admins.json
 
 # The upload set, assembled by tools/build_deploy_set.py on demand.
 _deploy/

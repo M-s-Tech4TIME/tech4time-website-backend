@@ -100,10 +100,10 @@ parallel:
 
 | Job | What runs | Needs |
 |---|---|---|
-| `checks` | the seven static checks, plus `build_deploy_set.py --check` | python, php |
+| `checks` | the **twelve** static checks, then a verdict — `build_deploy_set.py --check` is one of them, not an extra | python, php |
 | `php` | every suite that drives a real PHP server and a real sign-in, then a verdict | php, php-gd, php-xml, qrencode |
 | `both halves` | `test_end_to_end.py --clone` — this repository against the frontend, nothing stubbed | php, php-gd, network |
-| `firefox` | the eight browser suites, all of them, then a verdict | firefox, geckodriver, Pillow |
+| `firefox` | **both** browser suites — `test_editor.py` and `test_admin_forms.py` — then a verdict, then `check_admin_a11y.py` over twenty-seven signed-in screens in a step of its own | firefox, geckodriver, Pillow |
 
 ### A suite on disk and not on that list is a suite that does not exist
 
@@ -131,22 +131,26 @@ It is deliberately the **same list** as the pre-commit set in
 of checks, so that "it passed on my machine" and "it is safe to put on the server" stop being two
 different claims.
 
-### All eight suites run before the job reports
+### Both suites run before the job reports
 
 The `firefox` job runs the browser suites in **one step**, collects the failures and reports at the
 end, rather than giving each suite a step of its own.
 
-A step per suite stops at the first failure, and that hid more than it looked like it would:
-`test_motion.py` failed on its third check, so `test_editor.py`, `check_hover.py`,
-`check_dark_mode.py`, `check_responsive.py` and `check_focus.py` — five suites, most of the
-coverage — had **never executed in CI at all**. Fixing them would have meant one three-minute round
-trip per suite to discover the next problem.
+A step per suite stops at the first failure, and that hid more than it looked like it would. **This
+was learned in the monolith, before the split**, where the same job held the public site's browser
+suites too: `test_motion.py` failed on its third check, so `test_editor.py`, `check_hover.py`,
+`check_dark_mode.py`, `check_responsive.py` and `check_focus.py` — five suites, most of the coverage
+— had **never executed in CI at all**. Fixing them would have meant one three-minute round trip per
+suite to discover the next problem. Four of those five went to
+`tech4time-website-frontend` with the pages they were written for; the shape they taught stayed
+here, and every job in both workflows is built this way now.
 
 ### The silent-pass trap, and the guard against it
 
 Every browser suite calls `shutil.which("firefox")` and, finding nothing, prints a notice and
 **exits 0**. That is right on a laptop without geckodriver installed. It is wrong in CI, where a
-failed install would turn eight suites into eight green ticks that proved nothing.
+failed install would turn this whole job — two suites and a twenty-seven-screen accessibility crawl
+— into green ticks that proved nothing.
 
 So the workflow requires `php`, `firefox` and `geckodriver` to be on `PATH` in a step of its own,
 before any suite runs. Note the exact name: `firefox-esr` from apt installs a binary called

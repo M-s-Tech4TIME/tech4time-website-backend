@@ -125,10 +125,23 @@ def footer_notice(drift: list | None) -> None:
 
 
 def main() -> int:
+    # BOTH DOCUMENTS ARE COMMITTED, so a missing one is a broken tree and not
+    # a reason to pass. This returned 0 and said "nothing to compare", which is
+    # the same sentence a clean run would never print and the same exit code it
+    # would. The two files this reads are the two whose agreement is the entire
+    # point of the check: without them there is no comparison, and no
+    # comparison is not agreement.
     for name in ("privacy", "contact"):
         if not (ROOT / "content" / f"{name}.json").is_file():
-            print(f"content/{name}.json is missing — nothing to compare.")
-            return 0
+            print(f"  FAIL  content/{name}.json is missing, so nothing was "
+                  f"compared.")
+            print(f"        This check exists to prove the privacy policy and "
+                  f"the contact page still")
+            print(f"        state the same offices, emails and numbers. It "
+                  f"cannot prove that with one")
+            print(f"        of them absent. Restore it: "
+                  f"git checkout -- content/{name}.json")
+            return 1
 
     run = subprocess.run(["php", "-r", PHP], cwd=ROOT, capture_output=True, text=True)
     if run.returncode != 0:
@@ -138,9 +151,22 @@ def main() -> int:
     payload = json.loads(run.stdout)
     facts = payload["facts"]
     if not facts:
-        print("The contact document states no facts the policy repeats.")
+        # An empty set is agreed with by everything. A privacy policy names the
+        # company somebody's data goes to -- an address, an email, a number --
+        # so there is always something here to repeat. Finding none means the
+        # contact document was emptied or the extraction stopped matching, and
+        # either way the policy is now stating details nobody manages.
+        print("  FAIL  the contact document states no facts at all, so this "
+              "check compared nothing.")
+        print("        Every fact the privacy policy repeats is sourced from "
+              "content/contact.json.")
+        print("        An empty set agrees with any policy, including a wrong "
+              "one. Either the")
+        print("        contact document lost its offices, emails and numbers, "
+              "or the extraction in")
+        print("        PHP above no longer finds them.")
         footer_notice(payload["footer"])
-        return 0
+        return 1
 
     missing = []
     for fact in facts:

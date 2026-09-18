@@ -120,8 +120,29 @@ def main() -> int:
             elif verbose:
                 print(f"  ok    {where}:{line}  #{ident}")
 
+    scanned = len(php_files())
     print(f"\ncheck_password_fields: {found} password field(s) "
-          f"in {len(php_files())} file(s)")
+          f"in {scanned} file(s)")
+
+    # A FLOOR, BECAUSE ZERO PASSES EVERYTHING. Every assertion in this file is
+    # made about fields the scan found, so a scan that finds none makes no
+    # assertions and then prints that every password field carries a switch --
+    # which is true, vacuously, and reads exactly like the real thing. The ways
+    # it could happen are ordinary: TREES renamed, the directory moved, the
+    # pattern edited. This panel has password fields; a run that cannot see any
+    # has lost track of the code, not proved it safe.
+    if not scanned or not found:
+        print("\n  FAIL  this check proved nothing.")
+        print(f"        {scanned} PHP file(s) scanned, {found} password "
+              f"field(s) found.")
+        print("        There ARE password fields in this panel — sign-in, "
+              "setup, reset and the")
+        print("        account screen. Finding none means the scan is looking "
+              "in the wrong place")
+        print("        (see TREES) or the pattern no longer matches, not that "
+              "there is nothing")
+        print("        to check. Fix the scan.")
+        return 1
 
     if problems:
         print(f"\n{len(problems)} password field(s) would ship without a "

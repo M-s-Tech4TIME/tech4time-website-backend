@@ -1,8 +1,9 @@
 # Tech4TIME — backend
 
 The editor behind **`admin.tech4time.bd`**: its own sign-in — argon2id, an authenticator app, a
-lockout and an audit log — and the content of record for the two pages of the public website that
-change without a redeploy.
+lockout and an audit log — and the content of record for **every page of the public website**. All
+seventeen of them render from documents kept here, so a correction anywhere on the site is a save on
+this host rather than a redeploy of the other one.
 
 **No framework, bundler or build step.** The files here are the files that run on the server.
 
@@ -60,7 +61,8 @@ public/                   ← THE DOCUMENT ROOT. Everything a browser may ask fo
 └── assets/                 css, js, fonts, the icon sprite, flags
 
 lib/                      ← outside it. The sign-in, the contract, the publish client
-sections/                 ← outside it. The four editors
+sections/                 ← outside it. Fifteen screens: ten page editors, three
+                            site-wide (chrome, seo, settings), the dashboard and the account
 content/                  ← outside it. THE SYSTEM OF RECORD
 tools/                    build, audit and test scripts — never deployed
 docs/                     the documentation
@@ -112,6 +114,8 @@ Standing the host up: [docs/20-deployment/admin-activation.md](docs/20-deploymen
 
 ## Status
 
-Two of the public site's sixteen pages are editable here. The four accessibility crawlers in the
-frontend never covered the admin, before the split or after it; adapting them to its signed-in
-screens is outstanding.
+**All seventeen of the public site's pages are editable here** — their copy, their pictures, their
+metadata, the header and footer around them, and the colour tokens — as are `robots.txt`, the
+sitemap's hints and the web manifest. The admin's own screens are crawled by
+`tools/check_admin_a11y.py`, which signs in and walks **twenty-seven** of them; the frontend's
+accessibility crawlers still cover only the public site, which is what they are for.

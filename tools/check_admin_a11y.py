@@ -101,6 +101,13 @@ MAX_TABS = 60
 PUBLIC_SCREENS = ["/login.php", "/forgot.php", "/reset.php"]
 
 SIGNED_IN_SCREENS = ["/", "/?s=home", "/?s=careers", "/?s=contact", "/?s=company",
+                     # The timeline's own screen, which moved out of ?s=company
+                     # when the milestones document was split off. It was the
+                     # one section in ADMIN_PAGE_SECTIONS this crawl did not
+                     # visit: a new rail entry does not add itself here, so the
+                     # newest editor was the only one whose focus ring, 320px
+                     # reflow and dark mode nothing had ever measured.
+                     "/?s=milestones",
                      "/?s=about", "/?s=services", "/?s=certifications",
                      "/?s=branding", "/?s=privacy",
                      # Both services screens, because they are different pages

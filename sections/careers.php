@@ -174,10 +174,21 @@ $fieldLabels = [
     'offers'           => ['What We Offer', 'Use the bulleted list button for the points.'],
 ];
 
+/* Two screens, not one with a filter: the list of posts, and one post being
+   written. Only the list has bands to point at — a post's own form is a single
+   run of fields — so the outline is the list's and the editor gets none, which
+   is what it had before. */
+$outline = $editing === null
+    ? ['band-posts'    => 'The job posts',
+       'band-settings' => 'Speculative applications',
+       'band-meta'     => 'Search and sharing']
+    : [];
+
 admin_head('careers', $user,
     'Editing <code>content/careers.json</code>. Changes go live on '
     . '<a href="' . h(public_url('/pages/careers/')) . '">the careers page</a> '
-    . 'within a second — as soon as the live site accepts the publish.');
+    . 'within a second — as soon as the live site accepts the publish.',
+    $outline);
 
 admin_notices($errors);
 ?>
@@ -303,7 +314,7 @@ admin_notices($errors);
       </p>
     <?php endif; ?>
 
-    <ul class="admin__list">
+    <ul class="admin__list" id="band-posts">
       <?php foreach ($data['jobs'] as $index => $job): ?>
         <li class="admin-row">
           <div class="admin-row__main">
@@ -361,7 +372,7 @@ admin_notices($errors);
     </ul>
 
     <!-- =========================== settings =========================== -->
-    <form class="admin__settings" data-async method="post" action="<?= h(admin_url('careers')) ?>">
+    <form class="admin__settings" id="band-settings" data-async method="post" action="<?= h(admin_url('careers')) ?>">
       <?= admin_form_fields('careers') ?>
       <input type="hidden" name="action" value="settings">
 
@@ -380,6 +391,16 @@ admin_notices($errors);
       <div class="admin__actions">
         <button class="btn btn--secondary" type="submit">Save link</button>
       </div>
+
+      <?php /* THE ONE EDITOR THAT HAD NO WAY TO ITS OWN SEO SCREEN. Ten of the
+               eleven carry this band; careers did not, so the careers page's
+               browser tab title and search description were editable at
+               ?s=seo&page=careers and reachable from nowhere in the editor that
+               owns the page. lib/contract.php records the older half of the
+               same story under "THE CAREERS PAGE WAS THE ONE PAGE NOBODY COULD
+               RETITLE". It sits after the Save button because that button saves
+               the CV link and nothing here — this is a link out, not a field. */ ?>
+      <?php admin_meta_band('careers'); ?>
     </form>
 <?php endif; ?>
 

@@ -343,14 +343,25 @@ function seo_validate_meta(string $page, array $meta, array $others): array
         if ($key === $page) {
             continue;
         }
-        $name = SEO_ROUTES[$key][1] ?? $key;
 
-        if ($title !== '' && strcasecmp($title, trim((string)($other['title'] ?? ''))) === 0) {
+        /* THE NAME THE ROW CARRIES, not SEO_ROUTES'. A service page's key is
+           "service:cybersecurity" and it is in no SEO_ROUTES entry -- that is
+           the point of services, which are rows rather than routes -- so the
+           fallback fired for exactly the pages a person is most likely to
+           clash with, and named them by their record id. seo_pages() puts the
+           real name on every row, the 404 included. */
+        $name = (string)($other['name'] ?? '');
+        if ($name === '') {
+            $name = SEO_ROUTES[$key][1] ?? $key;
+        }
+        $meta = $other['meta'] ?? $other;
+
+        if ($title !== '' && strcasecmp($title, trim((string)($meta['title'] ?? ''))) === 0) {
             $errors[] = 'That browser tab title is already used by ' . $name
                       . '. Two pages with one title compete for the same result.';
         }
         if ($description !== ''
-            && strcasecmp($description, trim((string)($other['description'] ?? ''))) === 0) {
+            && strcasecmp($description, trim((string)($meta['description'] ?? ''))) === 0) {
             $errors[] = 'That search description is already used by ' . $name . '.';
         }
     }

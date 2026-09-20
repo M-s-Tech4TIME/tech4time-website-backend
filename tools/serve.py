@@ -7,6 +7,12 @@ Development tool. NOT deployed to the web server (see tools/README.md).
     python3 tools/serve.py            # http://localhost:8001
     python3 tools/serve.py 8080       # a different port
 
+It listens on all interfaces (0.0.0.0), so the admin is also reachable at
+this machine's LAN address -- e.g. from a phone on the same Wi-Fi, or from
+outside a virtual machine over a bridged network. This is a development
+server for trusted local networks only: never expose it to the internet,
+and it is never deployed (see tools/README.md).
+
 Requires the PHP CLI:  sudo apt install php-cli
 
 IT SERVES public/, NOT THE REPOSITORY
@@ -24,8 +30,10 @@ The accounts, sessions and audit log go in ../t4t-private-admin — beside this
 repository, never inside it, the same shape as /home/USER/t4t-private-admin on
 the server. Delete that directory to start over.
 
-It binds to localhost only, but it is still a real sign-in on a real port: do
-not run it on a public interface.
+It binds all interfaces on a trusted local network only, but it is still a
+real sign-in on a real port: do not run it where anyone untrusted can reach
+it. The sign-in, the lockout and the audit log all run exactly as on
+the host.
 
 PUBLISHING NEEDS THE OTHER HALF
 Every save pushes to the public site. With nothing to push to, the editor says
@@ -68,10 +76,21 @@ PAGES = [
 def port_is_free(port: int) -> bool:
     with socket.socket() as s:
         try:
-            s.bind(("127.0.0.1", port))
+            s.bind(("0.0.0.0", port))
             return True
         except OSError:
             return False
+
+
+def lan_ip() -> str | None:
+    """This machine's LAN address, without sending any traffic. None when
+    there is no route out -- localhost still works then."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        try:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+        except OSError:
+            return None
 
 
 def main() -> None:
@@ -92,6 +111,10 @@ def main() -> None:
     print(f"\n  Serving {DOCROOT}\n  (lib/, sections/ and content/ are OUTSIDE it, as on the host)\n")
     for label, path in PAGES:
         print(f"    {label.ljust(width)}   {base}{path}")
+    lan = lan_ip()
+    if lan and not lan.startswith("127."):
+        print(f"\n  On this machine's network (phones, VMs over bridge):"
+              f" {base.replace('localhost', lan)}/")
     private = ROOT.parent / "t4t-private-admin"
     first_run = not (private / "admins.json").is_file()
 
@@ -112,7 +135,7 @@ def main() -> None:
     )
 
     proc = subprocess.Popen(
-        ["php", "-S", f"localhost:{port}", "-t", str(DOCROOT), str(ROUTER)],
+        ["php", "-S", f"0.0.0.0:{port}", "-t", str(DOCROOT), str(ROUTER)],
         start_new_session=True,
     )
 

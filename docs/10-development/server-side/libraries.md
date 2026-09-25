@@ -25,6 +25,7 @@ store they read from is outside the document root entirely.
 | [`branding.php`](#brandingphp) | what this side does with the branding page | `contract`, `store` |
 | [`privacy.php`](#privacyphp) | what this side does with the privacy policy | `contract`, `store`, `contact` |
 | [`svg.php`](#svgphp) **shared** | what a publishable vector file is | — |
+| [`markdown.php`](#markdownphp) **shared** | the legal-Markdown renderer | `html` |
 | [`home.php`](#homephp) | what this side does with the home page | `contract`, `store` |
 | [`services.php`](#servicesphp) | what this side does with the services document | `contract`, `store`, `publish_client` |
 | [`seo.php`](#seophp) | what every page says about itself in its `<head>` — read from ten documents, written to whichever one owns the field | `contract`, `store`, `services`, `publish_client` |
@@ -534,6 +535,20 @@ independently.
 
 **It needs `ext-dom`**, which the live hosts have and Ubuntu's `php-cli` does not. `svg_problem()`
 says so plainly and the byte-level refusals still hold without it; CI installs `php-xml`.
+
+### `markdown.php`
+
+**Shared — byte-identical in both repositories.**
+
+`md_render()` · `md_inline()` · `md_safe_href()`
+
+The legal documents as Markdown, rendered to HTML: strict CommonMark core plus `++underline++`,
+`:::note` / `:::center` containers, and strict GFM tables. Raw HTML in the source is escaped,
+never passed through, and every emitted tag is one `rt_sanitise_html()` already approves — the
+full frozen dialect is `tech4time-website-frontend/plans/legal-markdown-syntax.md`, and ADR 0025
+records why one shared renderer exists instead of two. The backend previews with it, the
+frontend renders with it; `tools/test_markdown.py` asserts byte-identical output from both
+copies, because a digest proves the files match, not that they are right.
 
 ### `upload.php`
 

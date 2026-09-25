@@ -27,7 +27,8 @@ So the two are complements, not rivals. Keep both:
 WHAT IT COMPARES
 
     The shared runtime files    html.php, contract.php, publish.php, svg.php,
-                                store.php, throttle.php, sprite.svg, base.css
+                                markdown.php, store.php, throttle.php,
+                                sprite.svg, base.css
                                 -- read from check_shared_lib.py's own SHARED
                                 map, so this file cannot fall behind that one.
                                 COUNT THEM THERE, NOT HERE: this line said

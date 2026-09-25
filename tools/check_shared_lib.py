@@ -38,6 +38,13 @@ WHAT IS SHARED, AND WHY EACH ONE IS
                       which nothing else here would notice, because both
                       halves would be behaving exactly as written.
 
+    lib/markdown.php  the legal-Markdown renderer. The backend previews with
+                      it and the frontend renders with it; two renderers that
+                      disagree mean the preview approves words the page then
+                      prints differently. tools/test_markdown.py asserts the
+                      same output from both copies, because a digest only
+                      proves the files match, not that they are right.
+
 WHAT THIS CHECK IS WORTH, HONESTLY
 Not much on its own, and it is important to say so where somebody will read it.
 
@@ -92,6 +99,7 @@ SHARED = {
     # halves are drawn on.
     "store.php":    ["lib/store.php"],
     "throttle.php": ["lib/throttle.php"],
+    "markdown.php": ["lib/markdown.php"],
     "base.css":     ["assets/css/base.css", "public/assets/css/base.css"],
 }
 

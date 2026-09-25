@@ -181,7 +181,7 @@ jobs:
         run: |
           set -uo pipefail
           failed=""
-          for s in test_svg test_store test_upload test_qr \
+          for s in test_svg test_store test_markdown test_upload test_qr \
                    test_admin_auth test_publish_client test_reconcile \
                    test_careers_admin test_contact_admin test_company_admin \
                    test_milestones_admin test_about_admin test_home_admin \

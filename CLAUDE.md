@@ -30,8 +30,9 @@ its record before acting.
 5. **Never commit anything from the private store** (`t4t-private-admin/`, `*.key`, `admins.json`).
 6. **`content/` is the system of record.** Never overwrite it on a live server; the deploy seeds it
    with `--ignore-existing` and never syncs it.
-7. **Eight files are byte-identical** with `tech4time-website-frontend`: `lib/html.php`,
-   `lib/contract.php`, `lib/publish.php`, `lib/svg.php`, `lib/store.php`, `lib/throttle.php`,
+7. **Nine files are byte-identical** with `tech4time-website-frontend`: `lib/html.php`,
+   `lib/contract.php`, `lib/publish.php`, `lib/svg.php`, `lib/markdown.php`, `lib/store.php`,
+   `lib/throttle.php`,
    `public/assets/icons/sprite.svg` and `public/assets/css/base.css`. Change one and you change
    both, in the same breath, and bump `CONTRACT_VERSION` if the *shape* of a document changed.
    **The list is `SHARED` in `tools/check_shared_lib.py`, not this sentence** — this one had been
@@ -193,8 +194,8 @@ twenty-seven screens, signed in. Same Firefox and geckodriver, same clean-up. **
 does not add itself to that list** — `?s=milestones` shipped and went unvisited until a sweep
 found it.
 
-Touched any of the eight files `SHARED` names in `tools/check_shared_lib.py` — `contract.php`,
-`publish.php`, `html.php`, `svg.php`, `store.php`, `throttle.php`, the sprite or `base.css`? Also
+Touched any of the nine files `SHARED` names in `tools/check_shared_lib.py` — `contract.php`,
+`publish.php`, `html.php`, `svg.php`, `markdown.php`, `store.php`, `throttle.php`, the sprite or `base.css`? Also
 **`check_shared_lib.py --update`, and copy the changed file and the manifest to the frontend.**
 
 [docs/10-development/testing.md](docs/10-development/testing.md)

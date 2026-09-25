@@ -306,6 +306,17 @@ $facts = [
         'saved' => (string)($branding['updated'] ?? ''),
         'file'  => 'content/branding.json',
     ],
+    'legal' => [
+        'title' => 'Legal',
+        'lines' => [
+            'Privacy Policy — '
+            . ((($privacy['status'] ?? 'shown') === 'hidden') ? 'hidden' : 'shown')
+            . ', ' . $privacy_sections . ' section' . ($privacy_sections === 1 ? '' : 's'),
+            'Terms of Service and Cookie Policy — editors to follow',
+        ],
+        'saved' => (string)($privacy['updated'] ?? ''),
+        'file'  => 'content/privacy.json',
+    ],
     'privacy' => [
         'title' => 'Privacy policy',
         'lines' => [

@@ -52,6 +52,7 @@
     begin("adminPassword", api.adminPassword);
     begin("adminNav", api.adminNav);
     begin("editor", api.editor);
+    begin("mdEditor", api.mdEditor);
     begin("adminOutline", api.adminOutline);
     begin("adminToast", api.adminToast);
     /* Before admin-forms.js, which asks this one whether it can work: with the

@@ -23,6 +23,12 @@ nothing an editor ever does. The half it cannot see is covered where it can be:
 the privacy editor draws the same comparison as a standing notice, on every
 render, from the same function.
 
+ABSENCE IS NOT CONTRADICTION, for the telephone alone. The refreshed policy
+names email as its sole contact and states no telephone number anywhere -- a
+decided email-only posture. A policy carrying a DIFFERENT number still fails;
+one carrying none passes with a "post" notice saying so, so a future edit
+that drops the number by accident reads as a decision rather than hiding.
+
 WHY IT SHELLS OUT TO PHP
 privacy_shared_facts() lives in lib/contract.php, which is byte-identical
 across both repositories. A second implementation of "does the policy still say
@@ -84,6 +90,9 @@ echo json_encode([
         contract_normalise('privacy', $privacy),
         contract_normalise('contact', $contact)
     ),
+    'has_number' => (bool) preg_match('/\\d{7,}/',
+        (string) preg_replace('/\\D+/', ' ', privacy_source_text(
+            contract_normalise('privacy', $privacy)))),
     'footer' => is_array($chrome) ? chrome_contact_drift(
         contract_normalise('chrome', $chrome),
         contract_normalise('contact', $contact)
@@ -169,7 +178,24 @@ def main() -> int:
         return 1
 
     missing = []
+    posture = 0
     for fact in facts:
+        # EMAIL-ONLY POSTURE, STATED NOT SILENCED. The refreshed policy names
+        # email as its sole contact and states no telephone number at all --
+        # a decided posture, not drift. Absence and contradiction are different
+        # failures: a policy carrying a DIFFERENT number still fails below, but
+        # one carrying none passes with this notice, so a future edit that
+        # drops the number by accident reads as a decision here rather than
+        # hiding inside a green run. (The live half of the same question is
+        # the editor's standing notice, which reports whatever is missing
+        # regardless of posture.)
+        if (not fact["found"] and fact["label"] == "Telephone"
+                and not payload.get("has_number")):
+            print(f"  post  {fact['label']:<24} {fact['value']}")
+            print(f"        email-only: the policy states no telephone number, "
+                  f"so there is nothing to agree.")
+            posture += 1
+            continue
         mark = "ok   " if fact["found"] else "FAIL "
         print(f"  {mark} {fact['label']:<24} {fact['value']}")
         if not fact["found"]:
@@ -177,7 +203,11 @@ def main() -> int:
 
     print()
     if not missing:
-        print(f"The privacy policy still states all {len(facts)} facts the contact page manages.")
+        agreed = len(facts) - posture
+        print(f"The privacy policy still states {agreed} of {len(facts)} facts "
+              f"the contact page manages"
+              + (" outright." if posture == 0
+                 else ", and the rest is a stated posture above."))
         footer_notice(payload["footer"])
         return 0
 

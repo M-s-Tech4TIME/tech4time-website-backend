@@ -37,6 +37,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/html.php';
+
 /** Inline nesting deeper than this renders literally rather than recursing. */
 const MD_MAX_DEPTH = 16;
 

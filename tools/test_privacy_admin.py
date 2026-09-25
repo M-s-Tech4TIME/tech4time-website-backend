@@ -15,20 +15,17 @@ up as a clause that quietly stopped being published.
 
 It is also what tools/check_content_model.py points at. That check reads the
 model, the form and the renderer as text and asks whether every field the model
-declares is both editable and rendered — which it cannot do here, because both
-walk the lists in loops and the field names are expressions rather than
-literals. So this proves it by round trip instead.
+declares is both editable and rendered — which it cannot do here, because the
+form names its inputs "sections[<?= $s ?>][body]" and the page renders them
+by calling md_render() in a loop. So this proves it by round trip instead.
 
-THREE LISTS DEEP, WHICH IS ONE DEEPER THAN ANY EDITOR BEFORE IT
-Sections hold blocks; a list, an address or a table holds rows. So most of what
-follows is not that a button worked — it is that it worked on the row it named
-and left the other two levels alone.
-
-AND THE ROWS ARE TYPED, WHICH IS NEW
-A block declares which of six kinds it is, and the renderer owns the markup for
-that kind. Changing a kind must narrow the block to the fields that kind uses,
-or a block that was a list keeps its rows for ever: invisible on the page,
-carried in the document, published every time.
+MARKDOWN, NOT CARDS
+A section is {heading, status, body} and the body is Markdown source, stored
+verbatim and rendered by the shared lib/markdown.php. There is nothing to
+sanitise on the way in — and that is the load-bearing assertion below: hostile
+input must round-trip byte-identical (the renderer escapes it on the way
+out), because sanitising Markdown with an HTML sanitiser would entity-mangle
+it. What the editor refuses is emptiness and missing metadata, never content.
 
 THE ANCHOR RULE IS THE ONE WITH TEETH
 A section's id is its web address. Somebody may have linked to it from an email
@@ -36,6 +33,11 @@ this repository cannot see, so a section that has been named keeps its fragment
 — even when a new section with the same heading is added above it. That case is
 checked directly, because the obvious one-pass implementation gets it wrong and
 the failure is silent.
+
+PREVIEW SAVES NOTHING
+The Preview button renders the posted form through md_render() and redraws it.
+A preview that wrote the file would be a save wearing a different label, so
+the revision on disk is read before and after and must not move.
 
 NOTHING HERE REFUSES A SAVE BECAUSE OF THE CONTACT PAGE
 The comparison against contact.json is a notice, never a refusal. That is a
@@ -51,7 +53,8 @@ Every test runs against a COPY of the real data file, which is restored
 afterwards whether the run passes or fails.
 
 WHAT IT CANNOT COVER
-The sign-in itself, which is tools/test_admin_auth.py's subject.
+The sign-in itself, which is tools/test_admin_auth.py's subject. The ribbon
+toolbar, which is JavaScript — see tools/test_md_toolbar.py.
 """
 import json
 import os
@@ -208,8 +211,8 @@ def published(site) -> dict:
     """The privacy document as the live site last received it.
 
     This is where the editor's half of the journey ends. What the frontend then
-    DOES with the document — the sections, the six block kinds, the anchors —
-    is proved in tech4time-website-frontend, by test_publish.py. The model they
+    DOES with the document — the sections, the Markdown, the anchors — is
+    proved in tech4time-website-frontend, by test_publish.py. The model they
     share, lib/contract.php, is what makes the two ends meet.
     """
     return site.documents.get("privacy", {})
@@ -234,19 +237,11 @@ def headings(page):
     return re.findall(r'name="sections\[\d+\]\[heading\]"\s+value="([^"]*)"', page)
 
 
-def kinds(page, s):
+def bodies(page):
     return re.findall(
-        r'name="sections\[' + str(s) + r'\]\[blocks\]\[\d+\]\[kind\]">(.*?)</select>',
-        page, re.S)
-
-
-def chosen_kinds(page, s):
-    """The kind each block of section s currently is, in order."""
-    out = []
-    for body in kinds(page, s):
-        m = re.search(r'<option value="([^"]*)"[^>]*\bselected', body)
-        out.append(m.group(1) if m else "")
-    return out
+        r'name="sections\[\d+\]\[body\]"[^>]*data-md[^>]*>(.*?)</textarea>',
+        page, re.S) or re.findall(
+        r'name="sections\[\d+\]\[body\]"[^>]*>(.*?)</textarea>', page, re.S)
 
 
 def run(client, r, site):
@@ -255,7 +250,7 @@ def run(client, r, site):
     status, page = client.get(ADMIN)
     r.check("the screen is served", status == 200, f"status {status}")
     for band in ("band-hero", "band-facts", "band-callout", "band-sections",
-                 "band-cta", "band-meta"):
+                 "band-preview", "band-cta", "band-meta"):
         r.check(f"it has {band}", f'id="{band}"' in page)
 
     fields = form_fields(page)
@@ -283,7 +278,7 @@ def run(client, r, site):
             "admin-forms.js" in page,
             "admin_foot() did not run — every button would be a full reload")
 
-    print("\nthe twelve sections it starts with")
+    print("\nthe twelve sections it starts with, as Markdown")
 
     heads = headings(page)
     r.check("all twelve are on the screen", len(heads) == 12, f"{len(heads)} headings")
@@ -294,23 +289,15 @@ def run(client, r, site):
             fields.get("sections[6][id]", "missing"))
     r.check("the anchor is shown beside the heading it will not follow",
             "<code>#your-rights</code>" in page)
-
-    print("\nall six block kinds are represented, and each says what it is")
-
-    present = {k for s in range(12) for k in chosen_kinds(page, s)}
-    for kind in ("paragraph", "list", "subheading", "note", "address", "table"):
-        r.check(f"a {kind} block is in the document", kind in present)
-
-    r.check("the table carries its caption",
-            fields.get("sections[4][blocks][0][caption]")
-            == "Retention periods by type of data",
-            fields.get("sections[4][blocks][0][caption]", "missing"))
-    r.check("and two column headings",
-            [fields.get("sections[4][blocks][0][columns][0]"),
-             fields.get("sections[4][blocks][0][columns][1]")] == ["What", "How long"])
-    r.check("the address block kept its telephone link",
-            'tel:+8801320571562' in fields.get("sections[0][blocks][1][text]", ""),
-            fields.get("sections[0][blocks][1][text]", "")[:80])
+    r.check("every body is a Markdown field, not an HTML one",
+            len(re.findall(r'data-md', page)) >= 13,
+            "the ribbon has nothing to attach to")
+    r.check("and no block inputs survive from the card era",
+            "sections[6][blocks]" not in page
+            and "PRIVACY_BLOCK_KINDS" not in page)
+    r.check("the retention table travelled as Markdown",
+            "| What | How long |" in fields.get("sections[4][body]", ""),
+            fields.get("sections[4][body]", "")[:80])
 
     print("\nthe effective date is a field, and only a field")
 
@@ -319,16 +306,45 @@ def run(client, r, site):
     r.check("the form says nothing changes it for you",
             "Fixing a typo is not a new policy" in page)
 
-    print("\nediting a paragraph reaches the live site")
+    print("\nediting Markdown reaches the live site verbatim")
 
-    fields["sections[9][blocks][0][text]"] = "<p>Children marker <strong>A7</strong>.</p>"
+    fields["sections[9][body]"] = "Children marker **A7**.\n\n- one\n- two"
     status, headers, _ = save(client, fields)
     r.check("the save redirected", status in (302, 303), f"status {status}")
     sent = sections_sent(site)
     r.check("the live site was sent the document", len(sent) == 12, f"{len(sent)} sections")
-    r.check("with the edited paragraph in it",
-            "Children marker <strong>A7</strong>" in sent[9]["blocks"][0]["text"],
-            sent[9]["blocks"][0].get("text", "")[:90])
+    r.check("with the edited body in it, unmangled",
+            sent[9].get("body") == "Children marker **A7**.\n\n- one\n- two",
+            sent[9].get("body", "")[:90])
+
+    print("\nhostile input round-trips byte-identical -- never sanitised")
+
+    hostile = "<script>alert(9)</script>\n\n[click](javascript:alert(9))\n\n**ok**"
+    _status, page = client.get(ADMIN)
+    fields = form_fields(page)
+    fields["sections[9][body]"] = hostile
+    status, _headers, _ = save(client, fields)
+    r.check("even hostile input saves", status in (302, 303), f"status {status}")
+    sent = sections_sent(site)
+    r.check("and arrives byte-identical -- sanitising Markdown would mangle it",
+            sent[9].get("body") == hostile,
+            sent[9].get("body", "")[:100])
+
+    print("\npreview renders without saving")
+
+    _status, page = client.get(ADMIN)
+    fields = form_fields(page)
+    before = json.loads(DATA.read_bytes())["revision"]
+    fields["sections[9][body]"] = "Preview marker **P4**."
+    status, _headers, body = client.post(ADMIN, {**fields, "do": "preview:0"})
+    r.check("the preview comes back", status == 200, f"status {status}")
+    r.check("with the rendered sections",
+            "<h2" in body and "<strong>P4</strong>" in body,
+            "Markdown did not render")
+    r.check("and the revision on disk did not move",
+            json.loads(DATA.read_bytes())["revision"] == before,
+            "preview wrote the file -- it is a save wearing a different label")
+    r.check("saying so out loud", "nothing was saved" in body)
 
     print("\nadding a section, and the anchor rule that has teeth")
 
@@ -340,10 +356,14 @@ def run(client, r, site):
     r.check("the new one arrives hidden",
             fields.get("sections[12][status]") == "hidden",
             fields.get("sections[12][status]", "missing"))
+    r.check("with an empty Markdown body",
+            fields.get("sections[12][body]") == "",
+            repr(fields.get("sections[12][body]", "missing"))[:60])
 
     # Name it exactly as an existing section, and move it above that one.
     fields["sections[12][heading]"] = "Your rights"
     fields["sections[12][status]"] = "shown"
+    fields["sections[12][body]"] = "Newcomer words."
     # The index moves with the row. Pressing "section-up:12" a second time
     # would move whatever landed at 12, not the row being dragged.
     for at in range(12, 6, -1):
@@ -369,57 +389,11 @@ def run(client, r, site):
     r.check("and the original still holds the anchor",
             fields.get("sections[6][id]") == "your-rights")
 
-    print("\nblocks: added at the kind you asked for, in the section you named")
-
-    before = len(chosen_kinds(page, 3))
-    fields["addkind[3]"] = "table"
-    page = press(client, r, fields, "block-3-add:0", "adding a table to section 3")
-    fields = form_fields(page)
-    now = chosen_kinds(page, 3)
-    r.check("section 3 gained a block", len(now) == before + 1, f"{len(now)} vs {before}")
-    r.check("and it is the kind that was asked for", now[-1] == "table", now[-1])
-    r.check("no other section was touched",
-            len(chosen_kinds(page, 4)) == 3, str(len(chosen_kinds(page, 4))))
-
-    page = press(client, r, fields, f"block-3-remove:{before}", "removing it again")
-    fields = form_fields(page)
-    r.check("section 3 is as it was", len(chosen_kinds(page, 3)) == before)
-
-    print("\nchanging a block's kind narrows it to that kind's fields")
-
-    r.check("the list block has rows to begin with",
-            "sections[1][blocks][3][rows][0][text]" in fields)
-    fields["sections[1][blocks][3][kind]"] = "paragraph"
-    page = press(client, r, fields, "block-1-up:3", "changing kind, then pressing a button")
-    fields = form_fields(page)
-    r.check("it is drawn as a paragraph now",
-            chosen_kinds(page, 1)[2] == "paragraph", str(chosen_kinds(page, 1)[:4]))
-    r.check("and its rows are gone rather than carried invisibly",
-            "sections[1][blocks][2][rows][0][text]" not in fields)
-
-    print("\nrows inside a block move without disturbing their neighbours")
-
-    _status, page = client.get(ADMIN)
-    fields = form_fields(page)
-    first = fields["sections[1][blocks][3][rows][0][text]"]
-    second = fields["sections[1][blocks][3][rows][1][text]"]
-    other = fields["sections[2][blocks][1][rows][0][text]"]
-
-    page = press(client, r, fields, "row-1-3-down:0", "moving a bullet down")
-    fields = form_fields(page)
-    r.check("the two bullets swapped",
-            fields["sections[1][blocks][3][rows][0][text]"] == second
-            and fields["sections[1][blocks][3][rows][1][text]"] == first)
-    r.check("a list in another section is untouched",
-            fields["sections[2][blocks][1][rows][0][text]"] == other)
-
-    print("\nhiding happens at every level, and hiding is not deleting")
+    print("\nhiding is per section and per point, and hiding is not deleting")
 
     _status, page = client.get(ADMIN)
     fields = form_fields(page)
     fields["sections[8][status]"] = "hidden"
-    fields["sections[2][blocks][1][status]"] = "hidden"
-    fields["sections[2][blocks][1][rows][0][status]"] = "hidden"
     fields["callout[items][0][status]"] = "hidden"
     save(client, fields)
 
@@ -427,8 +401,6 @@ def run(client, r, site):
     r.check("the hidden section is still IN the document",
             len(sent) == 12 and sent[8]["status"] == "hidden",
             f'{len(sent)} sections, section 8 is {sent[8].get("status") if len(sent) > 8 else "gone"}')
-    r.check("so is the hidden block", sent[2]["blocks"][1]["status"] == "hidden")
-    r.check("and the hidden row", sent[2]["blocks"][1]["rows"][0]["status"] == "hidden")
     r.check("and the hidden summary point",
             published(site)["policy"]["callout"]["items"][0]["status"] == "hidden")
 
@@ -449,10 +421,16 @@ def run(client, r, site):
 
     _status, page = client.get(ADMIN)
     fields = form_fields(page)
-    fields["sections[4][blocks][0][caption]"] = ""
+    fields["sections[5][body]"] = ""
     _status, _h, body = save(client, fields)
-    r.check("a table with no caption is refused, because a screen reader needs it",
-            "no caption" in body)
+    r.check("a section with no words is refused", "has no words" in body)
+
+    _status, page = client.get(ADMIN)
+    fields = form_fields(page)
+    fields["sections[5][body]"] = ":::note\n:::\n"
+    _status, _h, body = save(client, fields)
+    r.check("a section that renders to nothing is refused too",
+            "has no words" in body, "an empty note sailed through")
 
     print("\nthe comparison with the contact page is a notice and never a refusal")
 
@@ -463,8 +441,10 @@ def run(client, r, site):
             "Nothing here stops you saving" in page)
 
     fields = form_fields(page)
-    # Rewrite the address block so the policy no longer states the Dhaka office.
-    fields["sections[0][blocks][1][text]"] = "<strong>Somebody Else</strong><br>Nowhere at all"
+    # Rewrite the first section so the policy no longer states the Dhaka office.
+    body0 = fields["sections[0][body]"]
+    assert "Manikdi" in body0, "expected the migrated address in section 0"
+    fields["sections[0][body]"] = "Reached at [info@tech4time.bd](mailto:info@tech4time.bd)."
     status, _headers, body = save(client, fields)
     r.check("a policy that has stopped agreeing with the contact page STILL SAVES",
             status in (302, 303),

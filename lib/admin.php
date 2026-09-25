@@ -127,6 +127,16 @@ const ADMIN_SECTIONS = [
         'desc'  => 'What the site collects, why, and what people can ask for',
         'view'  => '/pages/privacy-policy/',
     ],
+    'legal' => [
+        'label' => 'Legal',
+        /* The scales, unclaimed by any other row: the privacy screen it
+           replaces drew 'user-lock', which stays with that screen for its
+           remaining life as the hub's editor target. */
+        'icon'  => 'balance-scale',
+        'desc'  => 'Privacy, terms and cookie policies under one hood',
+        /* No single page: this screen lists three of them. */
+        'view'  => '',
+    ],
     'chrome' => [
         'label' => 'Header & Footer',
         /* Bands stacked down a page, which is what this screen edits: the
@@ -184,7 +194,7 @@ const ADMIN_SECTIONS = [
  */
 const ADMIN_RAIL_SECTIONS = ['overview', 'home', 'about', 'services', 'company',
                              'milestones', 'careers', 'contact', 'certifications',
-                             'branding', 'privacy', 'chrome', 'seo', 'settings'];
+                             'branding', 'legal', 'chrome', 'seo', 'settings'];
 
 /**
  * Sections that edit a page of the website, in rail order.
@@ -1790,6 +1800,7 @@ function admin_foot(string $note = ''): void
 <script src="<?= h(admin_asset('/assets/js/theme-toggle.js')) ?>" defer></script>
 <script src="<?= h(admin_asset('/assets/js/admin-nav.js')) ?>" defer></script>
 <script src="<?= h(admin_asset('/assets/js/editor.js')) ?>" defer></script>
+<script src="<?= h(admin_asset('/assets/js/md-editor.js')) ?>" defer></script>
 <script src="<?= h(admin_asset('/assets/js/admin-outline.js')) ?>" defer></script>
 <script src="<?= h(admin_asset('/assets/js/admin-toast.js')) ?>" defer></script>
 <script src="<?= h(admin_asset('/assets/js/admin-dialog.js')) ?>" defer></script>

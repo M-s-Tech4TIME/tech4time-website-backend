@@ -139,7 +139,7 @@ def run(r: Results, private: Path) -> None:
 
         envelope = json.loads(last["body"])
         r.check("the envelope carries the contract version",
-                envelope["contract_version"] == 1, str(envelope)[:120])
+                envelope["contract_version"] == 2, str(envelope)[:120])
         r.check("and the envelope's revision matches the document's",
                 envelope["revision"] == envelope["data"]["revision"], str(envelope)[:120])
 

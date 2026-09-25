@@ -190,7 +190,7 @@ proves all of it is still only an enhancement. Same browser requirements.
 
 Touched CSS, an admin screen or anything a keyboard reaches? Also
 `python3 tools/check_admin_a11y.py` — the focus ring, 320px, dark mode and hover across all
-twenty-seven screens, signed in. Same Firefox and geckodriver, same clean-up. **A new rail entry
+twenty-eight screens, signed in. Same Firefox and geckodriver, same clean-up. **A new rail entry
 does not add itself to that list** — `?s=milestones` shipped and went unvisited until a sweep
 found it.
 

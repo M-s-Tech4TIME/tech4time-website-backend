@@ -41,7 +41,7 @@ X-T4T-Signature:  4d3f0075b40b7fb4:9a1c…64 hex chars…
 
 ```json
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "document": "careers",
   "revision": 12,
   "published": "2026-08-26T09:14:03+00:00",

@@ -110,6 +110,13 @@ SIGNED_IN_SCREENS = ["/", "/?s=home", "/?s=careers", "/?s=contact", "/?s=company
                      "/?s=milestones",
                      "/?s=about", "/?s=services", "/?s=certifications",
                      "/?s=branding", "/?s=privacy",
+                     # The legal hub lists; the privacy screen edits. Both are
+                     # crawled because the hub holds the show/hide switches
+                     # (buttons submitting a form) and the editor holds the
+                     # Markdown ribbons -- different controls, different
+                     # failure modes, and a new rail entry does not add
+                     # itself here.
+                     "/?s=legal",
                      # Both services screens, because they are different pages
                      # rather than the same one with a filter: one lists the
                      # services and the other edits one, and only the second

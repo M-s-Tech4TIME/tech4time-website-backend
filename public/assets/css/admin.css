@@ -2553,3 +2553,33 @@ html { scroll-padding-block-start: var(--admin-bar-h); }
   fill: currentColor;
   vertical-align: -0.1em;
 }
+
+/* The Markdown preview pane and tall Markdown fields (legal documents).
+   Tokens only: hex values live in theme.css and nowhere else. The preview
+   renders the visitor's markup, so it gets the visitor's measure and table
+   rules in miniature rather than the admin's form spacing. */
+.admin__textarea--tall {
+  min-height: 16rem;
+}
+
+.admin__preview {
+  background-color: var(--bg-elevated);
+  border: var(--border-width) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  max-width: 70ch;
+}
+
+.admin__preview table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.admin__preview th,
+.admin__preview td {
+  padding: var(--space-2xs) var(--space-sm);
+  vertical-align: top;
+  text-align: start;
+  border-block-end: var(--border-width) solid var(--border-subtle);
+}

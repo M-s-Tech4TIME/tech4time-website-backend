@@ -52,7 +52,7 @@ public/
 └── assets/
     ├── css/                base.css theme.css layout.css components.css admin.css
     ├── js/                 theme-init.js theme-toggle.js admin-init.js admin-nav.js
-    │                       editor.js admin-swap.js admin-forms.js
+    │                       editor.js md-editor.js admin-swap.js admin-forms.js
     │                       admin-outline.js admin-toast.js admin-dialog.js
     │                       admin-password.js
     ├── fonts/              Inter, self-hosted
@@ -91,6 +91,9 @@ sections/
 ├── certifications.php  the certifications page  → content/certifications.json
 ├── branding.php        the branding page        → content/branding.json
 ├── privacy.php         the privacy policy       → content/privacy.json
+├── legal.php           the legal hub (`?s=legal`): three documents, one switch
+│                       each (privacy edits at `?s=privacy`; terms and cookies
+│                       gain editors in their own phases)
 ├── services.php        the services editor, and each service page beneath it
 │                                                → content/services.json
 ├── chrome.php          the header, footer and mobile dock every page carries

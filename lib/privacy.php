@@ -2,17 +2,18 @@
 /**
  * Tech4TIME — privacy policy page data access.
  *
- * Reading and writing the file is lib/store.php; escaping is lib/html.php; the
- * SHAPE of the page is lib/contract.php, which the frontend and the backend
- * hold byte-identical. What is left here is this side's own business with that
- * shape: validation, the save that publishes, and the comparison against the
- * contact page.
+ * Reading and writing the file is lib/store.php; the SHAPE of the page is
+ * lib/contract.php, which the frontend and the backend hold byte-identical.
+ * What is left here is this side's own business with that shape: validation,
+ * the save that publishes, and the comparison against the contact page.
  *
- * The renderers are the frontend's, because the frontend renders the page.
- * What is NOT split that way is privacy_shared_facts(), which lives in
- * contract.php: what counts as "the policy still says this" must be one
- * answer, or the editor's notice and any check of the same thing could
- * disagree about whether the site is consistent with itself.
+ * Body text is Markdown, rendered by the shared lib/markdown.php. Nothing
+ * here sanitises it and nothing here renders it: the source is stored
+ * verbatim (trimmed), and safety lives in the renderer, which escapes every
+ * text run and emits only a fixed tag vocabulary -- proven by
+ * tools/test_markdown.py in both repositories. Sanitising Markdown with an
+ * HTML sanitiser would entity-mangle it, so the one thing this file must
+ * never do is pass a body through rt_sanitise_*().
  *
  * WHAT THE SHAPE IS — see lib/contract.php, privacy_defaults().
  */
@@ -113,7 +114,9 @@ function privacy_validate(array $data): array
         $errors[] = 'The summary box is shown but has no heading.';
     }
     foreach ($callout['items'] as $i => $item) {
-        if (trim(strip_tags((string)$item['text'])) === '') {
+        /* Rendered, for the same reason sections are: Markdown that is only
+           syntax is empty too. */
+        if (trim(strip_tags(md_render((string)$item['text']))) === '') {
             $errors[] = 'Summary point ' . ($i + 1) . ' is empty.';
         }
     }
@@ -124,9 +127,9 @@ function privacy_validate(array $data): array
 
         if (trim((string)$section['heading']) === '') {
             /* A section with no heading renders an <h2> with nothing in it,
-               and the <h3> subheadings under it become a heading level with
-               no parent -- which audit_pages.py checks for on the public
-               side, after it has already shipped. */
+               and the Table of Contents links to an anchor with no name --
+               which audit_pages.py checks for on the public side, after it
+               has already shipped. */
             $errors[] = "$where has no heading.";
         }
 
@@ -139,45 +142,13 @@ function privacy_validate(array $data): array
         }
         $anchors[] = $anchor;
 
-        foreach ($section['blocks'] as $b => $block) {
-            $spot = "$where, block " . ($b + 1);
-            $kind = (string)$block['kind'];
-
-            if (!array_key_exists($kind, PRIVACY_BLOCK_KINDS)) {
-                $errors[] = "$spot is of a kind this page does not know how to draw.";
-                continue;
-            }
-
-            if (array_key_exists('text', $block)
-                    && trim(strip_tags((string)$block['text'])) === '') {
-                $errors[] = "$spot is empty.";
-            }
-
-            if ($kind === 'table') {
-                foreach ($block['columns'] as $c => $column) {
-                    if (trim((string)$column) === '') {
-                        $errors[] = "$spot has no heading for column " . ($c + 1) . '.';
-                    }
-                }
-                if (trim((string)$block['caption']) === '') {
-                    $errors[] = "$spot has no caption. A screen reader announces a table "
-                              . 'with no caption as just "table".';
-                }
-            }
-
-            foreach ($block['rows'] ?? [] as $r => $row) {
-                $at = "$spot, row " . ($r + 1);
-
-                if ($kind === 'table') {
-                    if (trim((string)$row['label']) === '' || trim((string)$row['value']) === '') {
-                        $errors[] = "$at is missing one of its two cells.";
-                    }
-                    continue;
-                }
-                if (trim(strip_tags((string)$row['text'])) === '') {
-                    $errors[] = "$at is empty.";
-                }
-            }
+        /* A body that renders to nothing is a section that says nothing: the
+           heading and its anchor ship, and the reader lands on an empty
+           heading. Rendered, not trimmed -- Markdown that is only syntax
+           (`**`, empty fences, a header row with no body) is empty too. */
+        require_once __DIR__ . '/markdown.php';
+        if (trim(strip_tags(md_render((string)($section['body'] ?? '')))) === '') {
+            $errors[] = "$where has no words in it.";
         }
     }
 

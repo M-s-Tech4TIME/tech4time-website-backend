@@ -1,64 +1,53 @@
 <?php
 /**
- * Tech4TIME admin — the privacy policy.
+ * Tech4TIME — privacy policy editor.
  *
- * The last page on the site to come under management, and the one whose words
- * carry the most weight. Twelve headed sections, a summary box, a retention
- * table and an address block, all of it editable here and none of it editable
- * anywhere before.
+ * Everything on /pages/privacy-policy/ that is words rather than structure:
+ * the banner, the summary box, and one Markdown document per headed section.
+ * Stored in content/privacy.json; there is no database.
  *
- * THREE LISTS DEEP, WHICH IS ONE DEEPER THAN ANY EDITOR BEFORE IT. Sections
- * hold blocks; a list block, an address and a table hold rows. The parent
- * indices go in the BAND NAME and never in the index -- "block-3-up:2" is the
- * third section's block two -- because admin_card_head() builds
- * "<band>-<verb>:<index>" and the index is cast to an int. That is the trick
- * certifications proved for two levels and branding repeated; this extends it
- * by one.
+ * MARKDOWN, NOT CARDS. Sections used to hold blocks, and blocks held rows --
+ * three levels of cards for prose. A section is now {heading, status, body},
+ * and the body is Markdown in the frozen dialect, edited with the ribbon
+ * toolbar (public/assets/js/md-editor.js) or typed by hand. Structure lives
+ * in the section; the renderer owns all markup. See ADR 0025 and
+ * tech4time-website-frontend/plans/legal-markdown-syntax.md.
  *
- * STRUCTURE IS A KIND, NOT MARKUP. rt_sanitise_html() allows nine tags and no
- * heading, no <address> and no <table> among them, so a person typing <h3>
- * into a rich field would watch it disappear on save with no way to tell that
- * from a bug. Each block declares what it IS and the renderer owns the markup.
- * See PRIVACY_BLOCK_KINDS.
+ * NOTHING HERE SANITISES A BODY. Markdown source must never meet an HTML
+ * sanitiser, which would entity-mangle it; safety lives in the shared
+ * lib/markdown.php, which escapes every text run and emits only a fixed tag
+ * vocabulary. The one thing this file must never do is pass a body through
+ * rt_sanitise_*() -- and test_legal_admin.py asserts the round trip is
+ * byte-identical for hostile input, not merely safe-looking.
  *
- * NOTHING HERE REFUSES A SAVE BECAUSE OF THE CONTACT PAGE. The policy repeats
- * the offices, the email and the telephone, and whether it still states the
- * current ones is drawn as a standing notice. It is never a refusal: after an
- * office move whichever page you edited first could not be saved, and an
- * unrelated typo fix would be blocked by an address that drifted months ago.
- * See privacy_facts() and privacy_validate().
+ * PREVIEW IS THE RENDERER. The Preview button posts the form and gets back
+ * HTML from the same md_render() the page prints -- there is no second
+ * implementation in JavaScript to keep identical for ever. Previewing saves
+ * nothing and publishes nothing.
  *
- * ONE SCREEN, AND THAT IS MEASURED. This form posts roughly 370 inputs against
- * a max_input_vars of 1000 -- more than certifications' 240, less than the
- * company profile's 550. Unlike those, though, it grows with PROSE, which is
- * the thing a legal editor adds most freely: about 150 more paragraphs would
- * reach the limit. admin_form_truncated() is in place regardless, because a
- * truncated POST would let this file rebuild the document from a short $_POST,
- * decide the missing sections had been removed, save that and report success.
+ * Included by public/index.php, which has already checked the password and
+ * started the session.
  */
 
 declare(strict_types=1);
 
 if (!defined('T4T_ADMIN')) {
     http_response_code(403);
-    exit;
+    exit('Not a page.');
 }
 
 require_once __DIR__ . '/../lib/privacy.php';
+require_once __DIR__ . '/../lib/markdown.php';
 
 /* ---------------------------------------------------------------- reading */
 
 /**
  * Rebuild the whole document from what the browser sent.
  *
- * Everything is re-trimmed here rather than trusted: the form's own
- * constraints are a convenience for whoever is typing, and this is the code
- * that decides what gets stored.
- *
- * It ends in privacy_normalise() rather than privacy_identify(), and that is
- * deliberate: normalising also NARROWS a block to the fields its kind uses, so
- * changing a block from a list to a paragraph and pressing any button redraws
- * it with the right fields immediately rather than on some later save.
+ * Bodies are re-trimmed and stored VERBATIM: no sanitising, no normalising
+ * of the Markdown itself. The form's constraints are a convenience for
+ * whoever is typing, and this is the code that decides what gets stored --
+ * which, for source text, is what was typed.
  */
 function privacy_from_post(array $current): array
 {
@@ -78,7 +67,7 @@ function privacy_from_post(array $current): array
     $data['policy']['callout'] = [
         'status' => ($callout['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown',
         'title'  => trim((string)($callout['title'] ?? '')),
-        'note'   => rt_sanitise_inline((string)($callout['note'] ?? '')),
+        'note'   => trim((string)($callout['note'] ?? '')),
         'items'  => privacy_items_from_post($callout['items'] ?? []),
     ];
 
@@ -89,19 +78,11 @@ function privacy_from_post(array $current): array
         if (!is_array($section)) {
             continue;
         }
-
-        $blocks = [];
-        foreach (array_values((array)($section['blocks'] ?? [])) as $block) {
-            if (is_array($block)) {
-                $blocks[] = privacy_block_from_post($block);
-            }
-        }
-
         $data['policy']['sections'][] = [
             'id'      => trim((string)($section['id'] ?? '')),
             'heading' => trim((string)($section['heading'] ?? '')),
             'status'  => ($section['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown',
-            'blocks'  => $blocks,
+            'body'    => trim((string)($section['body'] ?? '')),
         ];
     }
 
@@ -123,54 +104,7 @@ function privacy_from_post(array $current): array
     return privacy_normalise($data);
 }
 
-/**
- * One block, read as the kind it says it is.
- *
- * Every field of every kind is read, and privacy_block_defaults() throws away
- * the ones this kind does not use. Reading selectively here instead would mean
- * that changing a block's kind and changing its text in the same press lost
- * one of the two.
- */
-function privacy_block_from_post(array $block): array
-{
-    $kind = (string)($block['kind'] ?? 'paragraph');
-
-    /* Rich text is sanitised on the way in here and AGAIN on the far side by
-       contract_sanitise(), because a signature proves where a document came
-       from and not what is inside it. A list row is sanitised INLINE-only: it
-       renders inside an <li>, where a <p> or a <ul> from a stray Enter is a
-       list nested in a list item rather than emphasis somebody meant. */
-    $rich = in_array($kind, PRIVACY_RICH_BLOCKS, true);
-    $text = (string)($block['text'] ?? '');
-
-    $rows = [];
-    foreach (array_values((array)($block['rows'] ?? [])) as $row) {
-        if (!is_array($row)) {
-            continue;
-        }
-        $rows[] = [
-            'id'     => trim((string)($row['id'] ?? '')),
-            'text'   => rt_sanitise_inline((string)($row['text'] ?? '')),
-            'label'  => trim((string)($row['label'] ?? '')),
-            'value'  => trim((string)($row['value'] ?? '')),
-            'status' => ($row['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown',
-        ];
-    }
-
-    $columns = (array)($block['columns'] ?? []);
-
-    return privacy_block_defaults([
-        'id'      => trim((string)($block['id'] ?? '')),
-        'kind'    => $kind,
-        'status'  => ($block['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown',
-        'text'    => $rich ? rt_sanitise_inline($text) : trim($text),
-        'caption' => trim((string)($block['caption'] ?? '')),
-        'columns' => [trim((string)($columns[0] ?? '')), trim((string)($columns[1] ?? ''))],
-        'rows'    => $rows,
-    ]);
-}
-
-/** The summary box's bullets. Inline rich text: each one renders in an <li>. */
+/** The summary box's bullets. Markdown source, like everything else here. */
 function privacy_items_from_post(mixed $posted): array
 {
     $items = [];
@@ -179,7 +113,7 @@ function privacy_items_from_post(mixed $posted): array
         if (is_array($row)) {
             $items[] = privacy_item_defaults([
                 'id'     => trim((string)($row['id'] ?? '')),
-                'text'   => rt_sanitise_inline((string)($row['text'] ?? '')),
+                'text'   => trim((string)($row['text'] ?? '')),
                 'status' => ($row['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown',
             ]);
         }
@@ -188,11 +122,30 @@ function privacy_items_from_post(mixed $posted): array
     return $items;
 }
 
+/**
+ * Render the posted document the way the public page will print it.
+ *
+ * A twin of the frontend's section loop, kept deliberately small: headings
+ * escaped here, bodies through the shared renderer, nothing else. If this
+ * grows past headings-plus-bodies it should move beside the frontend
+ * renderer rather than duplicate it.
+ */
+function privacy_preview_html(array $data): string
+{
+    $out = '';
+    foreach (privacy_rows_shown($data['policy']['sections'] ?? []) as $section) {
+        $out .= '<h2>' . h((string)($section['heading'] ?? '')) . '</h2>' . "\n";
+        $out .= md_render((string)($section['body'] ?? '')) . "\n";
+    }
+    return trim($out);
+}
+
 /* ---------------------------------------------------------------- actions */
 
 $data = privacy_load();
 $errors = [];
 $pending = '';   /* an unsaved change made by a row button */
+$preview = '';   /* rendered HTML for the preview pane; never saved */
 
 /* Named here, not read inline below. See the note in sections/contact.php: a
    $_POST key that is only ever compared reads exactly like one that was
@@ -234,6 +187,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         /* Redraw with what was typed rather than throwing it away. */
         $data = $posted;
+    } elseif ($do === 'preview' || str_starts_with($do, 'preview:')) {
+        /* Rendered, not saved and not published: what the visitor would get
+           from exactly what is in the form right now. */
+        $preview = privacy_preview_html($posted);
+        $pending = 'Preview below — nothing was saved.';
+        $data = $posted;
     } elseif ($do !== 'nothing') {
         $applied = privacy_apply_row_action($posted, $do);
         $data = $applied[0] ?? $posted;
@@ -242,13 +201,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 /**
- * Add, remove or reorder a row, at whichever of the three levels it names.
+ * Add, remove or reorder a row, at either of the two levels that remain.
  *
  * The verb space, in full:
  *
  *   section-add:0        section-up:3        section-remove:3
- *   block-3-add:0        block-3-up:2        block-3-remove:2
- *   row-3-2-add:0        row-3-2-up:1        row-3-2-remove:1
  *   point-add:0          point-up:1          button-remove:0
  *
  * Returns null when the press cannot be honoured — a row that is not there, a
@@ -312,227 +269,26 @@ function privacy_apply_row_action(array $data, string $do): ?array
         return [privacy_identify($data), $out[1]];
     }
 
-    /* The blocks inside one section. */
-    if (preg_match('/^block-(\d+)-(add|remove|up|down)$/', $verb, $m)) {
-        $s = (int)$m[1];
-        if (!isset($data['policy']['sections'][$s])) {
-            return null;
-        }
-
-        $rows = $data['policy']['sections'][$s]['blocks'];
-
-        if ($m[2] === 'add') {
-            /* NOT hidden, unlike a section. A block sits inside a section that
-               is already shown or already hidden, and switching it on as well
-               is a second step for no protection: an empty block is refused by
-               privacy_validate() before it could be saved. */
-            $kind = (string)($_POST['addkind'][$s] ?? 'paragraph');
-            $rows[] = privacy_block_defaults(['kind' => $kind]);
-
-            $out = [$rows, 'Added a ' . strtolower(PRIVACY_BLOCK_KINDS[$kind]
-                        ?? PRIVACY_BLOCK_KINDS['paragraph']) . '.'];
-        } else {
-            $out = admin_move_row($rows, $m[2], $index);
-            if ($out === null) {
-                return null;
-            }
-        }
-
-        $data['policy']['sections'][$s]['blocks'] = $out[0];
-
-        return [privacy_identify($data), $out[1]];
-    }
-
-    /* The rows inside one block: a bullet, or a line of the table. */
-    if (preg_match('/^row-(\d+)-(\d+)-(add|remove|up|down)$/', $verb, $m)) {
-        [$s, $b] = [(int)$m[1], (int)$m[2]];
-        if (!isset($data['policy']['sections'][$s]['blocks'][$b]['rows'])) {
-            return null;
-        }
-
-        $rows = $data['policy']['sections'][$s]['blocks'][$b]['rows'];
-        $kind = (string)$data['policy']['sections'][$s]['blocks'][$b]['kind'];
-
-        if ($m[3] === 'add') {
-            $rows[] = $kind === 'table'
-                ? privacy_cell_defaults([])
-                : privacy_item_defaults([]);
-            $out = [$rows, $kind === 'table' ? 'Added a table row.' : 'Added a bullet.'];
-        } else {
-            $out = admin_move_row($rows, $m[3], $index);
-            if ($out === null) {
-                return null;
-            }
-        }
-
-        $data['policy']['sections'][$s]['blocks'][$b]['rows'] = $out[0];
-
-        return [privacy_identify($data), $out[1]];
-    }
-
     return null;
 }
 
 /* ---------------------------------------------------------------- helpers */
 
 /**
- * A card head's summary of a block, which is not the block.
- *
- * A paragraph card labelled with its whole paragraph is a card head several
- * lines deep, and at 320px it was the widest thing on the page. Bounded at a
- * word boundary, so a head stays one line of summary — which is what a card
- * head is for.
+ * A card head's summary of Markdown source: links read as their labels,
+ * markers fall away, bounded at a word boundary so a head stays one line.
  */
 function privacy_card_label(string $text, int $max = 52): string
 {
-    $text = trim(rt_plain($text));
-
+    $text = trim((string)preg_replace('/\[([^\]]*)\]\([^)]*\)/', '$1', $text) ?? $text);
+    $text = trim($text, "*+_`|#: \t\n\r");
     if ($text === '' || strlen($text) <= $max) {
         return $text;
     }
 
     $cut   = substr($text, 0, $max);
     $space = strrpos($cut, ' ');
-
     return rtrim($space === false ? $cut : substr($cut, 0, $space), " ,.;:") . '…';
-}
-
-/**
- * The fields one block shows, which are the fields its kind uses.
- *
- * A block is a card inside a card, so this is the third level of nesting on
- * the page. The band name carries both parents: "row-<section>-<block>".
- */
-function privacy_block_fields(int $s, int $b, array $block): void
-{
-    $name = "sections[$s][blocks][$b]";
-    $kind = (string)$block['kind'];
-    ?>
-    <input type="hidden" name="<?= h($name) ?>[id]" value="<?= h($block['id']) ?>">
-
-    <div class="admin__grid">
-      <label class="admin__field">
-        <span class="admin__label">What this is</span>
-        <select class="admin__input" name="<?= h($name) ?>[kind]">
-<?php foreach (PRIVACY_BLOCK_KINDS as $value => $label): ?>
-          <option value="<?= h($value) ?>"<?= $value === $kind ? ' selected' : '' ?>><?= h($label) ?></option>
-<?php endforeach; ?>
-        </select>
-        <span class="admin__hint">
-          Change this and press any button to redraw the fields below.
-        </span>
-      </label>
-
-      <?php admin_status_field($name . '[status]', (string)$block['status'], 'this block'); ?>
-    </div>
-
-<?php if ($kind === 'subheading'): ?>
-    <label class="admin__field admin__field--wide">
-      <span class="admin__label">Subheading</span>
-      <input class="admin__input" type="text" name="<?= h($name) ?>[text]"
-             value="<?= h((string)($block['text'] ?? '')) ?>">
-      <span class="admin__hint">
-        A smaller heading inside this section. It is plain text — no emphasis
-        and no links, because a heading is a landmark and not a sentence.
-      </span>
-    </label>
-<?php elseif (array_key_exists('text', $block)): ?>
-    <?php /* A <div>, not a <label>, and deliberately: a <label> forwards a
-             click from anywhere inside it to its first labelable descendant,
-             and editor.js puts its toolbar BEFORE the textarea — so every
-             click in the text would press Bold. */ ?>
-    <div class="admin__field admin__field--wide">
-      <label class="admin__label" for="block-<?= $s ?>-<?= $b ?>-text">The words</label>
-      <textarea class="admin__input admin__textarea" id="block-<?= $s ?>-<?= $b ?>-text"
-                name="<?= h($name) ?>[text]" rows="<?= $kind === 'address' ? 6 : 4 ?>"
-                data-editor><?= h((string)($block['text'] ?? '')) ?></textarea>
-      <span class="admin__hint">
-<?php   if ($kind === 'address'): ?>
-        The address block. Use the line break button for each line; emphasis
-        and links are allowed, which is how the email and telephone here are
-        the ones a visitor can actually press.
-<?php   elseif ($kind === 'note'): ?>
-        Drawn in a tinted box, for something a reader must not skim past.
-<?php   else: ?>
-        One paragraph. Emphasis and links are allowed.
-<?php   endif; ?>
-      </span>
-    </div>
-<?php endif; ?>
-
-<?php if ($kind === 'table'): ?>
-    <div class="admin__grid">
-      <label class="admin__field admin__field--wide">
-        <span class="admin__label">Caption</span>
-        <input class="admin__input" type="text" name="<?= h($name) ?>[caption]"
-               value="<?= h((string)($block['caption'] ?? '')) ?>">
-        <span class="admin__hint">
-          Read out before the table and shown to nobody. Without it a screen
-          reader announces this as just "table".
-        </span>
-      </label>
-
-      <label class="admin__field">
-        <span class="admin__label">First column</span>
-        <input class="admin__input" type="text" name="<?= h($name) ?>[columns][0]"
-               value="<?= h((string)($block['columns'][0] ?? '')) ?>">
-      </label>
-
-      <label class="admin__field">
-        <span class="admin__label">Second column</span>
-        <input class="admin__input" type="text" name="<?= h($name) ?>[columns][1]"
-               value="<?= h((string)($block['columns'][1] ?? '')) ?>">
-      </label>
-    </div>
-<?php endif; ?>
-
-<?php if (isset($block['rows'])): ?>
-    <div class="admin-card__nested">
-      <?php admin_band_head($kind === 'table' ? 'Rows' : 'Bullets', '',
-          ['do'    => "row-$s-$b-add:0",
-           'label' => $kind === 'table' ? 'Add a row' : 'Add a bullet',
-           'rows'  => "sections[$s][blocks][$b][rows]["]); ?>
-
-<?php   foreach ($block['rows'] as $r => $row): ?>
-<?php     $rname = "sections[$s][blocks][$b][rows][$r]"; ?>
-      <div class="admin-card admin-card--slim">
-        <?php admin_card_head("row-$s-$b", $r, count($block['rows']), [
-            'label'  => $kind === 'table'
-                      ? (string)($row['label'] ?? '')
-                      : privacy_card_label((string)($row['text'] ?? '')),
-            'noun'   => $kind === 'table' ? 'row' : 'bullet',
-            'status' => (string)$row['status'],
-        ]); ?>
-        <input type="hidden" name="<?= h($rname) ?>[id]" value="<?= h($row['id']) ?>">
-
-<?php     if ($kind === 'table'): ?>
-        <div class="admin__grid">
-          <label class="admin__field">
-            <span class="admin__label">What</span>
-            <input class="admin__input" type="text" name="<?= h($rname) ?>[label]"
-                   value="<?= h((string)($row['label'] ?? '')) ?>">
-          </label>
-
-          <label class="admin__field">
-            <span class="admin__label">How long</span>
-            <input class="admin__input" type="text" name="<?= h($rname) ?>[value]"
-                   value="<?= h((string)($row['value'] ?? '')) ?>">
-          </label>
-
-          <?php admin_status_field($rname . '[status]', (string)$row['status'], 'this row'); ?>
-        </div>
-<?php     else: ?>
-        <div class="admin__field admin__field--wide">
-          <label class="admin__label" for="row-<?= $s ?>-<?= $b ?>-<?= $r ?>">The bullet</label>
-          <textarea class="admin__input admin__textarea" id="row-<?= $s ?>-<?= $b ?>-<?= $r ?>"
-                    name="<?= h($rname) ?>[text]" rows="2" data-editor><?= h((string)($row['text'] ?? '')) ?></textarea>
-        </div>
-        <?php admin_status_field($rname . '[status]', (string)$row['status'], 'this bullet'); ?>
-<?php     endif; ?>
-      </div>
-<?php   endforeach; ?>
-    </div>
-<?php endif;
 }
 
 /* What the rail lists under "Privacy". The keys are the ids on the
@@ -542,6 +298,7 @@ const PRIVACY_OUTLINE = [
     'band-facts'    => 'Also on the contact page',
     'band-callout'  => 'The short version',
     'band-sections' => 'The policy',
+    'band-preview'  => 'Preview',
     'band-cta'      => 'The closing band',
     'band-meta'     => 'Search and sharing',
 ];
@@ -679,9 +436,10 @@ if (!$errors && $pending !== '') {
       <input type="hidden" name="callout[items][<?= $i ?>][id]" value="<?= h($point['id']) ?>">
 
       <div class="admin__field admin__field--wide">
-        <label class="admin__label" for="point-<?= $i ?>">The point</label>
+        <label class="admin__label" for="point-<?= $i ?>">The point, in Markdown</label>
         <textarea class="admin__input admin__textarea" id="point-<?= $i ?>"
-                  name="callout[items][<?= $i ?>][text]" rows="3" data-editor><?= h($point['text']) ?></textarea>
+                  name="callout[items][<?= $i ?>][text]" rows="3"><?= h($point['text']) ?></textarea>
+        <span class="admin__hint">One or two lines. Bold, links and emphasis welcome.</span>
       </div>
 
       <?php admin_status_field("callout[items][$i][status]", (string)$point['status'], 'this point'); ?>
@@ -690,9 +448,9 @@ if (!$errors && $pending !== '') {
 
     <div class="admin__grid">
       <div class="admin__field admin__field--wide">
-        <label class="admin__label" for="callout-note">The line under the list</label>
+        <label class="admin__label" for="callout-note">The line under the list, in Markdown</label>
         <textarea class="admin__input admin__textarea" id="callout-note"
-                  name="callout[note]" rows="2" data-editor><?= h($data['policy']['callout']['note']) ?></textarea>
+                  name="callout[note]" rows="2" data-md><?= h($data['policy']['callout']['note']) ?></textarea>
       </div>
     </div>
   </fieldset>
@@ -703,7 +461,8 @@ if (!$errors && $pending !== '') {
         'One card per headed section, in the order they appear. A section\'s '
       . 'heading is also what its web address is made from — and once a '
       . 'section has an address it keeps it, because somebody may have linked '
-      . 'to it.',
+      . 'to it. The body is Markdown: the toolbar inserts the syntax, or type '
+      . 'it by hand.',
         ['do' => 'section-add:0', 'label' => 'Add a section', 'rows' => 'sections[']); ?>
 
 <?php if (!$data['policy']['sections']): ?>
@@ -711,12 +470,13 @@ if (!$errors && $pending !== '') {
 <?php endif; ?>
 
 <?php foreach ($data['policy']['sections'] as $s => $section): ?>
-<?php   $shown = count(privacy_rows_shown($section['blocks'])); ?>
     <div class="admin-card">
       <?php admin_card_head('section', $s, count($data['policy']['sections']), [
-          'label'  => (string)$section['heading'],
+          'label'  => (string)$section['heading'] !== ''
+                      ? (string)$section['heading']
+                      : privacy_card_label((string)($section['body'] ?? '')),
           'noun'   => 'section',
-          'detail' => $shown . ' block' . ($shown === 1 ? '' : 's'),
+          'detail' => (string)strlen((string)($section['body'] ?? '')) . ' characters',
           'status' => (string)$section['status'],
       ]); ?>
       <input type="hidden" name="sections[<?= $s ?>][id]" value="<?= h($section['id']) ?>">
@@ -736,33 +496,31 @@ if (!$errors && $pending !== '') {
         <?php admin_status_field("sections[$s][status]", (string)$section['status'], 'this section'); ?>
       </div>
 
-      <div class="admin-card__nested">
-        <?php admin_band_head('Blocks', '',
-            ['do' => "block-$s-add:0", 'label' => 'Add a block',
-             'rows' => "sections[$s][blocks]["]); ?>
-
-        <label class="admin__field">
-          <span class="admin__label">Add which kind</span>
-          <select class="admin__input" name="addkind[<?= $s ?>]">
-<?php foreach (PRIVACY_BLOCK_KINDS as $value => $label): ?>
-            <option value="<?= h($value) ?>"><?= h($label) ?></option>
-<?php endforeach; ?>
-          </select>
-        </label>
-
-<?php   foreach ($section['blocks'] as $b => $block): ?>
-        <div class="admin-card admin-card--slim">
-          <?php admin_card_head("block-$s", $b, count($section['blocks']), [
-              'label'  => privacy_card_label((string)($block['text'] ?? $block['caption'] ?? '')),
-              'noun'   => strtolower(PRIVACY_BLOCK_KINDS[$block['kind']]),
-              'status' => (string)$block['status'],
-          ]); ?>
-          <?php privacy_block_fields($s, $b, $block); ?>
-        </div>
-<?php   endforeach; ?>
+      <div class="admin__field admin__field--wide">
+        <label class="admin__label" for="section-<?= $s ?>-body">The section, in Markdown</label>
+        <textarea class="admin__input admin__textarea admin__textarea--tall" id="section-<?= $s ?>-body"
+                  name="sections[<?= $s ?>][body]" rows="12" data-md><?= h((string)($section['body'] ?? '')) ?></textarea>
+        <span class="admin__hint">Paragraphs, lists, tables and notes — the ribbon above inserts the syntax.</span>
       </div>
     </div>
 <?php endforeach; ?>
+  </fieldset>
+
+  <!-- ========================= preview ========================= -->
+  <fieldset class="admin__block" id="band-preview">
+    <?php admin_band_head('Preview',
+        'What the visitor would get from exactly what is in this form right '
+      . 'now. Rendered by the same code that prints the page — previewing '
+      . 'saves nothing and publishes nothing.',
+        ['do' => 'preview:0', 'label' => 'Preview']); ?>
+
+<?php if ($preview !== ''): ?>
+    <div class="admin__preview">
+      <?= $preview ?>
+    </div>
+<?php else: ?>
+    <p class="admin__empty">Press Preview to render the policy as the page will print it.</p>
+<?php endif; ?>
   </fieldset>
 
   <!-- ====================== the closing band ====================== -->

@@ -47,7 +47,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 SKEW = 300
 MAX_BYTES = 1048576
 ASSET_MAX_BYTES = 2097152      # PUBLISH_ASSET_MAX_BYTES in lib/publish.php
-CONTRACT_VERSION = 1
+CONTRACT_VERSION = 2  # must match lib/contract.php: a stub refusing the version
+                  # the code actually sends would fail every publish
 
 # Where each format is posted. lib/publish_client.php derives the second from
 # the first by swapping the last path segment, so a stub that answered both at

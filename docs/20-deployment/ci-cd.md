@@ -103,7 +103,7 @@ parallel:
 | `checks` | the **twelve** static checks, then a verdict — `build_deploy_set.py --check` is one of them, not an extra | python, php |
 | `php` | every suite that drives a real PHP server and a real sign-in, then a verdict | php, php-gd, php-xml, qrencode |
 | `both halves` | `test_end_to_end.py --clone` — this repository against the frontend, nothing stubbed | php, php-gd, network |
-| `firefox` | **both** browser suites — `test_editor.py` and `test_admin_forms.py` — then a verdict, then `check_admin_a11y.py` over twenty-seven signed-in screens in a step of its own | firefox, geckodriver, Pillow |
+| `firefox` | **both** browser suites — `test_editor.py` and `test_admin_forms.py` — then a verdict, then `check_admin_a11y.py` over twenty-eight signed-in screens in a step of its own | firefox, geckodriver, Pillow |
 
 ### A suite on disk and not on that list is a suite that does not exist
 
@@ -149,7 +149,7 @@ here, and every job in both workflows is built this way now.
 
 Every browser suite calls `shutil.which("firefox")` and, finding nothing, prints a notice and
 **exits 0**. That is right on a laptop without geckodriver installed. It is wrong in CI, where a
-failed install would turn this whole job — two suites and a twenty-seven-screen accessibility crawl
+failed install would turn this whole job — two suites and a twenty-eight-screen accessibility crawl
 — into green ticks that proved nothing.
 
 So the workflow requires `php`, `firefox` and `geckodriver` to be on `PATH` in a step of its own,

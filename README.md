@@ -117,5 +117,5 @@ Standing the host up: [docs/20-deployment/admin-activation.md](docs/20-deploymen
 **All seventeen of the public site's pages are editable here** — their copy, their pictures, their
 metadata, the header and footer around them, and the colour tokens — as are `robots.txt`, the
 sitemap's hints and the web manifest. The admin's own screens are crawled by
-`tools/check_admin_a11y.py`, which signs in and walks **twenty-seven** of them; the frontend's
+`tools/check_admin_a11y.py`, which signs in and walks **twenty-eight** of them; the frontend's
 accessibility crawlers still cover only the public site, which is what they are for.

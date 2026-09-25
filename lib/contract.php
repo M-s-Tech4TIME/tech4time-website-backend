@@ -50,7 +50,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/html.php';
 
 /** The shape both repositories implement. See the header before changing it. */
-const CONTRACT_VERSION = 1;
+const CONTRACT_VERSION = 2;
 
 /** Every document that is published, by name. The endpoint refuses any other. */
 const CONTRACT_DOCUMENTS = ['careers', 'contact', 'company', 'milestones', 'about',
@@ -4784,56 +4784,19 @@ function branding_download_label(array $file): string
    ========================================================================== */
 
 /**
- * The kinds of block a section may hold, and what the editor calls each one.
+ * Body text is Markdown, rendered by lib/markdown.php — there are no block
+ * kinds any more. Structure lives in the section (heading, anchor, status)
+ * and in the callout/CTA bands; a section body holds prose, lists, tables
+ * and notes in the frozen dialect, and the renderer owns all markup. Anyone
+ * reaching for a seventh block kind is reaching for Markdown syntax, which
+ * is specified in tech4time-website-frontend/plans/legal-markdown-syntax.md
+ * rather than added as code.
  *
- * A CLOSED SET, and forced as much as chosen. rt_sanitise_html() allows nine
- * tags -- p, br, strong, em, u, ul, ol, li, a -- and no heading, no <address>
- * and no <table> among them. Structure therefore cannot live in a rich-text
- * field: somebody typing <h3> into one would watch it disappear on save, with
- * no way to tell that from a bug. So structure is a KIND, and the renderer
- * owns the markup for it; the rich field carries only what may appear inside a
- * paragraph.
- *
- * The list is what the page already contains and nothing more. A seventh shape
- * costs a row here and an arm in privacy_block_defaults(), which is the whole
- * price of adding one.
+ * The kinds died at the Markdown cutover with the three-level card UI, and
+ * their constants went with them rather than lingering as documentation.
+ * An unknown anything in an old document is handled the same way an unknown
+ * block kind used to be: shown, never dropped.
  */
-const PRIVACY_BLOCK_KINDS = [
-    'paragraph'  => 'Paragraph',
-    'list'       => 'Bulleted list',
-    'subheading' => 'Subheading',
-    'note'       => 'Highlighted note',
-    'address'    => 'Address block',
-    'table'      => 'Two-column table',
-];
-
-/**
- * The kinds whose own 'text' is markup rather than plain words.
- *
- * INLINE MARKUP ONLY, THROUGH rt_sanitise_inline(). Every one of these is
- * rendered INSIDE an element the renderer supplies -- a <p>, a
- * <p class="legal__notice">, an <address> -- so a <p> arriving from the editor
- * is not emphasis somebody added, it is a paragraph inside a paragraph. And
- * pressing Enter in a textarea is how it would arrive, which is not a corner
- * case. The same goes for a list row and a summary point, both of which land
- * in an <li>.
- *
- * 'address' is here, and that is the interesting one. Two of its five lines
- * carry links -- a mailto: and a tel: -- and rt_safe_href() permits exactly
- * those schemes, so the block round-trips as written, <strong>, <br> and all.
- * Holding it as a list of plain lines instead would have thrown both links
- * away.
- */
-const PRIVACY_RICH_BLOCKS = ['paragraph', 'note', 'address'];
-
-/** 'subheading' is the one kind whose text is plain: it becomes an <h3>. */
-const PRIVACY_PLAIN_BLOCKS = ['subheading'];
-
-/** The kinds that hold rows of their own, and the function that fills one row. */
-const PRIVACY_ROW_BLOCKS = [
-    'list'  => 'privacy_item_defaults',
-    'table' => 'privacy_cell_defaults',
-];
 
 /* Free-text single-line fields, by band. The sections carry their own
    headings, so 'policy' holds only the effective date and the callout. */
@@ -4893,6 +4856,12 @@ function privacy_defaults(): array
     return [
         'updated'  => '',
         'revision' => 0,
+        /* THE WHOLE PAGE, SHOWN OR GONE. Edited on the legal hub, one switch
+           per document: hidden answers 404, leaves the sitemap and the pills,
+           and keeps every word for re-showing. Stronger than noindex, which
+           keeps a live page out of search; when both are set, hidden wins
+           without a word, because there is no page to index. */
+        'status'   => 'shown',
         'meta'     => [
             'title'       => 'Privacy Policy | Tech4TIME',
             'description' => 'What Tech4TIME collects, why, how long it is kept and what '
@@ -4960,6 +4929,10 @@ function privacy_normalise(array $data): array
     $data['meta'] = contract_meta_defaults($data['meta'] ?? [],
                                           $defaults['meta']);
 
+    /* The whole page, shown or gone -- constrained here rather than trusted,
+       because anything that is not exactly 'hidden' is shown. */
+    $data['status'] = ($data['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown';
+
     foreach (PRIVACY_BANDS as $band) {
         $data[$band]['status'] =
             ($data[$band]['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown';
@@ -5012,76 +4985,21 @@ function privacy_callout_defaults(mixed $callout): array
     return $callout;
 }
 
-/** One headed section of the policy: an <h2> with an anchor, and its blocks. */
+/** One headed section of the policy: an <h2> with an anchor, and a Markdown body. */
 function privacy_section_defaults(array $row): array
 {
     $row += [
         'id'      => '',
         'heading' => '',
         'status'  => 'shown',
+        'body'    => '',
     ];
-
-    $blocks = is_array($row['blocks'] ?? null) ? $row['blocks'] : [];
-    $row['blocks'] = array_map(
-        'privacy_block_defaults',
-        array_values(array_filter($blocks, 'is_array'))
-    );
+    $row['status'] = ($row['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown';
 
     return $row;
 }
 
-/**
- * One block, normalised down to the fields its kind actually uses.
- *
- * NARROWED, not merely filled. A block that was a list and is now a paragraph
- * would otherwise keep its items[] for ever -- invisible on the page, carried
- * in the document, and published every time. Keeping only what the kind reads
- * means what is stored is what is rendered, which is the same bargain
- * upload_store() makes with a picture.
- *
- * An unknown kind becomes a paragraph rather than being dropped. Dropping it
- * would lose words somebody wrote; a paragraph shows them, which is the
- * failure that can be seen and fixed.
- */
-function privacy_block_defaults(array $row): array
-{
-    $kind = (string)($row['kind'] ?? '');
-    $kind = isset(PRIVACY_BLOCK_KINDS[$kind]) ? $kind : 'paragraph';
-
-    $block = [
-        'id'     => (string)($row['id'] ?? ''),
-        'kind'   => $kind,
-        'status' => ($row['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown',
-    ];
-
-    if (in_array($kind, PRIVACY_RICH_BLOCKS, true) || in_array($kind, PRIVACY_PLAIN_BLOCKS, true)) {
-        $block['text'] = (string)($row['text'] ?? '');
-    }
-
-    if (isset(PRIVACY_ROW_BLOCKS[$kind])) {
-        $rows = is_array($row['rows'] ?? null) ? $row['rows'] : [];
-        $block['rows'] = array_map(
-            PRIVACY_ROW_BLOCKS[$kind],
-            array_values(array_filter($rows, 'is_array'))
-        );
-    }
-
-    if ($kind === 'table') {
-        /* The caption is read out before the table and shown to nobody. It is
-           not decoration: a table with no caption is announced as "table" and
-           the listener has to infer what it holds from the first cell. */
-        $block['caption'] = (string)($row['caption'] ?? '');
-        $columns = is_array($row['columns'] ?? null) ? array_values($row['columns']) : [];
-        $block['columns'] = [
-            (string)($columns[0] ?? ''),
-            (string)($columns[1] ?? ''),
-        ];
-    }
-
-    return $block;
-}
-
-/** One bullet, in a list block or in the callout. 'text' is sanitised HTML. */
+/** One bullet in the callout. 'text' is Markdown source, rendered inline. */
 function privacy_item_defaults(array $row): array
 {
     return $row + [
@@ -5091,22 +5009,6 @@ function privacy_item_defaults(array $row): array
     ];
 }
 
-/**
- * One row of a two-column table: the <th scope="row"> and the <td> beside it.
- *
- * Both plain. A retention period is a fact, and the one thing a legal table
- * should not invite is a link or an emphasis that changes what the row appears
- * to promise.
- */
-function privacy_cell_defaults(array $row): array
-{
-    return $row + [
-        'id'     => '',
-        'label'  => '',
-        'value'  => '',
-        'status' => 'shown',
-    ];
-}
 
 /** One button in the closing band. The page ships with two. */
 function privacy_button_defaults(array $row): array
@@ -5157,53 +5059,15 @@ function privacy_identify(array $data): array
         $data['policy']['callout']['items'][$i]['id'] = $id;
     }
 
-    $sections = contract_identify_rows(
+    $ids = contract_identify_rows(
         $data['policy']['sections'], PRIVACY_SECTION_PLACEHOLDER,
         static fn(array $r): string => (string)($r['heading'] ?? '')
     );
-
-    foreach ($sections as $s => $id) {
+    foreach ($ids as $s => $id) {
         $data['policy']['sections'][$s]['id'] = $id;
-
-        $blocks = contract_identify_rows(
-            $data['policy']['sections'][$s]['blocks'], PRIVACY_ID_PLACEHOLDER,
-            static fn(array $r): string => (string)($r['kind'] ?? '')
-        );
-
-        foreach ($blocks as $b => $bid) {
-            $data['policy']['sections'][$s]['blocks'][$b]['id'] = $bid;
-
-            if (!isset($data['policy']['sections'][$s]['blocks'][$b]['rows'])) {
-                continue;
-            }
-
-            $rows = contract_identify_rows(
-                $data['policy']['sections'][$s]['blocks'][$b]['rows'], PRIVACY_ID_PLACEHOLDER,
-                static function (array $r): string {
-                    $name = trim((string)($r['label'] ?? ''));
-                    return $name !== '' ? $name : privacy_row_name((string)($r['text'] ?? ''));
-                }
-            );
-            foreach ($rows as $r => $rid) {
-                $data['policy']['sections'][$s]['blocks'][$b]['rows'][$r]['id'] = $rid;
-            }
-        }
     }
 
     return $data;
-}
-
-/**
- * A short name for a row that has only prose to be named after.
- *
- * Bounded, because contract_slug() will happily turn a forty-word bullet into
- * a forty-word id and then that id is frozen for good.
- */
-function privacy_row_name(string $text): string
-{
-    $words = preg_split('/\s+/', trim(rt_plain($text))) ?: [];
-
-    return implode(' ', array_slice($words, 0, 6));
 }
 
 /** Whether a band of the page is shown at all. */
@@ -5225,42 +5089,20 @@ function privacy_sections(array $data): array
 }
 
 /**
- * Re-sanitise every rich field this document carries.
+ * Leave Markdown source byte-identical, explicitly.
  *
- * Its own function rather than a branch inside contract_sanitise(), because
- * the walk is three levels deep and the knowledge of which of six kinds hold
- * markup belongs beside the constant that says so.
+ * The old walk re-sanitised HTML-subset fields; Markdown source must never
+ * meet rt_sanitise_html(), which would entity-mangle it (and double-encode
+ * on render). Safety lives in lib/markdown.php instead: it escapes every
+ * text run, validates every URL, and emits only a fixed tag vocabulary --
+ * proven by tools/test_markdown.py in both repositories, which is the same
+ * shape of guarantee a re-sanitise pass gives, minus the mangling. The
+ * branch stays explicit rather than falling to the throw below, for the
+ * reason the seo branch states: "nothing to sanitise" must not arrive at
+ * the same line as "document I do not know".
  */
 function privacy_sanitise(array $data): array
 {
-    $callout = $data['policy']['callout'] ?? [];
-    $data['policy']['callout']['note'] = rt_sanitise_inline((string)($callout['note'] ?? ''));
-
-    foreach ($callout['items'] ?? [] as $i => $row) {
-        $data['policy']['callout']['items'][$i]['text'] =
-            rt_sanitise_inline((string)($row['text'] ?? ''));
-    }
-
-    foreach ($data['policy']['sections'] ?? [] as $s => $section) {
-        foreach ($section['blocks'] ?? [] as $b => $block) {
-            $kind = (string)($block['kind'] ?? '');
-
-            if (in_array($kind, PRIVACY_RICH_BLOCKS, true)) {
-                $data['policy']['sections'][$s]['blocks'][$b]['text'] =
-                    rt_sanitise_inline((string)($block['text'] ?? ''));
-            }
-
-            if ($kind !== 'list') {
-                continue;
-            }
-
-            foreach ($block['rows'] ?? [] as $r => $row) {
-                $data['policy']['sections'][$s]['blocks'][$b]['rows'][$r]['text'] =
-                    rt_sanitise_inline((string)($row['text'] ?? ''));
-            }
-        }
-    }
-
     return $data;
 }
 
@@ -5363,18 +5205,11 @@ function privacy_source_text(array $data): string
 
     foreach ($data['policy']['sections'] ?? [] as $section) {
         $parts[] = (string)($section['heading'] ?? '');
-        foreach ($section['blocks'] ?? [] as $block) {
-            $parts[] = (string)($block['text'] ?? '');
-            $parts[] = (string)($block['caption'] ?? '');
-            foreach ($block['columns'] ?? [] as $column) {
-                $parts[] = (string)$column;
-            }
-            foreach ($block['rows'] ?? [] as $row) {
-                $parts[] = (string)($row['text'] ?? '');
-                $parts[] = (string)($row['label'] ?? '');
-                $parts[] = (string)($row['value'] ?? '');
-            }
-        }
+        /* Markdown source, not rendered output: markers never hide a word
+           (they stand beside it), so containment still finds the facts.
+           Rendered HTML would work too, but tags would need stripping first
+           and this is the cheaper honest haystack. */
+        $parts[] = (string)($section['body'] ?? '');
     }
 
     $parts[] = (string)($data['cta']['text'] ?? '');

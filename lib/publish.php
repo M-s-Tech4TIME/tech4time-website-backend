@@ -17,7 +17,7 @@
  *
  * THE ENVELOPE
  *   {
- *     "contract_version": 1,        the shape; see lib/contract.php
+ *     "contract_version": 2,        the shape; see lib/contract.php
  *     "document":         "careers",
  *     "revision":         12,       monotonic per document
  *     "published":        "2026-08-26T09:14:03+00:00",

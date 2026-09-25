@@ -74,6 +74,7 @@ The public site's palette, layout, motion, JavaScript modules and page markup ar
 | Whether a link moves screens without reloading | write it as `?s=<section>`; `public/assets/js/admin-swap.js` |
 | What survives a move between screens | anything outside `#admin-body` — the rail, and nothing else |
 | The rich-text toolbar | `public/assets/js/editor.js` |
+| The Markdown ribbons (legal documents) | `public/assets/js/md-editor.js` — plaintext surface, syntax insertion, no preview (preview is server-rendered through the shared renderer) |
 | Where "Saved …" appears | `public/assets/js/admin-toast.js` — the server still prints it into the page |
 | What a confirmation question looks like | `public/assets/js/admin-dialog.js`; the `<dialog>` styles are in `admin.css` |
 | The "On this page" column, and its marker | `admin_foot()` in `lib/admin.php`; `public/assets/js/admin-outline.js` |

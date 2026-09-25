@@ -42,3 +42,4 @@ new record superseding the old one rather than quietly doing the opposite.
 | [0022](0022-form-properties-are-read-off-the-prototype.md) | A form's properties are read off the prototype, never off the form | accepted |
 | [0023](0023-the-header-and-footer-are-emitted-once.md) | The header, footer and dock are emitted once, from a document anybody can edit | accepted, **built** |
 | [0024](0024-one-mark-many-renditions.md) | One mark, many renditions: the site's identity is a document | accepted, **built** |
+| [0025](0025-legal-documents-are-markdown.md) | Legal documents are Markdown, rendered by one shared library | accepted |

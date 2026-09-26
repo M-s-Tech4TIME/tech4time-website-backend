@@ -406,10 +406,11 @@
   /* Dropdown menus: style (paragraph + H2-H6) and alignment. Native
      <select>s cannot carry icons in their options, and this ribbon is icons
      or it is text pretending -- so these are buttons opening menus, with
-     the menu contract spelled out: one open at a time, arrows/Home/End
-     travel, Enter/Space activates, Escape and outside-click close with focus
-     back on the trigger, Tab leaves and closes behind it. No focus trap: a
-     menu is dismissed, never modal, unlike admin-dialog.js. */
+     the menu contract spelled out: one open at a time, the options laid
+     out in a horizontal strip, arrows/Home/End travel, Enter/Space
+     activates, Escape and outside-click close with focus back on the
+     trigger, Tab leaves and closes behind it. No focus trap: a menu is
+     dismissed, never modal, unlike admin-dialog.js. */
   var openMenu = null;
 
   function closeMenu(refocus) {

@@ -1798,13 +1798,15 @@ html { scroll-padding-block-start: var(--admin-bar-h); }
   border-color: transparent;
 }
 
-/* The open menu: the trigger's twins stacked, sharing its border. Items
-   carry icon + visually-hidden name; the glyph rules below size both. */
+/* The open menu: the trigger's options in a horizontal strip, sharing its
+   border. Items carry icon + visually-hidden name; the glyph rules below
+   size both. Absolute, so the strip overlays the field instead of shifting
+   the ribbon. */
 .rte__menu {
   position: absolute;
   z-index: 60;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   min-width: 3rem;
   padding: var(--space-3xs);
   background-color: var(--bg-elevated);

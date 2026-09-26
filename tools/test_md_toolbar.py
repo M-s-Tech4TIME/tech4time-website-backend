@@ -296,6 +296,10 @@ def run(b: Browser, web_port: int, r: Results):
     open_menu("Heading level")
     r.check("one open at a time",
             b.js("return document.querySelectorAll('#band-policy .rte__menu:not([hidden])').length") == 1)
+    r.check("its options run in a horizontal strip, not a column",
+            b.js("var m = document.querySelector('#band-policy .rte__menu:not([hidden])');"
+                 "return getComputedStyle(m).flexDirection === 'row'"
+                 " && new Set([...m.children].map(el => el.offsetTop)).size === 1"))
     open_menu("Text alignment")
     r.check("opening another closes the first",
             b.js("return document.querySelectorAll('#band-policy .rte__menu:not([hidden])').length") == 1)

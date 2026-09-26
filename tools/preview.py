@@ -8,6 +8,8 @@ Run from the repo root:
     python3 tools/preview.py             # opens a browser, signed in
     python3 tools/preview.py --no-browser    # just the server and the codes
     python3 tools/preview.py 8123        # a different port
+    python3 tools/preview.py legal       # land on the legal hub instead
+    python3 tools/preview.py 8123 legal  # both: a port and a landing screen
 
 WHAT THIS IS FOR
 Looking at the editors. Reviewing a change to the shell means seeing the rail,
@@ -46,6 +48,7 @@ sign in yourself in whatever browser you like.
 
 import json
 import os
+import re
 import shutil
 import signal
 import socket
@@ -270,7 +273,16 @@ def main() -> None:
     if not shutil.which("php"):
         raise SystemExit("This needs the PHP CLI:  sudo apt install php-cli")
 
-    port = int(args[0]) if args else DEFAULT_PORT
+    port = DEFAULT_PORT
+    section = "company"
+    for arg in args:
+        if arg.isdigit():
+            port = int(arg)
+        elif re.fullmatch(r"[a-z]+", arg):
+            section = arg
+        else:
+            raise SystemExit(f"cannot tell if {arg!r} is a port or a screen -- "
+                             f"ports are digits, screens are ?s=<name>")
     base = f"http://127.0.0.1:{port}"
 
     want_browser = "--no-browser" not in flags
@@ -320,7 +332,7 @@ def main() -> None:
             if wait_for(drv_port):
                 browser = Browser(drv_port)
                 browser.sign_in(base, secret)
-                browser.go(base + "/?s=company")
+                browser.go(base + f"/?s={section}")
 
                 # Asked rather than assumed: a sign-in that silently did not
                 # take leaves a browser sitting on the login page, and saying

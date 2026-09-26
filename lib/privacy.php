@@ -98,10 +98,16 @@ function privacy_validate(array $data): array
 
     /* THE ONE FIELD ON THIS PAGE THAT IS A LEGAL CLAIM ON ITS OWN. A policy
        with no effective date does not say when it started applying, which is
-       the first thing anybody checks and the first thing anybody disputes. */
-    if (trim((string)$data['policy']['effective']) === '') {
-        $errors[] = 'The policy has no effective date. Say when it took effect — it is '
-                  . 'the line at the top of the page.';
+       the first thing anybody checks and the first thing anybody disputes.
+       A calendar date, not a sentence: the field is a date picker, and
+       anything that is not YYYY-MM-DD is refused rather than guessed at. */
+    $effective = trim((string)$data['policy']['effective']);
+    $parts = [];
+    if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $effective, $parts)
+        || !checkdate((int)$parts[2], (int)$parts[3], (int)$parts[1])
+    ) {
+        $errors[] = 'The policy has no effective date. Pick it from the calendar — '
+                  . 'it is the line at the top of the page.';
     }
     if (trim((string)$data['policy']['label']) === '') {
         $errors[] = 'The section needs a name for screen readers. It is the heading '
@@ -113,42 +119,45 @@ function privacy_validate(array $data): array
             && trim((string)$callout['title']) === '') {
         $errors[] = 'The summary box is shown but has no heading.';
     }
-    foreach ($callout['items'] as $i => $item) {
-        /* Rendered, for the same reason sections are: Markdown that is only
-           syntax is empty too. */
-        if (trim(strip_tags(md_render((string)$item['text']))) === '') {
-            $errors[] = 'Summary point ' . ($i + 1) . ' is empty.';
-        }
-    }
 
-    $anchors = [];
-    foreach ($data['policy']['sections'] as $s => $section) {
-        $where = 'Section ' . ($s + 1);
-
-        if (trim((string)$section['heading']) === '') {
-            /* A section with no heading renders an <h2> with nothing in it,
-               and the Table of Contents links to an anchor with no name --
-               which audit_pages.py checks for on the public side, after it
-               has already shipped. */
-            $errors[] = "$where has no heading.";
-        }
-
-        /* An anchor is a promise. Two sections answering to one fragment means
-           a link that used to land somewhere now lands somewhere else, and
-           the page cannot tell you which. */
-        $anchor = (string)$section['id'];
-        if (in_array($anchor, $anchors, true)) {
-            $errors[] = "$where has the same web address as another section (#$anchor).";
-        }
-        $anchors[] = $anchor;
-
-        /* A body that renders to nothing is a section that says nothing: the
-           heading and its anchor ship, and the reader lands on an empty
-           heading. Rendered, not trimmed -- Markdown that is only syntax
-           (`**`, empty fences, a header row with no body) is empty too. */
-        require_once __DIR__ . '/markdown.php';
-        if (trim(strip_tags(md_render((string)($section['body'] ?? '')))) === '') {
-            $errors[] = "$where has no words in it.";
+    /* The policy is one body. It keeps the landmark order the whole page
+       promises: the hero is the h1, so a body opens on h2 and never skips
+       a level down. The renderer is line-blind by design, so this rule
+       lives here, where the body is visible whole. An explicitly doubled
+       {#id} is refused for the same reason a doubled section anchor always
+       was; slugged twins get -2 silently, because nothing stated is wrong. */
+    $body = (string)($data['policy']['body'] ?? '');
+    require_once __DIR__ . '/markdown.php';
+    if (trim(strip_tags(md_render($body))) === '') {
+        /* Rendered, not trimmed -- Markdown that is only syntax (`**`,
+           empty fences, a header row with no body) is empty too. A policy
+           that renders to nothing is a page with a title and no policy. */
+        $errors[] = 'The policy has no words in it.';
+    } else {
+        $prev = 1;
+        $stated = [];
+        $lines = preg_split('/\r\n|\r|\n/', $body) ?: [];
+        foreach ($lines as $line) {
+            $heading = md_parse_heading($line);
+            if ($heading === null) {
+                continue;
+            }
+            [$level, $text, $explicit] = $heading;
+            if ($prev === 1 && $level !== 2) {
+                $errors[] = "The policy opens on an H$level heading — the page "
+                          . 'title is the H1, so it starts at H2.';
+            } elseif ($level > $prev + 1) {
+                $errors[] = "The policy jumps from H$prev to H$level in \"$text\" — "
+                          . 'fill the level between, or the page skips a landmark.';
+            }
+            $prev = $level;
+            if ($explicit !== null) {
+                if (isset($stated[$explicit])) {
+                    $errors[] = "The policy states #$explicit twice — one of "
+                              . 'them must be renamed.';
+                }
+                $stated[$explicit] = true;
+            }
         }
     }
 

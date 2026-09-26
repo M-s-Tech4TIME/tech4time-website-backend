@@ -249,7 +249,7 @@ def run(client, r, site):
 
     status, page = client.get(ADMIN)
     r.check("the screen is served", status == 200, f"status {status}")
-    for band in ("band-hero", "band-facts", "band-callout", "band-sections",
+    for band in ("band-hero", "band-facts", "band-callout", "band-policy",
                  "band-preview", "band-cta", "band-meta"):
         r.check(f"it has {band}", f'id="{band}"' in page)
 
@@ -278,131 +278,66 @@ def run(client, r, site):
             "admin-forms.js" in page,
             "admin_foot() did not run — every button would be a full reload")
 
-    print("\nthe twelve sections it starts with, as Markdown")
+    print("\nthe policy is one Markdown field")
 
-    heads = headings(page)
-    r.check("all twelve are on the screen", len(heads) == 12, f"{len(heads)} headings")
-    r.check("the first is the one the page opens with",
-            heads[0] == "Who is responsible for your data", heads[0] if heads else "")
-    r.check("each carries its own anchor",
-            fields.get("sections[6][id]") == "your-rights",
-            fields.get("sections[6][id]", "missing"))
-    r.check("the anchor is shown beside the heading it will not follow",
-            "<code>#your-rights</code>" in page)
-    r.check("every body is a Markdown field, not an HTML one",
-            len(re.findall(r'data-md', page)) >= 13,
-            "the ribbon has nothing to attach to")
-    r.check("and no block inputs survive from the card era",
-            "sections[6][blocks]" not in page
-            and "PRIVACY_BLOCK_KINDS" not in page)
+    r.check("a single body holds the whole policy",
+            "policy[body]" in fields, "no single body field")
+    r.check("twelve headings with pinned anchors inside it",
+            fields.get("policy[body]", "").count("## ") >= 12,
+            "the sections did not all arrive")
+    r.check("old anchors preserved as suffixes",
+            "## Who is responsible for your data {#who-we-are}" in fields.get("policy[body]", ""))
+    r.check("and no section inputs survive from the card era",
+            "sections[0][heading]" not in page
+            and "sections[0][blocks]" not in page)
     r.check("the retention table travelled as Markdown",
-            "| What | How long |" in fields.get("sections[4][body]", ""),
-            fields.get("sections[4][body]", "")[:80])
-
-    print("\nthe effective date is a field, and only a field")
-
-    r.check("it is on the screen", fields.get("policy[effective]") == "Effective 21 August 2026",
+            "| What | How long |" in fields.get("policy[body]", ""))
+    r.check("the effective date is a calendar picker",
+            'name="policy[effective]"' in page and 'type="date"' in page,
+            "free-text dates misstate legal claims")
+    r.check("currently the migration date",
+            fields.get("policy[effective]") == "2026-08-21",
             fields.get("policy[effective]", "missing"))
-    r.check("the form says nothing changes it for you",
-            "Fixing a typo is not a new policy" in page)
 
     print("\nediting Markdown reaches the live site verbatim")
 
-    fields["sections[9][body]"] = "Children marker **A7**.\n\n- one\n- two"
+    fields["policy[body]"] = "## Test head {#test-head}\n\nMarker **A7**."
     status, headers, _ = save(client, fields)
     r.check("the save redirected", status in (302, 303), f"status {status}")
-    sent = sections_sent(site)
-    r.check("the live site was sent the document", len(sent) == 12, f"{len(sent)} sections")
-    r.check("with the edited body in it, unmangled",
-            sent[9].get("body") == "Children marker **A7**.\n\n- one\n- two",
-            sent[9].get("body", "")[:90])
+    sent = published(site)
+    r.check("the live site was sent the document",
+            "Marker **A7**." in sent.get("policy", {}).get("body", ""),
+            "body missing")
 
     print("\nhostile input round-trips byte-identical -- never sanitised")
 
     hostile = "<script>alert(9)</script>\n\n[click](javascript:alert(9))\n\n**ok**"
     _status, page = client.get(ADMIN)
     fields = form_fields(page)
-    fields["sections[9][body]"] = hostile
+    fields["policy[body]"] = "## Test head {#test-head}\n\n" + hostile
     status, _headers, _ = save(client, fields)
     r.check("even hostile input saves", status in (302, 303), f"status {status}")
-    sent = sections_sent(site)
+    sent = published(site)
     r.check("and arrives byte-identical -- sanitising Markdown would mangle it",
-            sent[9].get("body") == hostile,
-            sent[9].get("body", "")[:100])
+            hostile in sent.get("policy", {}).get("body", ""),
+            sent.get("policy", {}).get("body", "")[:100])
 
     print("\npreview renders without saving")
 
     _status, page = client.get(ADMIN)
     fields = form_fields(page)
     before = json.loads(DATA.read_bytes())["revision"]
-    fields["sections[9][body]"] = "Preview marker **P4**."
+    fields["policy[body]"] = "## Preview head {#preview-head}\n\nPreview marker **P4**."
     status, _headers, body = client.post(ADMIN, {**fields, "do": "preview:0"})
     r.check("the preview comes back", status == 200, f"status {status}")
-    r.check("with the rendered sections",
-            "<h2" in body and "<strong>P4</strong>" in body,
+    r.check("with the rendered heading and emphasis",
+            '<h2 class="legal__heading" id="preview-head">Preview head</h2>' in body
+            and "<strong>P4</strong>" in body,
             "Markdown did not render")
     r.check("and the revision on disk did not move",
             json.loads(DATA.read_bytes())["revision"] == before,
             "preview wrote the file -- it is a save wearing a different label")
     r.check("saying so out loud", "nothing was saved" in body)
-
-    print("\nadding a section, and the anchor rule that has teeth")
-
-    _status, page = client.get(ADMIN)
-    fields = form_fields(page)
-    page = press(client, r, fields, "section-add:0", "adding a section")
-    fields = form_fields(page)
-    r.check("there are thirteen now", len(headings(page)) == 13)
-    r.check("the new one arrives hidden",
-            fields.get("sections[12][status]") == "hidden",
-            fields.get("sections[12][status]", "missing"))
-    r.check("with an empty Markdown body",
-            fields.get("sections[12][body]") == "",
-            repr(fields.get("sections[12][body]", "missing"))[:60])
-
-    # Name it exactly as an existing section, and move it above that one.
-    fields["sections[12][heading]"] = "Your rights"
-    fields["sections[12][status]"] = "shown"
-    fields["sections[12][body]"] = "Newcomer words."
-    # The index moves with the row. Pressing "section-up:12" a second time
-    # would move whatever landed at 12, not the row being dragged.
-    for at in range(12, 6, -1):
-        page = press(client, r, fields, f"section-up:{at}", f"moving it up from {at}")
-        fields = form_fields(page)
-
-    heads = headings(page)
-    r.check("it sits above the section it was named after",
-            heads.index("Your rights") < len(heads) - 1
-            and heads[6] == "Your rights" and heads[7] == "Your rights",
-            str(heads[5:9]))
-    r.check("the SECTION THAT ALREADY HAD THE ANCHOR KEEPS IT",
-            fields.get("sections[7][id]") == "your-rights",
-            f'the incumbent became {fields.get("sections[7][id]")!r} — a link that was '
-            f'a promise now lands on the wrong section')
-    r.check("and the newcomer is given a different one",
-            fields.get("sections[6][id]") == "your-rights-2",
-            fields.get("sections[6][id]", "missing"))
-
-    page = press(client, r, fields, "section-remove:6", "removing the newcomer")
-    fields = form_fields(page)
-    r.check("twelve again", len(headings(page)) == 12)
-    r.check("and the original still holds the anchor",
-            fields.get("sections[6][id]") == "your-rights")
-
-    print("\nhiding is per section and per point, and hiding is not deleting")
-
-    _status, page = client.get(ADMIN)
-    fields = form_fields(page)
-    fields["sections[8][status]"] = "hidden"
-    fields["callout[items][0][status]"] = "hidden"
-    save(client, fields)
-
-    sent = sections_sent(site)
-    r.check("the hidden section is still IN the document",
-            len(sent) == 12 and sent[8]["status"] == "hidden",
-            f'{len(sent)} sections, section 8 is {sent[8].get("status") if len(sent) > 8 else "gone"}')
-    r.check("and the hidden summary point",
-            published(site)["policy"]["callout"]["items"][0]["status"] == "hidden")
 
     print("\nwhat the editor refuses, and what it does not")
 
@@ -415,22 +350,30 @@ def run(client, r, site):
 
     _status, page = client.get(ADMIN)
     fields = form_fields(page)
-    fields["sections[5][heading]"] = ""
+    fields["policy[effective]"] = "next Tuesday"
     _status, _h, body = save(client, fields)
-    r.check("a section with no heading is refused", "has no heading" in body)
+    r.check("a date that is not a date is refused",
+            "no effective date" in body, "free text sailed through the picker")
 
     _status, page = client.get(ADMIN)
     fields = form_fields(page)
-    fields["sections[5][body]"] = ""
+    fields["policy[body]"] = ""
     _status, _h, body = save(client, fields)
-    r.check("a section with no words is refused", "has no words" in body)
+    r.check("a policy with no words is refused", "has no words" in body)
 
     _status, page = client.get(ADMIN)
     fields = form_fields(page)
-    fields["sections[5][body]"] = ":::note\n:::\n"
+    fields["policy[body]"] = "#### Orphan {#orphan}\n\ntext"
     _status, _h, body = save(client, fields)
-    r.check("a section that renders to nothing is refused too",
-            "has no words" in body, "an empty note sailed through")
+    r.check("a body opening past H2 is refused",
+            "starts at H2" in body, "the landmark skipped silently")
+
+    _status, page = client.get(ADMIN)
+    fields = form_fields(page)
+    fields["policy[body]"] = "## A {#dup}\n\n## B {#dup}\n\ntext"
+    _status, _h, body = save(client, fields)
+    r.check("a doubled explicit anchor is refused",
+            "states #dup twice" in body, "two fragments, one address")
 
     print("\nthe comparison with the contact page is a notice and never a refusal")
 
@@ -441,10 +384,20 @@ def run(client, r, site):
             "Nothing here stops you saving" in page)
 
     fields = form_fields(page)
-    # Rewrite the first section so the policy no longer states the Dhaka office.
-    body0 = fields["sections[0][body]"]
-    assert "Manikdi" in body0, "expected the migrated address in section 0"
-    fields["sections[0][body]"] = "Reached at [info@tech4time.bd](mailto:info@tech4time.bd)."
+    # State the office plainly, then drop it: the hostile save two blocks up
+    # legitimately removed it, so it is written back here first.
+    fields["policy[body]"] = (
+        "## Contact {#contact}\n\n"
+        "Reached at [info@tech4time.bd](mailto:info@tech4time.bd), "
+        "278/3, Manikdi, Dhaka."
+    )
+    status, _headers, body = save(client, fields)
+    r.check("a policy that states the office saves",
+            status in (302, 303), f"status {status}")
+
+    _status, page = client.get(ADMIN)
+    fields = form_fields(page)
+    fields["policy[body]"] = fields["policy[body]"].replace("Manikdi", "Nowhere")
     status, _headers, body = save(client, fields)
     r.check("a policy that has stopped agreeing with the contact page STILL SAVES",
             status in (302, 303),

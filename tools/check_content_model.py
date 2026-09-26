@@ -213,20 +213,16 @@ COVERED_ELSEWHERE = {
     "privacy": (
         "tools/test_privacy_admin.py" if SIDE in ("backend", "both")
         else "tools/test_publish.py",
-        "The privacy policy's sections hold Markdown bodies, not typed blocks: "
-        "a section is {heading, status, body} and the shared renderer owns all "
-        "markup, because raw HTML in source is escaped and structure therefore "
-        "cannot live in a field. Neither half can be read field by field: "
-        "the editor names its inputs "
-        "\"sections[<?= $s ?>][body]\" and "
-        "the page renders with foreach over privacy_rows_shown(), calling "
-        "md_render() per section. It is proved "
-        "by round trip instead: every field set through the editor and read "
-        "back off the wire, add, remove and hide of sections and points, "
-        "every dialect construct rendering its own markup, hostile input "
-        "round-tripping byte-identical, and the anchor rule "
-        "that a section which has been named keeps its fragment when a section "
-        "with the same heading is added above it.",
+        "The privacy policy is one Markdown body, not typed blocks: a single "
+        "policy[body] field the editor posts whole, rendered by one md_render() "
+        "call the page makes. Neither half can be read field by field: the "
+        "editor names one input and the page renders one call, so there is no "
+        "field list to compare. It is proved "
+        "by round trip instead: the body set through the editor and read "
+        "back off the wire, every dialect construct rendering its own markup, "
+        "hostile input round-tripping byte-identical, hierarchy and anchor "
+        "rules refused at save, and the hidden page answering 404. The hub's "
+        "show/hide switch is tools/test_legal_admin.py's subject.",
     ),
     "milestones": (
         "tools/test_milestones_admin.py" if SIDE in ("backend", "both")

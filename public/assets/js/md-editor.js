@@ -283,6 +283,15 @@
   }
 
   var TOOLS = [
+    { select: "heading", title: "Heading level", options: [
+        ["p", "Paragraph"], ["h2", "Heading 2"], ["h3", "Heading 3"],
+        ["h4", "Heading 4"], ["h5", "Heading 5"], ["h6", "Heading 6"]
+      ] },
+    { select: "align", title: "Text alignment", options: [
+        ["none", "Alignment"], ["left", "Left"], ["center", "Center"],
+        ["right", "Right"], ["justify", "Justified"]
+      ] },
+    { separator: true },
     { label: "B", title: "Bold", wrap: ["**", "**", "bold words"],
       className: "rte__btn--bold" },
     { label: "I", title: "Italic", wrap: ["*", "*", "emphasised words"],
@@ -298,6 +307,110 @@
     { icon: "note", title: "Highlight box", fence: ":::note" },
     { icon: "align-center", title: "Centre block", fence: ":::center" }
   ];
+
+  /* Headings and alignment arrive as native selects, not custom menus:
+     keyboard, screen readers, touch and zoom all work without a line of
+     code here. A select keeps its value; both reset to the neutral option
+     after applying, so the ribbon never claims the caret sits in a level
+     it does not track. */
+  var HEADING_PREFIX = { h2: "## ", h3: "### ", h4: "#### ", h5: "##### ",
+                         h6: "###### " };
+
+  function applyHeading(textarea, value) {
+    var start = textarea.selectionStart;
+    var end = textarea.selectionEnd;
+    var val = textarea.value;
+    if (start === null || start === undefined) {
+      return;
+    }
+    while (start > 0 && val[start - 1] !== "\n") {
+      start -= 1;
+    }
+    while (end < val.length && val[end - 1] !== "\n") {
+      end += 1;
+    }
+    var marked = val.slice(start, end).split("\n").map(function (line) {
+      var bare = line.replace(/^#{2,6}\s+/, "");
+      if (value === "p" || bare.trim() === "") {
+        return bare;
+      }
+      return (HEADING_PREFIX[value] || "") + bare;
+    }).join("\n");
+    textarea.focus();
+    if (typeof textarea.setRangeText === "function") {
+      textarea.setRangeText(marked, start, end, "end");
+    } else {
+      textarea.value = val.slice(0, start) + marked + val.slice(end);
+    }
+    textarea.dispatchEvent(new global.Event("input", { bubbles: true }));
+  }
+
+  function applyAlign(textarea, value) {
+    var start = textarea.selectionStart;
+    var end = textarea.selectionEnd;
+    var val = textarea.value;
+    if (start === null || start === undefined) {
+      return;
+    }
+    var chosen = val.slice(start, end);
+    if (value === "none") {
+      /* Unwrap one fence pair the ribbon itself could have written; anything
+         else is hand prose and stays exactly as typed. */
+      var unwrapped = chosen.replace(
+        /^:::(left|center|right|justify)\n([\s\S]*)\n:::$/, "$2");
+      if (unwrapped === chosen) {
+        return;
+      }
+      textarea.focus();
+      if (typeof textarea.setRangeText === "function") {
+        textarea.setRangeText(unwrapped, start, end, "end");
+      } else {
+        textarea.value = val.slice(0, start) + unwrapped + val.slice(end);
+      }
+    } else {
+      var fence = ":::" + value;
+      var trimmed = chosen.trim();
+      if (trimmed === "") {
+        return;
+      }
+      var insert = fence + "\n" + trimmed + "\n:::\n";
+      var from = start + (chosen.length - chosen.replace(/^\s+/, "").length);
+      var to = end - (chosen.length - chosen.replace(/\s+$/, "").length);
+      textarea.focus();
+      if (typeof textarea.setRangeText === "function") {
+        textarea.setRangeText(insert, from, to, "end");
+      } else {
+        textarea.value = val.slice(0, from) + insert + val.slice(to);
+      }
+    }
+    textarea.dispatchEvent(new global.Event("input", { bubbles: true }));
+  }
+
+  function buildSelect(bar, textarea, tool) {
+    var sel = doc.createElement("select");
+    sel.className = "rte__select";
+    sel.setAttribute("aria-label", tool.title);
+    sel.title = tool.title;
+    tool.options.forEach(function (opt) {
+      var el = doc.createElement("option");
+      el.value = opt[0];
+      el.textContent = opt[1];
+      sel.appendChild(el);
+    });
+    /* No mousedown prevention here, unlike the buttons: preventing it would
+       stop the menu opening, and the textarea's selection offsets survive
+       the blur untouched, so there is nothing to protect. */
+    sel.addEventListener("change", function () {
+      if (tool.select === "heading") {
+        applyHeading(textarea, sel.value);
+      } else {
+        applyAlign(textarea, sel.value);
+      }
+      sel.value = tool.options[0][0];
+      textarea.focus();
+    });
+    return sel;
+  }
 
   function build(textarea) {
     /* Field and ribbon in one bordered box, the way the careers surface
@@ -319,6 +432,10 @@
         bar.appendChild(hr);
         return;
       }
+      if (tool.select) {
+        bar.appendChild(buildSelect(bar, textarea, tool));
+        return;
+      }
       var button = doc.createElement("button");
       button.type = "button";
       button.className = "rte__btn" + (tool.className ? " " + tool.className : "");
@@ -329,7 +446,7 @@
       }
       button.title = tool.title;
       button.setAttribute("aria-label", tool.title);
-      button.tabIndex = index === 0 ? 0 : -1;
+      button.tabIndex = -1;
       button.addEventListener("mousedown", function (event) {
         /* Keep the caret in the textarea: focusing the button would move
            the selection before the insertion could use it. */
@@ -351,14 +468,24 @@
       bar.appendChild(button);
     });
 
-    /* Arrow keys travel the toolbar; it is one tab stop, like editor.js. */
+    /* One tab stop for the whole toolbar; arrow keys travel it, selects
+       included -- a dropdown is a toolbar control like the buttons. The
+       first control takes the stop; everything else is reached by arrows. */
+    var first = bar.querySelector("select, button");
+    if (first) {
+      first.tabIndex = 0;
+    }
     bar.addEventListener("keydown", function (event) {
       var keys = { ArrowRight: 1, ArrowLeft: -1, Home: "first", End: "last" };
       if (!(event.key in keys)) {
         return;
       }
+      /* Inside an open select, arrows belong to the menu, not the toolbar. */
+      if (event.target && event.target.nodeName === "SELECT") {
+        return;
+      }
       event.preventDefault();
-      var items = Array.prototype.slice.call(bar.querySelectorAll("button"));
+      var items = Array.prototype.slice.call(bar.querySelectorAll("select, button"));
       var current = items.indexOf(doc.activeElement);
       if (current < 0) {
         current = 0;

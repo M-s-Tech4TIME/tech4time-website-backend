@@ -83,10 +83,11 @@ function legal_toggle(string $doc, string $to): array
 
     $load = LEGAL_DOCS[$doc]['load'];
     $save = LEGAL_DOCS[$doc]['save'];
+    /* No readability gate: the loader normalises whatever is there (missing
+       file included) to the shipped shape, the write is atomic with a .bak
+       beside it, and refusing a toggle on an unreadable file would leave a
+       page nobody can hide. */
     $data = $load();
-    if (($data['revision'] ?? 0) === 0 && $data['updated'] === '') {
-        return [false, 'The document could not be read, so nothing was changed.'];
-    }
     $data['status'] = $to;
 
     if (!$save($data)) {

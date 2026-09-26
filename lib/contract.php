@@ -4785,21 +4785,21 @@ function branding_download_label(array $file): string
 
 /**
  * Body text is Markdown, rendered by lib/markdown.php — there are no block
- * kinds any more. Structure lives in the section (heading, anchor, status)
- * and in the callout/CTA bands; a section body holds prose, lists, tables
- * and notes in the frozen dialect, and the renderer owns all markup. Anyone
- * reaching for a seventh block kind is reaching for Markdown syntax, which
- * is specified in tech4time-website-frontend/plans/legal-markdown-syntax.md
- * rather than added as code.
+ * kinds and no sections array any more. The policy is one body whose ##
+ * headings carry {#anchors}; structure lives in the callout/CTA bands and
+ * in the heading lines themselves. Anyone reaching for structure beyond
+ * that is reaching for Markdown syntax, which is specified in
+ * tech4time-website-frontend/plans/legal-markdown-syntax.md rather than
+ * added as code.
  *
  * The kinds died at the Markdown cutover with the three-level card UI, and
- * their constants went with them rather than lingering as documentation.
- * An unknown anything in an old document is handled the same way an unknown
- * block kind used to be: shown, never dropped.
+ * the sections array went next, when per-section cards proved to be
+ * archaeology for prose: old ids survive as {#suffixes} written by the
+ * migration, so no anchor changed hands.
  */
 
-/* Free-text single-line fields, by band. The sections carry their own
-   headings, so 'policy' holds only the effective date and the callout. */
+/* Free-text single-line fields, by band. 'policy' holds the effective date
+   and the callout; the prose itself is one body field. */
 const PRIVACY_TEXT_FIELDS = [
     'meta'   => CONTRACT_META_TEXT,
     'hero'   => ['title', 'subtitle'],
@@ -4828,19 +4828,8 @@ const PRIVACY_BANDS = ['cta'];
    branding.assets and certifications.certs are handled apart. */
 const PRIVACY_LISTS = ['cta' => 'privacy_button_defaults'];
 
-/* What a block or a row is called before it is called anything. */
+/* What a button is called before it is called anything. */
 const PRIVACY_ID_PLACEHOLDER = 'row';
-
-/**
- * What a SECTION is called before it is called anything, and a separate
- * constant on purpose.
- *
- * A section's id is its anchor. #row-4 is a fragment somebody could link to
- * and then find renamed; #section-4 at least says what it is while it waits
- * for a heading. Blocks and rows are not fragment targets and keep the plain
- * placeholder.
- */
-const PRIVACY_SECTION_PLACEHOLDER = 'section';
 
 /**
  * The page as it ships, and the fallback for anything missing from the file.
@@ -4948,11 +4937,14 @@ function privacy_normalise(array $data): array
 
     $data['policy']['callout'] = privacy_callout_defaults($data['policy']['callout'] ?? []);
 
-    $sections = is_array($data['policy']['sections'] ?? null) ? $data['policy']['sections'] : [];
-    $data['policy']['sections'] = array_map(
-        'privacy_section_defaults',
-        array_values(array_filter($sections, 'is_array'))
-    );
+    /* The policy itself: one Markdown body. Stored verbatim (trimmed) -- see
+       privacy_sanitise() for why nothing here normalises the prose. A
+       pre-cutover document still carrying sections[] degrades to an EMPTY
+       policy here rather than a converted one: conversion is the migration's
+       job, once, reviewed -- and an empty policy is visibly broken where a
+       half-converted one would be silently wrong. */
+    $data['policy']['body'] = (string)($data['policy']['body'] ?? '');
+    unset($data['policy']['sections']);
 
     return privacy_identify($data);
 }
@@ -4960,12 +4952,14 @@ function privacy_normalise(array $data): array
 /**
  * The summary box at the top, "The short version".
  *
- * Its own structure rather than a section, because it is not one: it has no
- * anchor, it renders inside .legal__callout, and its heading is an <h2> that
- * is deliberately NOT a direct child of .legal__body. That last point is
- * load-bearing -- assets/css/pages/legal.css zeroes the top margin of the
- * first direct-child heading, and a flattened callout would steal the match
- * from the first real section.
+ * Title and note only: the bullets lived here as rows, and now live in the
+ * note itself as a Markdown list -- one field, nothing to add, remove or
+ * reorder. Its own structure rather than a section, because it is not one:
+ * it has no anchor, it renders inside .legal__callout, and its heading is
+ * an <h2> that is deliberately NOT a direct child of .legal__body. That last
+ * point is load-bearing -- assets/css/pages/legal.css zeroes the top margin
+ * of the first direct-child heading, and a flattened callout would steal the
+ * match from the first real section.
  */
 function privacy_callout_defaults(mixed $callout): array
 {
@@ -4975,40 +4969,15 @@ function privacy_callout_defaults(mixed $callout): array
         'title'  => '',
         'note'   => '',
     ];
-
-    $items = is_array($callout['items'] ?? null) ? $callout['items'] : [];
-    $callout['items'] = array_map(
-        'privacy_item_defaults',
-        array_values(array_filter($items, 'is_array'))
-    );
+    /* Pre-cutover bullets are folded into the note by the migration, once,
+       reviewed -- not here, on every load. Anything still carrying items
+       afterwards is a stale restore, and its points would render nowhere:
+       dropping them is visible (the note stands without them) where carrying
+       them would be silent. */
+    unset($callout['items']);
 
     return $callout;
 }
-
-/** One headed section of the policy: an <h2> with an anchor, and a Markdown body. */
-function privacy_section_defaults(array $row): array
-{
-    $row += [
-        'id'      => '',
-        'heading' => '',
-        'status'  => 'shown',
-        'body'    => '',
-    ];
-    $row['status'] = ($row['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown';
-
-    return $row;
-}
-
-/** One bullet in the callout. 'text' is Markdown source, rendered inline. */
-function privacy_item_defaults(array $row): array
-{
-    return $row + [
-        'id'     => '',
-        'text'   => '',
-        'status' => 'shown',
-    ];
-}
-
 
 /** One button in the closing band. The page ships with two. */
 function privacy_button_defaults(array $row): array
@@ -5023,23 +4992,12 @@ function privacy_button_defaults(array $row): array
 }
 
 /**
- * Give every row an id.
+ * Give every button an id.
  *
- * Through contract_identify_rows(), which claims every id somebody already
- * chose before it mints anything new. That matters here more than anywhere
- * else on the site: a SECTION's id is its anchor, and the one-pass version
- * lets a section added above an existing one take the existing one's fragment
- * and rename it.
- *
- * Sections are numbered across the policy, because two of them may not answer
- * to the same fragment. Blocks are numbered within their section and rows
- * within their block, as certifications numbers roles within a group -- two
- * sections may each hold a "paragraph-2" without either being renamed, because
- * neither is a link target.
- *
- * A block is named for its KIND rather than for its words. Minting an id out
- * of a sentence gives the longest field on the page the ugliest handle, and
- * then freezes it.
+ * Headings need none from here: anchors resolve at render from {#ids} and
+ * slugs, claimed in order, so there is nothing to mint and nothing to keep.
+ * That is the whole difference from the section era, when an id had to be
+ * frozen before it could be linked to.
  */
 function privacy_identify(array $data): array
 {
@@ -5049,22 +5007,6 @@ function privacy_identify(array $data): array
         foreach ($ids as $i => $id) {
             $data[$band]['items'][$i]['id'] = $id;
         }
-    }
-
-    $ids = contract_identify_rows(
-        $data['policy']['callout']['items'], PRIVACY_ID_PLACEHOLDER,
-        static fn(array $r): string => privacy_row_name((string)($r['text'] ?? ''))
-    );
-    foreach ($ids as $i => $id) {
-        $data['policy']['callout']['items'][$i]['id'] = $id;
-    }
-
-    $ids = contract_identify_rows(
-        $data['policy']['sections'], PRIVACY_SECTION_PLACEHOLDER,
-        static fn(array $r): string => (string)($r['heading'] ?? '')
-    );
-    foreach ($ids as $s => $id) {
-        $data['policy']['sections'][$s]['id'] = $id;
     }
 
     return $data;
@@ -5082,10 +5024,17 @@ function privacy_rows_shown(mixed $rows): array
     return contract_rows_shown($rows);
 }
 
-/** Every section, hidden ones included. The editor lists these. */
+/** Every h2 in the body, in order. The editor lists these; the overview counts them. */
 function privacy_sections(array $data): array
 {
-    return is_array($data['policy']['sections'] ?? null) ? $data['policy']['sections'] : [];
+    require_once __DIR__ . '/markdown.php';
+    $out = [];
+    foreach (md_headings((string)($data['policy']['body'] ?? '')) as $heading) {
+        if ($heading['level'] === 2) {
+            $out[] = $heading;
+        }
+    }
+    return $out;
 }
 
 /**
@@ -5203,14 +5152,9 @@ function privacy_source_text(array $data): string
         $parts[] = (string)($row['text'] ?? '');
     }
 
-    foreach ($data['policy']['sections'] ?? [] as $section) {
-        $parts[] = (string)($section['heading'] ?? '');
-        /* Markdown source, not rendered output: markers never hide a word
-           (they stand beside it), so containment still finds the facts.
-           Rendered HTML would work too, but tags would need stripping first
-           and this is the cheaper honest haystack. */
-        $parts[] = (string)($section['body'] ?? '');
-    }
+    /* One body, not twelve sections: headings live inside it, and the
+       anchor suffixes with them. */
+    $parts[] = (string)($data['policy']['body'] ?? '');
 
     $parts[] = (string)($data['cta']['text'] ?? '');
     foreach ($data['cta']['items'] ?? [] as $row) {

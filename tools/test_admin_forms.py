@@ -1092,7 +1092,7 @@ def improvements(b: Browser, base: str, r: Results) -> None:
         ("/?s=about", "story", "story[items]"),
         ("/?s=certifications", "certs", "certs[items]"),
         ("/?s=branding", "assets", "assets[items]"),
-        ("/?s=privacy", "sections", "sections"),
+        ("/?s=privacy", "cta", "cta[items]"),
         ("/?s=about", "whyus", "whyus[items]"),
         ("/?s=about", "accreditations", "accreditations[items]"),
         ("/?s=home", "tags", "tags[items]"),

@@ -1798,6 +1798,34 @@ html { scroll-padding-block-start: var(--admin-bar-h); }
   border-color: transparent;
 }
 
+/* The Markdown toolbar's two dropdowns (heading level, alignment): native
+   selects, styled as buttons so they read as ribbon controls. Native, not
+   custom menus: keyboard, screen readers, touch and zoom all work without a
+   line of code here, and a custom menu would rebuild admin-dialog.js badly. */
+.rte__select {
+  height: 2rem;
+  max-width: 9rem;
+  padding-inline: var(--space-3xs);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  background-color: transparent;
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.rte__select:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-elevated);
+  border-color: var(--border-subtle);
+}
+
+.rte__select:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
 .rte__btn--on:hover {
   color: var(--on-accent);
   background-image: var(--silver-gradient-fill);

@@ -157,19 +157,23 @@ def run(b: Browser, web_port: int, r: Results):
 
     print("setup")
     r.check("the Markdown fields carry toolbars", b.js(
-        "return document.querySelectorAll('textarea[data-md]').length") >= 13)
+        "return document.querySelectorAll('textarea[data-md]').length") == 2)
     r.check("and stay plain textareas underneath", b.js(
         "return document.querySelectorAll('textarea[data-md].rte__source').length") == 0)
     r.check("the HTML editor left them alone", b.js(
         "return [...document.querySelectorAll('textarea[data-md]')]"
         ".every(t => !t.hasAttribute('hidden'))"))
     r.check("ribbon and field read as one box", b.js(
-        "var t = document.querySelector('textarea[name=\"sections[0][body]\"]');"
+        "var t = document.querySelector('textarea[name=\"policy[body]\"]');"
         "return t.parentNode.classList.contains('md')"))
     r.check("with icon buttons, not text ones", b.js(
-        "return [...document.querySelectorAll('#band-sections .rte__toolbar button')]"
+        "return [...document.querySelectorAll('#band-policy .rte__toolbar button')]"
         ".slice(0, 9).every((btn, i) => i < 3 ? btn.textContent.trim().length === 1"
         " : btn.querySelector('svg') !== null)"))
+    r.check("plus heading and alignment dropdowns", b.js(
+        "return [...document.querySelectorAll('#band-policy .rte__toolbar select')]"
+        ".slice(0, 2).map(s => s.getAttribute('aria-label')).join('|')") == "Heading level|Text alignment",
+        "dropdowns missing or mislabelled")
 
     # No prompt stubbing: questions are asked in the page's own dialog,
     # which the test drives like a person would -- fill the field, press
@@ -184,41 +188,44 @@ def run(b: Browser, web_port: int, r: Results):
         b.js("document.querySelector('.dialog .btn--ghost').click();")
         time.sleep(0.4)
 
-    # The first 21 characters are "Tech4TIME decides why".
-    sel = ("var t = document.querySelector('textarea[name=\"sections[0][body]\"]');"
-           "t.focus(); t.setSelectionRange(0, 21);")
-    sel25 = ("var t = document.querySelector('textarea[name=\"sections[0][body]\"]');"
-             "t.focus(); t.setSelectionRange(0, 25);")
+    # Selects "data controller" inside the single policy body.
+    sel = ("var t = document.querySelector('textarea[name=\"policy[body]\"]');"
+           "t.focus(); t.setSelectionRange(t.value.indexOf('data controller'),"
+           " t.value.indexOf('data controller') + 15);")
+    sel25 = ("var t = document.querySelector('textarea[name=\"policy[body]\"]');"
+             "t.focus();"
+             "var i = t.value.indexOf('**data controller**');"
+             "t.setSelectionRange(i, i + 21);")
 
     print("\ninline ribbons wrap the selection")
     b.js(sel + "t.value")
-    b.toolbar_button("band-sections", BOLD)
+    b.toolbar_button("band-policy", BOLD)
     r.check("Bold wraps in asterisks", b.js(
-        "return document.querySelector('textarea[name=\"sections[0][body]\"]').value"
-        ".startsWith('**Tech4TIME decides why**')"))
+        "return document.querySelector('textarea[name=\"policy[body]\"]').value"
+        ".includes('**data controller**')"))
     b.js(sel25)
-    b.toolbar_button("band-sections", ITALIC)
+    b.toolbar_button("band-policy", ITALIC)
     r.check("Italic nests inside", b.js(
-        "var v = document.querySelector('textarea[name=\"sections[0][body]\"]').value;"
-        "return v.indexOf('***Tech4TIME decides why***') === 0"))
+        "var v = document.querySelector('textarea[name=\"policy[body]\"]').value;"
+        "return v.indexOf('***data controller***') !== -1"))
     b.js("location.reload();")
     time.sleep(1.5)
 
     print("\nblock ribbons stand on their own lines")
     b.js(sel)
-    b.toolbar_button("band-sections", NOTE)
-    v = b.js("return document.querySelector('textarea[name=\"sections[0][body]\"]').value")
+    b.toolbar_button("band-policy", NOTE)
+    v = b.js("return document.querySelector('textarea[name=\"policy[body]\"]').value")
     r.check("a note wraps the selection on its own lines",
-            v.startswith(":::note\nTech4TIME decides why\n:::\n"), v[:60])
+            ":::note\ndata controller\n:::" in v, v[:80])
     b.js("location.reload();")
     time.sleep(1.5)
 
     b.js(sel)
-    b.toolbar_button("band-sections", TABLE)
+    b.toolbar_button("band-policy", TABLE)
     r.check("a dialog asks, in the page and not the browser",
             b.js("return document.querySelector('.dialog__input') !== null"))
     answer("3")
-    v = b.js("return document.querySelector('textarea[name=\"sections[0][body]\"]').value")
+    v = b.js("return document.querySelector('textarea[name=\"policy[body]\"]').value")
     r.check("a table arrives square: header, rule, one row",
             "| --- | --- | --- |" in v
             and len([ln for ln in v.split("\n") if ln.strip().startswith("|")]) >= 3,
@@ -228,49 +235,75 @@ def run(b: Browser, web_port: int, r: Results):
     b.js("location.reload();")
     time.sleep(1.5)
 
+    before = b.js("return (document.querySelector('textarea[name=\"policy[body]\"]').value.match(/\\| --- \\|/g) || []).length")
     b.js(sel)
-    b.toolbar_button("band-sections", TABLE)
+    b.toolbar_button("band-policy", TABLE)
     answer("9")
     r.check("nine columns are refused with words",
             b.js("return [...document.querySelectorAll('.dialog__text')].some("
                  "el => el.textContent.indexOf('2 to 6') !== -1)"))
     dismiss()
-    r.check("and nothing was inserted",
-            b.js("return document.querySelector('textarea[name=\"sections[0][body]\"]').value"
-                 ".indexOf('| --- |') === -1"))
+    r.check("and no skeleton was added by the refused attempt", b.js(
+        "return (document.querySelector('textarea[name=\"policy[body]\"]').value.match(/\\| --- \\|/g) || []).length"
+        ) == before)
+
+    print("\nthe dropdowns rewrite whole lines and blocks")
+    b.js(sel)
+    b.js("var bar = document.querySelector('#band-policy .rte__toolbar');"
+         "var sel = bar.querySelectorAll('select')[0];"
+         "sel.value = 'h3';"
+         "sel.dispatchEvent(new Event('change', {bubbles: true}));")
+    time.sleep(0.4)
+    r.check("a heading prefixes the whole line", b.js(
+        "return document.querySelector('textarea[name=\"policy[body]\"]').value"
+        ".includes('### Tech4TIME decides why and how')"))
+    b.js("location.reload();")
+    time.sleep(1.5)
+
+    b.js(sel)
+    b.js("var bar = document.querySelector('#band-policy .rte__toolbar');"
+         "var sel = bar.querySelectorAll('select')[1];"
+         "sel.value = 'right';"
+         "sel.dispatchEvent(new Event('change', {bubbles: true}));")
+    time.sleep(0.4)
+    r.check("an alignment wraps the selection in fences", b.js(
+        "return document.querySelector('textarea[name=\"policy[body]\"]').value"
+        ".includes(':::right\\ndata controller\\n:::')"))
+    b.js("location.reload();")
+    time.sleep(1.5)
 
     print("\nlists take whole lines, links take the dialog's answer")
     b.js("location.reload();")
     time.sleep(1.5)
 
-    b.js("var t = document.querySelector('textarea[name=\"sections[0][body]\"]');"
+    b.js("var t = document.querySelector('textarea[name=\"policy[body]\"]');"
          "t.focus(); t.setSelectionRange(0, t.value.indexOf('\\n'));")
-    b.toolbar_button("band-sections", BULLETS)
+    b.toolbar_button("band-policy", BULLETS)
     r.check("a bullet prefixes the line", b.js(
-        "return document.querySelector('textarea[name=\"sections[0][body]\"]').value"
-        ".startsWith('- Tech4TIME decides why')"))
+        "return document.querySelector('textarea[name=\"policy[body]\"]').value"
+        ".startsWith('- ## Who is responsible')"))
     b.js("location.reload();")
     time.sleep(1.5)
 
     b.js(sel)
-    b.toolbar_button("band-sections", LINK)
+    b.toolbar_button("band-policy", LINK)
     answer("https://example.example/x")
     r.check("a link wraps with the answered address", b.js(
-        "return document.querySelector('textarea[name=\"sections[0][body]\"]').value"
-        ".startsWith('[Tech4TIME decides why](https://example.example/x)')"))
+        "return document.querySelector('textarea[name=\"policy[body]\"]').value"
+        ".includes('[data controller](https://example.example/x)')"))
     b.js("location.reload();")
     time.sleep(1.5)
 
     print("\na bad address is refused before it reaches the field")
     b.js(sel)
-    b.toolbar_button("band-sections", LINK)
+    b.toolbar_button("band-policy", LINK)
     answer("javascript:alert(1)")
     r.check("the guard speaks in the page",
             b.js("return [...document.querySelectorAll('.dialog__text')].some("
                  "el => el.textContent.indexOf('https://') !== -1)"))
     dismiss()
     r.check("and the field is untouched",
-            b.js("return document.querySelector('textarea[name=\"sections[0][body]\"]').value"
+            b.js("return document.querySelector('textarea[name=\"policy[body]\"]').value"
                  ".indexOf('[Tech4TIME') === -1"))
 
     print("\nthe field still saves what the ribbons wrote")
@@ -295,7 +328,7 @@ def run(b: Browser, web_port: int, r: Results):
     r.check("the editor swapped in after it",
             b.js("return location.search") == "?s=privacy")
     n = b.js("return document.querySelectorAll('#admin-body .rte__toolbar').length")
-    r.check("the twice-swapped screen carries its ribbons", n >= 13,
+    r.check("the twice-swapped screen carries its ribbons", n == 2,
             f"{n} toolbars after the swaps")
 
 

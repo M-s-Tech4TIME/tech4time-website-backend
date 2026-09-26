@@ -20,19 +20,22 @@
  * through. Every text run is entity-decoded and re-escaped, every link URL is
  * validated against the same shape rt_safe_href() accepts, and every tag in
  * the output is written by this file from a fixed vocabulary -- p, br,
- * strong, em, u, a, ul, ol, li, table, thead, tbody, tr, th, td, and divs
- * carrying exactly legal__notice or ta-center. Anything else in the source --
+ * strong, em, u, a, ul, ol, li, h2, h3, h4, h5, h6, table, thead, tbody,
+ * tr, th, td, and divs
+ * carrying exactly legal__notice or ta-left/ta-center/ta-right/ta-justify.
+ * Anything else in the source --
  * a tag, raw HTML, an unknown container -- is escaped to visible text. The
  * output cannot contain a construct this file does not explicitly emit.
  *
  * WHAT IT IS NOT
- * Not CommonMark: no headings (a # renders literally -- headings are section
- * fields, and heading levels are a landmark contract), no nested lists, no
- * code spans, no autolinks, no hard breaks. Not GFM either, except tables,
- * which are strict: a malformed table renders as literal pipe-text rather
- * than a guessed table, because a mangled schedule on a legal page must be
- * visible, not silently repaired. The frozen dialect, with every edge ruled,
- * is tech4time-website-frontend/plans/legal-markdown-syntax.md.
+ * Not CommonMark: no h1/h2 (a # or ## renders literally -- headings above h3
+ * belong to fields, and heading levels are a landmark contract), no nested
+ * lists, no code spans, no autolinks, no hard breaks. h3/h4 come from ###
+ * and ####, the only levels a section body may mint. Not GFM either, except
+ * tables, which are strict: a malformed table renders as literal pipe-text
+ * rather than a guessed table, because a mangled schedule on a legal page
+ * must be visible, not silently repaired. The frozen dialect, with every
+ * edge ruled, is tech4time-website-frontend/plans/legal-markdown-syntax.md.
  */
 
 declare(strict_types=1);
@@ -43,7 +46,8 @@ require_once __DIR__ . '/html.php';
 const MD_MAX_DEPTH = 16;
 
 /** Container names the dialect knows. Anything else degrades to text. */
-const MD_CONTAINERS = ['note' => true, 'center' => true];
+const MD_CONTAINERS = ['note' => true, 'left' => true, 'center' => true,
+                         'right' => true, 'justify' => true];
 
 /**
  * Render a Markdown document to HTML.
@@ -56,8 +60,107 @@ function md_render(string $src): string
 {
     $lines = preg_split('/\r\n|\r|\n/', $src) ?: [];
     $i = 0;
-    $out = md_blocks($lines, $i);
+    $used = [];
+    $out = md_blocks($lines, $i, $used);
     return trim(implode("\n", $out));
+}
+
+/**
+ * Parse one heading line: [level 2-6, display text, explicit id or null].
+ *
+ * Null when the line is not a heading at all -- a lone #, seven hashes, no
+ * space after the run, or plain prose. The display text has the closing run
+ * and any {#id} suffix removed; the suffix is validated here (letter start,
+ * alphanumerics plus _-:. after) and anything else stays literal text.
+ */
+function md_parse_heading(string $line): ?array
+{
+    if (!preg_match('/^( {0,3})(#{2,6})[ \t]+(.*)$/', $line, $m)) {
+        return null;
+    }
+    $text = trim((string)preg_replace('/\s+#+\s*$/', '', $m[3]));
+    $explicit = null;
+    if (preg_match('/^(.*)\s*\{#([A-Za-z][A-Za-z0-9_:.-]*)\}\s*$/', $text, $im)
+        && trim($im[1]) !== ''
+    ) {
+        $text = trim($im[1]);
+        $explicit = $im[2];
+    }
+    if ($text === '') {
+        return null;
+    }
+    return [(int)strlen($m[2]), $text, $explicit];
+}
+
+/**
+ * An id from heading text: lowercase alphanumerics, everything else a
+ * hyphen, runs collapsed, edges trimmed. Byte-safe on UTF-8: only ASCII
+ * bytes are folded or replaced, so multibyte text degrades to hyphens
+ * rather than mojibake, and never to an empty promise -- see md_claim_id().
+ *
+ * Slugged from DISPLAY text, not source: markers are stripped first, so
+ * "A **b** and [c](/d)" anchors as "a-b-and-c" rather than "a-b-and-c-d".
+ * The TOC reads the same display text, so both agree by construction.
+ */
+function md_slug(string $text): string
+{
+    $plain = (string)preg_replace('/\[([^\]]*)\]\([^)]*\)/', '$1', $text);
+    $plain = str_replace(['**', '++'], ' ', $plain);
+    $plain = str_replace(['*', '_', '`'], ' ', $plain);
+    $slug = (string)preg_replace('/[^a-z0-9]+/', '-', strtolower($plain));
+    return trim($slug, '-');
+}
+
+/**
+ * Claim an anchor: the explicit id when one was stated, else the slug.
+ *
+ * First come, first served with -2, -3 suffixes, tracked in $used -- one map
+ * per document, shared by the renderer and md_headings() below, so the table
+ * of contents and the page can never disagree. An empty slug (a heading of
+ * pure punctuation) becomes section-N rather than an empty id, which would
+ * anchor nothing and validate as nothing.
+ */
+function md_claim_id(?string $explicit, string $text, array &$used): string
+{
+    $id = ($explicit !== null && $explicit !== '') ? $explicit : md_slug($text);
+    if ($id === '') {
+        $id = 'section';
+    }
+    $base = $id;
+    $k = 2;
+    while (isset($used[$id])) {
+        $id = $base . '-' . $k;
+        $k++;
+    }
+    $used[$id] = true;
+    return $id;
+}
+
+/**
+ * Every heading in a document, in order: [{level, id, text}].
+ *
+ * The table of contents reads this, never the HTML: same lines, same
+ * resolution, same dedupe order as the renderer, so a TOC link pointing at
+ * a missing anchor is structurally impossible.
+ */
+function md_headings(string $src): array
+{
+    $lines = preg_split('/\r\n|\r|\n/', $src) ?: [];
+    $used = [];
+    $out = [];
+    foreach ($lines as $line) {
+        $heading = md_parse_heading($line);
+        if ($heading === null) {
+            continue;
+        }
+        [$level, $text, $explicit] = $heading;
+        $out[] = [
+            'level' => $level,
+            'id'    => md_claim_id($explicit, $text, $used),
+            'text'  => $text,
+        ];
+    }
+    return $out;
 }
 
 /**
@@ -66,8 +169,13 @@ function md_render(string $src): string
  * $stopAtFence makes a ::: line end the run instead of opening a container,
  * which is what keeps containers from nesting: the inner fence is left for
  * the caller to meet, and it meets it as literal text.
+ *
+ * $used carries the claimed anchors for the whole document, so a heading id
+ * emitted here and one listed by md_headings() are claimed in the same
+ * order from the same map. It starts empty in md_render() and travels into
+ * containers by reference -- a container is not a new document.
  */
-function md_blocks(array $lines, int &$i, bool $stopAtFence = false): array
+function md_blocks(array $lines, int &$i, array &$used, bool $stopAtFence = false): array
 {
     $out = [];
     $n = count($lines);
@@ -100,7 +208,7 @@ function md_blocks(array $lines, int &$i, bool $stopAtFence = false): array
                 $out[] = '<p>' . md_inline($line, 0) . '</p>';
                 continue;
             }
-            $inner = md_blocks($lines, $i, true);
+            $inner = md_blocks($lines, $i, $used, true);
             if ($i >= $n) {
                 /* Never closed: the opener was text after all. */
                 $out[] = '<p>' . md_inline($line, 0) . '</p>';
@@ -109,9 +217,13 @@ function md_blocks(array $lines, int &$i, bool $stopAtFence = false): array
                 }
                 continue;
             }
-            /* Consume the closing fence and wrap what was gathered. */
+            /* Consume the closing fence and wrap what was gathered. Notes get
+               the tinted box; alignment names map straight onto their
+               ta-* class, which is why the container vocabulary is closed:
+               a class from author text would be a style smuggled past the
+               sanitizer. */
             $i++;
-            $class = $name === 'note' ? 'legal__notice' : 'ta-center';
+            $class = $name === 'note' ? 'legal__notice' : 'ta-' . $name;
             $out[] = '<div class="' . $class . '">' . "\n"
                    . implode("\n", $inner) . "\n" . '</div>';
             continue;
@@ -130,6 +242,32 @@ function md_blocks(array $lines, int &$i, bool $stopAtFence = false): array
                 $out[] = '<p>' . md_inline($line, 0) . '</p>';
                 $i++;
             }
+            continue;
+        }
+
+        /* A heading: ## through ######, and nothing else. # is the page
+           title and lives in the hero field; a lone # renders literally
+           rather than minting a second h1, which would break the landmark
+           hierarchy audit_pages.py enforces. An optional {#custom-id}
+           suffix pins the anchor (see md_claim_id()); without one the id
+           is slugged from the text. Five... there is no five: ###### is
+           the deepest, and seven hashes or no space after the run is prose.
+           A closing run (### x ###) is stripped. h4 and below need their
+           parent above them in the same body; that is validated at save,
+           not here, because this renderer sees lines and the rule is about
+           a document. */
+        if (($heading = md_parse_heading($line)) !== null) {
+            [$level, $text, $explicit] = $heading;
+            $tag = 'h' . $level;
+            /* h2 is a section heading and keeps the page's heading class;
+               h3 and below are subheadings. The first-of-type rule in
+               legal.css keys off .legal__heading, so this distinction is
+               load-bearing, not cosmetic. */
+            $class = $level === 2 ? 'legal__heading' : 'legal__subheading';
+            $out[] = '<' . $tag . ' class="' . $class . '" id="'
+                   . h(md_claim_id($explicit, $text, $used)) . '">'
+                   . md_inline($text, 0) . '</' . $tag . '>';
+            $i++;
             continue;
         }
 
@@ -158,6 +296,7 @@ function md_blocks(array $lines, int &$i, bool $stopAtFence = false): array
         while ($i < $n
             && trim($lines[$i]) !== ''
             && !preg_match('/^\s{0,3}:::\s*([A-Za-z]*)\s*$/', $lines[$i])
+            && !preg_match('/^( {0,3})(#{2,6})[ \t]+/', $lines[$i])
             && !preg_match('/^( {0,3})(-|\d+\.)[ \t]+/', $lines[$i])
             && !(str_contains($lines[$i], '|') && $i + 1 < $n && md_delimiter($lines[$i + 1]) !== null)
         ) {

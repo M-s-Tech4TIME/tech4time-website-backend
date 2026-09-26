@@ -38,6 +38,7 @@ TIMEOUT = 30
 
 ALLOWED_TAGS = {
     "p", "br", "strong", "em", "u", "a", "ul", "ol", "li",
+    "h2", "h3", "h4", "h5", "h6",
     "table", "thead", "tbody", "tr", "th", "td", "div",
 }
 TAG_RE = re.compile(r"</?([a-zA-Z][a-zA-Z0-9]*)[^>]*>")
@@ -67,6 +68,18 @@ def render(src: str) -> str:
     if out.returncode != 0:
         raise RuntimeError("php failed: " + out.stderr.decode()[:300])
     return out.stdout.decode()
+
+
+def headings(src: str) -> list:
+    """The TOC list for a document, in order."""
+    code = ("require 'lib/html.php'; require 'lib/markdown.php';"
+            "echo json_encode(md_headings(file_get_contents('php://stdin')));")
+    out = subprocess.run(["php", "-r", code], cwd=ROOT, input=src.encode(),
+                         capture_output=True, timeout=TIMEOUT)
+    if out.returncode != 0:
+        raise RuntimeError("php failed: " + out.stderr.decode()[:300])
+    import json as _json
+    return _json.loads(out.stdout.decode())
 
 
 def vocab_ok(html: str):
@@ -151,6 +164,31 @@ EXACT = [
      '<div class="legal__notice">\n<p>Hi <em>there</em></p>\n</div>'),
     ("center", ":::center\nHi\n:::",
      '<div class="ta-center">\n<p>Hi</p>\n</div>'),
+    ("h2", "## Second", '<h2 class="legal__heading" id="second">Second</h2>'),
+    ("h3-h6", "### T\n#### F\n##### V\n###### S",
+     '<h3 class="legal__subheading" id="t">T</h3>\n'
+     '<h4 class="legal__subheading" id="f">F</h4>\n'
+     '<h5 class="legal__subheading" id="v">V</h5>\n'
+     '<h6 class="legal__subheading" id="s">S</h6>'),
+    ("h1 stays literal", "# Top", "<p># Top</p>"),
+    ("seven hashes literal", "####### x", "<p>####### x</p>"),
+    ("no space literal", "###x", "<p>###x</p>"),
+    ("closing run stripped", "### Done ###",
+     '<h3 class="legal__subheading" id="done">Done</h3>'),
+    ("explicit id", "## Who {#who}",
+     '<h2 class="legal__heading" id="who">Who</h2>'),
+    ("explicit id kept on reword", "## Whatever {#who}",
+     '<h2 class="legal__heading" id="who">Whatever</h2>'),
+    ("duplicate slugs dedupe", "## Terms\n## Terms",
+     '<h2 class="legal__heading" id="terms">Terms</h2>\n'
+     '<h2 class="legal__heading" id="terms-2">Terms</h2>'),
+    ("invalid suffix literal, slug id", "## {#bad id}",
+     '<h2 class="legal__heading" id="bad-id">{#bad id}</h2>'),
+    ("empty suffix literal", "## {#}",
+     '<h2 class="legal__heading" id="section">{#}</h2>'),
+    ("heading inline", "## A **b** and [c](/d)",
+     '<h2 class="legal__heading" id="a-b-and-c">A <strong>b</strong> and '
+     '<a href="/d">c</a></h2>'),
     ("unknown container literal", ":::nope\nx\n:::",
      "<p>:::nope</p>\n<p>x</p>\n<p>:::</p>"),
     ("unclosed container literal", ":::note\nunclosed",
@@ -226,6 +264,23 @@ def main() -> int:
                 not bad, "; ".join(f"{s[:40]}: {d}" for s, d in bad[:3]))
     except Exception as e:  # noqa: BLE001
         r.check("output vocabulary holds over the whole corpus", False, str(e)[:200])
+
+    print("\nthe table of contents reads the same resolution as the page")
+    try:
+        got = headings("## Alpha {#a}\n\ntext\n\n### Beta\n\n## Alpha\n\n#### Deep")
+        want = [
+            {"level": 2, "id": "a", "text": "Alpha"},
+            {"level": 3, "id": "beta", "text": "Beta"},
+            {"level": 2, "id": "alpha", "text": "Alpha"},
+            {"level": 4, "id": "deep", "text": "Deep"},
+        ]
+        r.check("levels, ids and texts in order", got == want,
+                f"got {got!r:.200}")
+        r.check("a rail link can never miss its anchor",
+                all(h["id"] for h in got) and len({h["id"] for h in got}) == len(got))
+    except Exception as e:  # noqa: BLE001
+        r.check("the table of contents reads the same resolution as the page",
+                False, f"did not return: {e}")
 
     print(f"\n{r.passed}/{r.passed + len(r.failed)} checks passed")
     return 1 if r.failed else 0

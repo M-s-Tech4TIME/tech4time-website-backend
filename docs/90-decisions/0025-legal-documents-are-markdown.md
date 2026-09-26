@@ -79,3 +79,22 @@ deploy in lockstep; inside the window a publish is refused loudly rather than re
 - **What this forbids:** raw HTML in legal source (escaped, always); headings in body text
   (`#` renders as a literal `#`, since heading levels belong to fields); a second renderer in
   JavaScript; per-document Markdown flavors.
+
+## Amendment — one body, mintable headings, picked dates
+
+The section-per-card editor proved to be archaeology for prose, exactly as suspected, so the
+shape simplified one step further before terms or cookies existed to copy it: the policy is a
+single Markdown `body`, the callout points folded into the note as a list, and headings moved
+into the text with it.
+
+- **H2–H6 in bodies, H1 in its field.** The page title owns H1; the ribbon offers the rest
+  through a dropdown, and `#` alone stays literal. A body opens on H2 and never skips down —
+  refused at save, naming the heading — because the renderer is line-blind and the rule is
+  about a document.
+- **Anchors declared or derived, never stored.** `## Heading {#custom}` pins; otherwise the
+  heading words slug, deduped `-2`. One shared resolver serves renderer and rail, explicit
+  doubles are refused, and the migration wrote `{#old-id}` onto every heading so no anchor
+  changed hands.
+- **Alignment joins the containers** (`:::left/right/justify` beside `note`/`center`), and
+  the effective date is a calendar picker storing ISO beside the auto `updated` stamp —
+  "Effective …" authored, "Last updated …" minted, never confused.

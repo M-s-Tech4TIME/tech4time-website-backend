@@ -157,13 +157,14 @@ def run(client, r, site):
     status, _headers, body = client.post(
         ADMIN, {"csrf": csrf, "s": "legal", "do": "hide:privacy"})
     r.check("the toggle answers", status == 200, f"status {status}")
-    r.check("saying what hidden means",
-            "answers 404" in body, "no consequence stated")
+    r.check("saying what hidden means, as the outcome and not the wallpaper",
+            "Hidden: the page now answers 404" in body,
+            "the toggle reported nothing -- did it refuse?")
     sent = site.documents.get("privacy", {})
     r.check("the live site holds it hidden",
             sent.get("status") == "hidden", str(sent.get("status")))
     r.check("with every word still in it",
-            len(sent.get("policy", {}).get("sections", [])) == 12,
+            len(sent.get("policy", {}).get("body", "")) > 1000,
             "hiding dropped the policy")
     on_disk = json_loads(DATA)
     r.check("and the file on disk agrees",

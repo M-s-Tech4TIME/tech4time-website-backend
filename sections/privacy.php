@@ -62,29 +62,20 @@ function privacy_from_post(array $current): array
     $data['cta']['status'] =
         ($_POST['cta']['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown';
 
-    /* The summary box. */
+    /* The summary box: title and note only. The bullets lived here as rows;
+       they live in the note itself now, as a Markdown list -- one field,
+       nothing to add, remove or reorder. */
     $callout = (array)($_POST['callout'] ?? []);
     $data['policy']['callout'] = [
         'status' => ($callout['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown',
         'title'  => trim((string)($callout['title'] ?? '')),
         'note'   => trim((string)($callout['note'] ?? '')),
-        'items'  => privacy_items_from_post($callout['items'] ?? []),
     ];
 
-    /* Rows arrive keyed by their position in the form. Removing one leaves a
-       hole in those keys, so they are renumbered rather than trusted. */
-    $data['policy']['sections'] = [];
-    foreach (array_values((array)($_POST['sections'] ?? [])) as $section) {
-        if (!is_array($section)) {
-            continue;
-        }
-        $data['policy']['sections'][] = [
-            'id'      => trim((string)($section['id'] ?? '')),
-            'heading' => trim((string)($section['heading'] ?? '')),
-            'status'  => ($section['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown',
-            'body'    => trim((string)($section['body'] ?? '')),
-        ];
-    }
+    /* The policy: one Markdown body. Rows arrived keyed by position nowhere
+       now -- there is a single field, so there is nothing to renumber and
+       nothing that truncating a POST could silently delete a part of. */
+    $data['policy']['body'] = trim((string)($_POST['policy']['body'] ?? ''));
 
     $data['cta']['items'] = [];
     foreach (array_values((array)($_POST['cta']['items'] ?? [])) as $row) {
@@ -104,40 +95,16 @@ function privacy_from_post(array $current): array
     return privacy_normalise($data);
 }
 
-/** The summary box's bullets. Markdown source, like everything else here. */
-function privacy_items_from_post(mixed $posted): array
-{
-    $items = [];
-
-    foreach (array_values((array)$posted) as $row) {
-        if (is_array($row)) {
-            $items[] = privacy_item_defaults([
-                'id'     => trim((string)($row['id'] ?? '')),
-                'text'   => trim((string)($row['text'] ?? '')),
-                'status' => ($row['status'] ?? 'shown') === 'hidden' ? 'hidden' : 'shown',
-            ]);
-        }
-    }
-
-    return $items;
-}
-
 /**
  * Render the posted document the way the public page will print it.
  *
- * A twin of the frontend's section loop, kept deliberately small: headings
- * escaped here, bodies through the shared renderer, nothing else. If this
- * grows past headings-plus-bodies it should move beside the frontend
- * renderer rather than duplicate it.
+ * The body through the shared renderer, nothing else -- the twin of the
+ * frontend's page loop, kept deliberately small. If this grows past that,
+ * it should move beside the frontend renderer rather than duplicate it.
  */
 function privacy_preview_html(array $data): string
 {
-    $out = '';
-    foreach (privacy_rows_shown($data['policy']['sections'] ?? []) as $section) {
-        $out .= '<h2>' . h((string)($section['heading'] ?? '')) . '</h2>' . "\n";
-        $out .= md_render((string)($section['body'] ?? '')) . "\n";
-    }
-    return trim($out);
+    return trim(md_render((string)($data['policy']['body'] ?? '')));
 }
 
 /* ---------------------------------------------------------------- actions */
@@ -201,15 +168,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 /**
- * Add, remove or reorder a row, at either of the two levels that remain.
+ * Add, remove or reorder a closing-band button -- the only rows left now
+ * that sections and points are prose.
  *
- * The verb space, in full:
- *
- *   section-add:0        section-up:3        section-remove:3
- *   point-add:0          point-up:1          button-remove:0
- *
- * Returns null when the press cannot be honoured — a row that is not there, a
- * move off the end — and the page redraws unchanged, which is what a button
+ * Returns null when the press cannot be honoured -- a row that is not there, a
+ * move off the end -- and the page redraws unchanged, which is what a button
  * pressed twice before the page caught up should do.
  */
 function privacy_apply_row_action(array $data, string $do): ?array
@@ -217,79 +180,27 @@ function privacy_apply_row_action(array $data, string $do): ?array
     [$verb, $index] = array_pad(explode(':', $do, 2), 2, '');
     $index = (int)$index;
 
-    /* The two flat lists: the summary box's bullets, and the closing band. */
-    if (preg_match('/^(point|button)-(add|remove|up|down)$/', $verb, $m)) {
-        $rows = $m[1] === 'point'
-            ? $data['policy']['callout']['items']
-            : $data['cta']['items'];
-
-        if ($m[2] === 'add') {
-            /* Hidden, as everywhere else here: a half-written clause is never
-               live, and this is the page where that matters most. */
-            $rows[] = $m[1] === 'point'
-                ? privacy_item_defaults(['status' => 'hidden'])
-                : privacy_button_defaults(['status' => 'hidden']);
-
-            $out = [$rows, $m[1] === 'point'
-                ? 'Added a summary point. It is hidden until you show it.'
-                : 'Added a button. It is hidden until you show it.'];
-        } else {
-            $out = admin_move_row($rows, $m[2], $index);
-            if ($out === null) {
-                return null;
-            }
-        }
-
-        if ($m[1] === 'point') {
-            $data['policy']['callout']['items'] = $out[0];
-        } else {
-            $data['cta']['items'] = $out[0];
-        }
-
-        return [privacy_identify($data), $out[1]];
+    if (!preg_match('/^button-(add|remove|up|down)$/', $verb, $m)) {
+        return null;
     }
 
-    /* The sections. */
-    if (preg_match('/^section-(add|remove|up|down)$/', $verb, $m)) {
-        $rows = $data['policy']['sections'];
-
-        if ($m[1] === 'add') {
-            $rows[] = privacy_section_defaults(['status' => 'hidden']);
-            $out = [$rows, 'Added a section. It is hidden until you show it — give it a '
-                         . 'heading, which is also what its web address is made from.'];
-        } else {
-            $out = admin_move_row($rows, $m[1], $index);
-            if ($out === null) {
-                return null;
-            }
+    $rows = $data['cta']['items'];
+    if ($m[1] === 'add') {
+        /* Hidden, as everywhere else here: a half-written clause is never
+           live, and this is the page where that matters most. */
+        $rows[] = privacy_button_defaults(['status' => 'hidden']);
+        $out = [$rows, 'Added a button. It is hidden until you show it.'];
+    } else {
+        $out = admin_move_row($rows, $m[1], $index);
+        if ($out === null) {
+            return null;
         }
-
-        $data['policy']['sections'] = $out[0];
-
-        return [privacy_identify($data), $out[1]];
     }
 
-    return null;
+    $data['cta']['items'] = $out[0];
+    return [privacy_identify($data), $out[1]];
 }
-
 /* ---------------------------------------------------------------- helpers */
-
-/**
- * A card head's summary of Markdown source: links read as their labels,
- * markers fall away, bounded at a word boundary so a head stays one line.
- */
-function privacy_card_label(string $text, int $max = 52): string
-{
-    $text = trim((string)preg_replace('/\[([^\]]*)\]\([^)]*\)/', '$1', $text) ?? $text);
-    $text = trim($text, "*+_`|#: \t\n\r");
-    if ($text === '' || strlen($text) <= $max) {
-        return $text;
-    }
-
-    $cut   = substr($text, 0, $max);
-    $space = strrpos($cut, ' ');
-    return rtrim($space === false ? $cut : substr($cut, 0, $space), " ,.;:") . '…';
-}
 
 /* What the rail lists under "Privacy". The keys are the ids on the
    <fieldset>s below and the order is the order of the page. */
@@ -297,7 +208,7 @@ const PRIVACY_OUTLINE = [
     'band-hero'     => 'The banner',
     'band-facts'    => 'Also on the contact page',
     'band-callout'  => 'The short version',
-    'band-sections' => 'The policy',
+    'band-policy'   => 'The policy',
     'band-preview'  => 'Preview',
     'band-cta'      => 'The closing band',
     'band-meta'     => 'Search and sharing',
@@ -356,13 +267,12 @@ if (!$errors && $pending !== '') {
 
       <label class="admin__field">
         <span class="admin__label">Effective date</span>
-        <input class="admin__input" type="text" name="policy[effective]" required
+        <input class="admin__input" type="date" name="policy[effective]" required
                value="<?= h($data['policy']['effective']) ?>">
         <span class="admin__hint">
-          The whole line, as it appears at the top of the policy — "Effective
-          21 August 2026". The wording is yours: "Effective" and "Last updated"
-          do not mean the same thing. <strong>Nothing changes this for you.</strong>
-          Fixing a typo is not a new policy.
+          When the policy took effect — picked from the calendar, stored as a
+          date, printed as "Effective 21 August 2026". <strong>Nothing changes
+          this for you.</strong> Fixing a typo is not a new policy.
         </span>
       </label>
 
@@ -422,88 +332,28 @@ if (!$errors && $pending !== '') {
       </label>
     </div>
 
-<?php if (!$data['policy']['callout']['items']): ?>
-    <p class="admin__empty">No points yet. Add one to start the list.</p>
-<?php endif; ?>
-
-<?php foreach ($data['policy']['callout']['items'] as $i => $point): ?>
-    <div class="admin-card">
-      <?php admin_card_head('point', $i, count($data['policy']['callout']['items']), [
-          'label'  => privacy_card_label((string)$point['text']),
-          'noun'   => 'point',
-          'status' => (string)$point['status'],
-      ]); ?>
-      <input type="hidden" name="callout[items][<?= $i ?>][id]" value="<?= h($point['id']) ?>">
-
-      <div class="admin__field admin__field--wide">
-        <label class="admin__label" for="point-<?= $i ?>">The point, in Markdown</label>
-        <textarea class="admin__input admin__textarea" id="point-<?= $i ?>"
-                  name="callout[items][<?= $i ?>][text]" rows="3"><?= h($point['text']) ?></textarea>
-        <span class="admin__hint">One or two lines. Bold, links and emphasis welcome.</span>
-      </div>
-
-      <?php admin_status_field("callout[items][$i][status]", (string)$point['status'], 'this point'); ?>
-    </div>
-<?php endforeach; ?>
-
     <div class="admin__grid">
       <div class="admin__field admin__field--wide">
-        <label class="admin__label" for="callout-note">The line under the list, in Markdown</label>
+        <label class="admin__label" for="callout-note">The short version, in Markdown</label>
         <textarea class="admin__input admin__textarea" id="callout-note"
-                  name="callout[note]" rows="2" data-md><?= h($data['policy']['callout']['note']) ?></textarea>
+                  name="callout[note]" rows="6" data-md><?= h($data['policy']['callout']['note']) ?></textarea>
+        <span class="admin__hint">Bullets live here as a Markdown list — one field, nothing to add or remove.</span>
       </div>
     </div>
   </fieldset>
 
   <!-- ========================= the policy ========================= -->
-  <fieldset class="admin__block" id="band-sections">
+  <fieldset class="admin__block" id="band-policy">
     <?php admin_band_head('The policy',
-        'One card per headed section, in the order they appear. A section\'s '
-      . 'heading is also what its web address is made from — and once a '
-      . 'section has an address it keeps it, because somebody may have linked '
-      . 'to it. The body is Markdown: the toolbar inserts the syntax, or type '
-      . 'it by hand.',
-        ['do' => 'section-add:0', 'label' => 'Add a section', 'rows' => 'sections[']); ?>
+        'The whole policy in one Markdown field. Headings mint anchors: '
+      . 'a {#custom} suffix pins one, otherwise the heading words do. '
+      . 'The ribbon above inserts the syntax.'); ?>
 
-<?php if (!$data['policy']['sections']): ?>
-    <p class="admin__empty">No sections yet. Add one to start the policy.</p>
-<?php endif; ?>
-
-<?php foreach ($data['policy']['sections'] as $s => $section): ?>
-    <div class="admin-card">
-      <?php admin_card_head('section', $s, count($data['policy']['sections']), [
-          'label'  => (string)$section['heading'] !== ''
-                      ? (string)$section['heading']
-                      : privacy_card_label((string)($section['body'] ?? '')),
-          'noun'   => 'section',
-          'detail' => (string)strlen((string)($section['body'] ?? '')) . ' characters',
-          'status' => (string)$section['status'],
-      ]); ?>
-      <input type="hidden" name="sections[<?= $s ?>][id]" value="<?= h($section['id']) ?>">
-
-      <div class="admin__grid">
-        <label class="admin__field admin__field--wide">
-          <span class="admin__label">Heading</span>
-          <input class="admin__input" type="text" name="sections[<?= $s ?>][heading]"
-                 value="<?= h($section['heading']) ?>">
-          <span class="admin__hint">
-            Its web address on the page ends
-            <code>#<?= h($section['id']) ?></code>, and renaming the heading
-            does not change it — somebody may have linked to it.
-          </span>
-        </label>
-
-        <?php admin_status_field("sections[$s][status]", (string)$section['status'], 'this section'); ?>
-      </div>
-
-      <div class="admin__field admin__field--wide">
-        <label class="admin__label" for="section-<?= $s ?>-body">The section, in Markdown</label>
-        <textarea class="admin__input admin__textarea admin__textarea--tall" id="section-<?= $s ?>-body"
-                  name="sections[<?= $s ?>][body]" rows="12" data-md><?= h((string)($section['body'] ?? '')) ?></textarea>
-        <span class="admin__hint">Paragraphs, lists, tables and notes — the ribbon above inserts the syntax.</span>
-      </div>
+    <div class="admin__field admin__field--wide">
+      <label class="admin__label" for="policy-body">The policy, in Markdown</label>
+      <textarea class="admin__input admin__textarea admin__textarea--tall" id="policy-body"
+                name="policy[body]" rows="40" data-md><?= h((string)($data['policy']['body'] ?? '')) ?></textarea>
     </div>
-<?php endforeach; ?>
   </fieldset>
 
   <!-- ========================= preview ========================= -->

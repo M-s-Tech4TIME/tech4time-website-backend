@@ -2661,7 +2661,8 @@ html { scroll-padding-block-start: var(--admin-bar-h); }
   vertical-align: -0.1em;
 }
 
-/* The Markdown preview pane and tall Markdown fields (legal documents).
+/* The Markdown preview (a new tab, not a pane) and tall Markdown fields
+   (legal documents).
    Tokens only: hex values live in theme.css and nowhere else. The preview
    renders the visitor's markup, so it gets the visitor's measure and table
    rules in miniature rather than the admin's form spacing. */

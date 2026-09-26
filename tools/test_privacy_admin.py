@@ -250,7 +250,7 @@ def run(client, r, site):
     status, page = client.get(ADMIN)
     r.check("the screen is served", status == 200, f"status {status}")
     for band in ("band-hero", "band-facts", "band-callout", "band-policy",
-                 "band-preview", "band-cta", "band-meta"):
+                 "band-cta", "band-meta"):
         r.check(f"it has {band}", f'id="{band}"' in page)
 
     fields = form_fields(page)
@@ -322,15 +322,21 @@ def run(client, r, site):
             hostile in sent.get("policy", {}).get("body", ""),
             sent.get("policy", {}).get("body", "")[:100])
 
-    print("\npreview renders without saving")
+    print("\npreview opens in a new tab and saves nothing")
 
     _status, page = client.get(ADMIN)
     fields = form_fields(page)
+    r.check("the policy band offers the new-tab preview, not a pane",
+            'value="preview-tab"' in page and 'formtarget="_blank"' in page)
+    r.check("and the preview band is gone",
+            'id="band-preview"' not in page and 'value="preview:0"' not in page)
     before = json.loads(DATA.read_bytes())["revision"]
     fields["policy[body]"] = "## Preview head {#preview-head}\n\nPreview marker **P4**."
-    status, _headers, body = client.post(ADMIN, {**fields, "do": "preview:0"})
-    r.check("the preview comes back", status == 200, f"status {status}")
-    r.check("with the rendered heading and emphasis",
+    status, _headers, body = client.post(ADMIN, {**fields, "do": "preview-tab"})
+    r.check("a standalone document comes back", status == 200, f"status {status}")
+    r.check("as HTML, not a screen fragment",
+            "<!DOCTYPE html>" in body and "Preview — " in body)
+    r.check("with the posted body rendered as the pane showed it",
             '<h2 class="legal__heading" id="preview-head">Preview head</h2>' in body
             and "<strong>P4</strong>" in body,
             "Markdown did not render")
@@ -338,35 +344,6 @@ def run(client, r, site):
             json.loads(DATA.read_bytes())["revision"] == before,
             "preview wrote the file -- it is a save wearing a different label")
     r.check("saying so out loud", "nothing was saved" in body)
-
-    print("\nthe new-tab rail numbers displayed rows, not headings")
-
-    _status, page = client.get(ADMIN)
-    fields = form_fields(page)
-    fields["policy[body]"] = ("## Alpha {#alpha}\n\ntext\n\n### Sub\n\n"
-                              "## Beta {#beta}\n\nmore")
-    status, _headers, body = client.post(ADMIN, {**fields, "do": "preview-tab"})
-    r.check("the document comes back", status == 200, f"status {status}")
-    r.check("numbered 01, 02 with nothing skipped",
-            ">01<" in body and ">02<" in body and ">03<" not in body,
-            "h3s ate numbers again")
-
-    print("\nthe new-tab preview is a whole document that writes nothing")
-
-    _status, page = client.get(ADMIN)
-    fields = form_fields(page)
-    before = json.loads(DATA.read_bytes())["revision"]
-    fields["policy[body]"] = "## Tab head {#tab-head}\n\nTab marker **T9**."
-    status, headers, body = client.post(ADMIN, {**fields, "do": "preview-tab"})
-    r.check("a standalone document comes back", status == 200, f"status {status}")
-    r.check("as HTML, not a screen fragment",
-            "<!DOCTYPE html>" in body and "Preview — " in body)
-    r.check("with the posted words rendered in it",
-            '<h2 class="legal__heading" id="tab-head">Tab head</h2>' in body
-            and "<strong>T9</strong>" in body)
-    r.check("and the revision on disk did not move",
-            json.loads(DATA.read_bytes())["revision"] == before,
-            "a preview wrote the file")
 
     print("\nwhat the editor refuses, and what it does not")
 

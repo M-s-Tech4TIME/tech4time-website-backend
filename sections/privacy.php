@@ -20,10 +20,11 @@
  * rt_sanitise_*() -- and test_legal_admin.py asserts the round trip is
  * byte-identical for hostile input, not merely safe-looking.
  *
- * PREVIEW IS THE RENDERER. The Preview button posts the form and gets back
- * HTML from the same md_render() the page prints -- there is no second
- * implementation in JavaScript to keep identical for ever. Previewing saves
- * nothing and publishes nothing.
+ * PREVIEW IS THE RENDERER, IN A NEW TAB. The Preview button posts the form
+ * and gets back HTML from the same md_render() the page prints -- there is
+ * no second implementation in JavaScript to keep identical for ever, and no
+ * preview pane inside the editorial page. Previewing saves nothing and
+ * publishes nothing.
  *
  * Included by public/index.php, which has already checked the password and
  * started the session.
@@ -96,27 +97,10 @@ function privacy_from_post(array $current): array
 }
 
 /**
- * Render the posted body the way the public page will print it, for the
- * in-place pane.
- *
- * The body through the shared renderer, nothing else -- the twin of the
- * frontend's page loop, kept deliberately small. If this grows past that,
- * it should move beside the frontend renderer rather than duplicate it.
- */
-function privacy_preview_html(array $data): string
-{
-    return trim(md_render((string)($data['policy']['body'] ?? '')));
-}
-
-/**
- * The whole posted document as a standalone page, in a new tab.
- *
- * Same renderer, same content as the pane and the public page: hero title,
- * date chips, rail, callout, body, closing band. Admin dress, not frontend
- * dress -- the frontend's stylesheets cannot load here (CSP style-src
- * 'self'), and duplicating them would fork the visual truth. What this
- * proves over the pane is structure at page scale: heading order, rail
- * numbering, the chips beside the title.
+ * The posted body rendered the way the pane showed it, as a standalone page
+ * in a new tab -- preview lives here now, not in the editorial page. Same
+ * md_render(), same admin__preview dressing the pane wore, so the tab shows
+ * what the pane showed, only full-tab.
  *
  * Never saved, never published: it exits before the shell prints.
  */
@@ -124,50 +108,6 @@ function privacy_preview_doc(array $data): void
 {
     $policy = $data['policy'] ?? [];
     $hero = $data['hero'] ?? [];
-    $cta = $data['cta'] ?? [];
-    $effective = trim((string)($policy['effective'] ?? ''));
-    $updated = trim((string)($data['updated'] ?? ''));
-
-    /* Twin of the frontend's date chips (lib/privacy.php): ISO in, dated
-       line out, blank when it will not read. Two implementations of four
-       lines each is the documented exception, not a second renderer -- the
-       words still come from md_render() alone. */
-    $eff_line = '';
-    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $effective, $m)
-        && checkdate((int)$m[2], (int)$m[3], (int)$m[1])
-        && ($stamp = strtotime($m[1] . '-' . $m[2] . '-' . $m[3] . ' UTC')) !== false
-    ) {
-        $eff_line = 'Effective ' . gmdate('j F Y', $stamp);
-    }
-    $upd_line = '';
-    if ($updated !== '' && ($stamp = strtotime($updated)) !== false) {
-        $upd_line = 'Last updated ' . gmdate('j F Y', $stamp);
-    }
-
-    /* Numbered by displayed position, not by heading index: h3 and below
-       never reach the rail, so counting every heading would print 01, 02,
-       07 -- photographed on a real preview, which is how this was found. */
-    $n = 0;
-    foreach (md_headings((string)($policy['body'] ?? '')) as $heading) {
-        if ((int)$heading['level'] !== 2) {
-            continue;
-        }
-        $n++;
-        $toc .= '<li><a href="#' . h((string)$heading['id']) . '">'
-              . '<span>' . sprintf('%02d', $n) . '</span> '
-              . h((string)$heading['text']) . '</a></li>' . "\n";
-    }
-
-    $callout = $policy['callout'] ?? [];
-    $buttons = '';
-    foreach (($cta['items'] ?? []) as $button) {
-        if (($button['status'] ?? 'shown') === 'hidden') {
-            continue;
-        }
-        $buttons .= '<a class="btn btn--' . h($button['style'] === 'ghost' ? 'secondary' : 'primary')
-                  . '" href="' . h((string)($button['href'] ?? '')) . '">'
-                  . h((string)($button['label'] ?? '')) . '</a>' . "\n";
-    }
 
     header('Content-Type: text/html; charset=utf-8');
     header('X-Robots-Tag: noindex, nofollow');
@@ -179,18 +119,9 @@ function privacy_preview_doc(array $data): void
         '<link rel="stylesheet" href="' . h(admin_asset('/assets/css/base.css')) . '">',
         '<link rel="stylesheet" href="' . h(admin_asset('/assets/css/theme.css')) . '">',
         '<link rel="stylesheet" href="' . h(admin_asset('/assets/css/admin.css')) . '">',
-        '</head><body class="page"><main class="admin__preview-doc">',
-        '<p class="legal__eyebrow">Legal · preview, not published</p>',
-        '<h1>' . h((string)($hero['title'] ?? '')) . '</h1>',
-        '<p>' . h((string)($hero['subtitle'] ?? '')) . '</p>',
-        '<p>' . h(trim($eff_line . ' · ' . $upd_line, ' ·')) . '</p>',
-        $toc !== '' ? '<nav aria-label="On this page"><ol>' . "\n" . $toc . '</ol></nav>' : '',
-        '<h2>' . h((string)($callout['title'] ?? '')) . '</h2>',
-        md_render((string)($callout['note'] ?? '')),
+        '</head><body class="page"><main class="admin__preview">',
+        '<p class="legal__eyebrow">Legal · preview, not published — nothing was saved.</p>',
         md_render((string)($policy['body'] ?? '')),
-        '<h2>' . h((string)($cta['title'] ?? '')) . '</h2>',
-        '<p>' . h((string)($cta['text'] ?? '')) . '</p>',
-        $buttons,
         '</main></body></html>';
     exit;
 }
@@ -200,7 +131,6 @@ function privacy_preview_doc(array $data): void
 $data = privacy_load();
 $errors = [];
 $pending = '';   /* an unsaved change made by a row button */
-$preview = '';   /* rendered HTML for the preview pane; never saved */
 
 /* Named here, not read inline below. See the note in sections/contact.php: a
    $_POST key that is only ever compared reads exactly like one that was
@@ -242,16 +172,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         /* Redraw with what was typed rather than throwing it away. */
         $data = $posted;
-    } elseif ($do === 'preview' || str_starts_with($do, 'preview:')) {
-        /* Rendered, not saved and not published: what the visitor would get
-           from exactly what is in the form right now. */
-        $preview = privacy_preview_html($posted);
-        $pending = 'Preview below — nothing was saved.';
-        $data = $posted;
     } elseif ($do === 'preview-tab') {
-        /* The whole document in a new tab (formtarget="_blank" on the
-           button): same render, standalone page, then stop before the shell
-           prints. Saves and publishes nothing, like the pane. */
+        /* The rendered body in a new tab (formtarget="_blank" on the
+           button): the same render the pane showed, as a standalone page,
+           then stop before the shell prints. Saves and publishes nothing. */
         privacy_preview_doc($posted);
     } elseif ($do !== 'nothing') {
         $applied = privacy_apply_row_action($posted, $do);
@@ -302,7 +226,6 @@ const PRIVACY_OUTLINE = [
     'band-facts'    => 'Also on the contact page',
     'band-callout'  => 'The short version',
     'band-policy'   => 'The policy',
-    'band-preview'  => 'Preview',
     'band-cta'      => 'The closing band',
     'band-meta'     => 'Search and sharing',
 ];
@@ -447,23 +370,6 @@ if (!$errors && $pending !== '') {
       <textarea class="admin__input admin__textarea admin__textarea--tall" id="policy-body"
                 name="policy[body]" rows="40" data-md><?= h((string)($data['policy']['body'] ?? '')) ?></textarea>
     </div>
-  </fieldset>
-
-  <!-- ========================= preview ========================= -->
-  <fieldset class="admin__block" id="band-preview">
-    <?php admin_band_head('Preview',
-        'What the visitor would get from exactly what is in this form right '
-      . 'now. Rendered by the same code that prints the page — previewing '
-      . 'saves nothing and publishes nothing.',
-        ['do' => 'preview:0', 'label' => 'Preview']); ?>
-
-<?php if ($preview !== ''): ?>
-    <div class="admin__preview">
-      <?= $preview ?>
-    </div>
-<?php else: ?>
-    <p class="admin__empty">Press Preview to render the policy as the page will print it.</p>
-<?php endif; ?>
 
     <div class="admin__actions">
       <button class="btn btn--secondary" type="submit" name="do" value="preview-tab"

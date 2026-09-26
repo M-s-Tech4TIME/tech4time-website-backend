@@ -453,11 +453,6 @@ if (!$errors && $pending !== '') {
       . 'saves nothing and publishes nothing.',
         ['do' => 'preview:0', 'label' => 'Preview']); ?>
 
-    <p>
-      <button class="btn btn--secondary" type="submit" name="do" value="preview-tab"
-              formtarget="_blank">Preview in new tab</button>
-    </p>
-
 <?php if ($preview !== ''): ?>
     <div class="admin__preview">
       <?= $preview ?>
@@ -465,6 +460,11 @@ if (!$errors && $pending !== '') {
 <?php else: ?>
     <p class="admin__empty">Press Preview to render the policy as the page will print it.</p>
 <?php endif; ?>
+
+    <div class="admin__actions">
+      <button class="btn btn--secondary" type="submit" name="do" value="preview-tab"
+              formtarget="_blank">Preview in new tab</button>
+    </div>
   </fieldset>
 
   <!-- ====================== the closing band ====================== -->

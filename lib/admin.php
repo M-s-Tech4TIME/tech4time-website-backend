@@ -1015,6 +1015,11 @@ function admin_send_files(array $paths): string
  * $add    ['do' => 'technology-add:0', 'label' => 'Add a technology']
  * $status ['name' => 'technology[status]', 'value' => …, 'noun' => 'this section']
  *
+ * An $add button may ask for a new tab with 'target' => '_blank', rendered
+ * as formtarget: the privacy policy's Preview button posts the unsaved form
+ * beside the field it previews rather than under it. admin-forms.js leaves
+ * such buttons to the browser, so no async or focus handling reaches them.
+ *
  * The `do` value must begin with the same word the row's own fields are named
  * with — technology[items][…] goes with technology-add. admin-forms.js finds
  * the new row by that name, and a band whose button and fields disagree adds a
@@ -1037,7 +1042,8 @@ function admin_band_head(string $legend, string $blurb = '',
 <?php if ($add): ?>
         <button class="btn btn--secondary admin__band-add" type="submit"
                 name="do" value="<?= h((string)$add['do']) ?>"<?=
-          isset($add['rows']) ? ' data-rows="' . h((string)$add['rows']) . '"' : '' ?>>
+          isset($add['rows']) ? ' data-rows="' . h((string)$add['rows']) . '"' : '' ?><?=
+          ($add['target'] ?? '') === '_blank' ? ' formtarget="_blank"' : '' ?>>
           <?= h((string)$add['label']) ?>
         </button>
 <?php endif; ?>

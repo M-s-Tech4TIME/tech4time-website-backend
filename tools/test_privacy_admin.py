@@ -328,6 +328,10 @@ def run(client, r, site):
     fields = form_fields(page)
     r.check("the policy band offers the new-tab preview, not a pane",
             'value="preview-tab"' in page and 'formtarget="_blank"' in page)
+    r.check("beside the heading it previews, not under the field",
+            page.index('id="band-policy"') < page.index('value="preview-tab"')
+            < page.index('name="policy[body]"'),
+            "the button drifted out of the band head")
     r.check("and the preview band is gone",
             'id="band-preview"' not in page and 'value="preview:0"' not in page)
     before = json.loads(DATA.read_bytes())["revision"]

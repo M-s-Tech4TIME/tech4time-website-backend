@@ -2676,6 +2676,10 @@ html { scroll-padding-block-start: var(--admin-bar-h); }
   border-radius: var(--radius-lg);
   padding: var(--space-lg);
   max-width: 70ch;
+  /* Its only stage now is the standalone new-tab document, a bare body:
+     centred column with room above and below, not hugging the left edge. */
+  margin-block: var(--space-xl);
+  margin-inline: auto;
 }
 
 .admin__preview table {

@@ -363,17 +363,14 @@ if (!$errors && $pending !== '') {
     <?php admin_band_head('The policy',
         'The whole policy in one Markdown field. Headings mint anchors: '
       . 'a {#custom} suffix pins one, otherwise the heading words do. '
-      . 'The ribbon above inserts the syntax.'); ?>
+      . 'The ribbon above inserts the syntax.',
+        ['do' => 'preview-tab', 'label' => 'Preview in new tab',
+         'target' => '_blank']); ?>
 
     <div class="admin__field admin__field--wide">
       <label class="admin__label" for="policy-body">The policy, in Markdown</label>
       <textarea class="admin__input admin__textarea admin__textarea--tall" id="policy-body"
                 name="policy[body]" rows="40" data-md><?= h((string)($data['policy']['body'] ?? '')) ?></textarea>
-    </div>
-
-    <div class="admin__actions">
-      <button class="btn btn--secondary" type="submit" name="do" value="preview-tab"
-              formtarget="_blank">Preview in new tab</button>
     </div>
   </fieldset>
 

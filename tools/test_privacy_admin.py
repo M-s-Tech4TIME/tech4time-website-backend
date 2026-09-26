@@ -339,6 +339,18 @@ def run(client, r, site):
             "preview wrote the file -- it is a save wearing a different label")
     r.check("saying so out loud", "nothing was saved" in body)
 
+    print("\nthe new-tab rail numbers displayed rows, not headings")
+
+    _status, page = client.get(ADMIN)
+    fields = form_fields(page)
+    fields["policy[body]"] = ("## Alpha {#alpha}\n\ntext\n\n### Sub\n\n"
+                              "## Beta {#beta}\n\nmore")
+    status, _headers, body = client.post(ADMIN, {**fields, "do": "preview-tab"})
+    r.check("the document comes back", status == 200, f"status {status}")
+    r.check("numbered 01, 02 with nothing skipped",
+            ">01<" in body and ">02<" in body and ">03<" not in body,
+            "h3s ate numbers again")
+
     print("\nthe new-tab preview is a whole document that writes nothing")
 
     _status, page = client.get(ADMIN)

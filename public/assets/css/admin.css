@@ -1798,16 +1798,42 @@ html { scroll-padding-block-start: var(--admin-bar-h); }
   border-color: transparent;
 }
 
-/* The Markdown toolbar's two dropdowns (heading level, alignment): native
-   selects, styled as buttons so they read as ribbon controls. Native, not
-   custom menus: keyboard, screen readers, touch and zoom all work without a
-   line of code here, and a custom menu would rebuild admin-dialog.js badly. */
-.rte__select {
-  height: 2rem;
-  max-width: 9rem;
-  padding-inline: var(--space-3xs);
+/* The open menu: the trigger's twins stacked, sharing its border. Items
+   carry icon + visually-hidden name; the glyph rules below size both. */
+.rte__menu {
+  position: absolute;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  min-width: 3rem;
+  padding: var(--space-3xs);
+  background-color: var(--bg-elevated);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+}
+
+.rte__menu[hidden] {
+  display: none;
+}
+
+.rte__menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.rte__menu-item {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  justify-content: start;
+  gap: var(--space-2xs);
+  min-width: 2.5rem;
+  min-height: 2rem;
+  padding-inline: var(--space-2xs);
   font-family: inherit;
   font-size: var(--text-sm);
+  font-weight: 700;
   color: var(--text-secondary);
   background-color: transparent;
   border: var(--border-width) solid transparent;
@@ -1815,35 +1841,15 @@ html { scroll-padding-block-start: var(--admin-bar-h); }
   cursor: pointer;
 }
 
-.rte__select:hover {
+.rte__menu-item:hover {
   color: var(--text-primary);
-  background-color: var(--bg-elevated);
+  background-color: var(--bg-surface);
   border-color: var(--border-subtle);
 }
 
-.rte__select:focus-visible {
+.rte__menu-item:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
-}
-
-/* The glyphs prefacing the two dropdowns: pilcrow and flush-lines in the
-   same 24px vocabulary as the icon buttons. Decorative -- both controls
-   carry their own aria-labels -- so pointer events pass straight through
-   to whatever is beneath, and keyboard flow never stops on them. */
-.rte__glyph {
-  display: grid;
-  place-items: center;
-  width: 1.5rem;
-  height: 2rem;
-  font-size: var(--text-sm);
-  font-weight: 700;
-  color: var(--text-secondary);
-  pointer-events: none;
-}
-
-.rte__glyph .rte__icon {
-  width: 1.25rem;
-  height: 1.25rem;
 }
 
 .rte__btn--on:hover {

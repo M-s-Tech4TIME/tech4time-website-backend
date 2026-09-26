@@ -108,11 +108,12 @@ class Browser:
         return rq("POST", self.s + "/execute/sync",
                   {"script": script, "args": []})["value"]
 
-    def toolbar_button(self, bar, index):
-        eid = rq("POST", self.s + "/elements",
-                 {"using": "css selector",
-                  "value": f"#{bar} .rte__toolbar button"})["value"][index][W3C]
-        rq("POST", self.s + f"/element/{eid}/click", {})
+    def toolbar_button(self, bar, label):
+        found = rq("POST", self.s + "/elements",
+                   {"using": "css selector",
+                    "value": f'#{bar} .rte__toolbar button[aria-label="{label}"]'})["value"]
+        assert found, f"no ribbon button {label!r} on {bar}"
+        rq("POST", self.s + f"/element/{found[0][W3C]}/click", {})
         time.sleep(0.4)
 
     def sign_in(self, web_port, secret):
@@ -147,9 +148,9 @@ class Browser:
             pass
 
 
-# Buttons in the first toolbar, in TOOLS order: B I U | ul ol link | table
-# note centre. Separator spans carry no button.
-BOLD, ITALIC, UNDERLINE, BULLETS, NUMBERED, LINK, TABLE, NOTE = range(8)
+# Ribbon buttons, located by accessible name -- never by index, which menu
+# triggers interleaved with plain buttons would silently shift. Separators
+# carry no button.
 
 
 def run(b: Browser, web_port: int, r: Results):
@@ -167,13 +168,38 @@ def run(b: Browser, web_port: int, r: Results):
         "var t = document.querySelector('textarea[name=\"policy[body]\"]');"
         "return t.parentNode.classList.contains('md')"))
     r.check("with icon buttons, not text ones", b.js(
-        "return [...document.querySelectorAll('#band-policy .rte__toolbar button')]"
-        ".slice(0, 9).every((btn, i) => i < 3 ? btn.textContent.trim().length === 1"
-        " : btn.querySelector('svg') !== null)"))
-    r.check("plus heading and alignment dropdowns", b.js(
-        "return [...document.querySelectorAll('#band-policy .rte__toolbar select')]"
-        ".slice(0, 2).map(s => s.getAttribute('aria-label')).join('|')") == "Heading level|Text alignment",
-        "dropdowns missing or mislabelled")
+        "return [...document.querySelectorAll('#band-policy .rte__toolbar')]"
+        ".every(bar => [...bar.children]"
+        ".filter(el => el.tagName === 'BUTTON' || el.classList.contains('rte__menu-wrap'))"
+        ".every(el => {"
+        " const btn = el.tagName === 'BUTTON' ? el : el.querySelector('button');"
+        " return btn.querySelector('svg') !== null || btn.textContent.trim().length <= 2; }))"))
+    r.check("plus heading and alignment menus, icon-only", b.js(
+        "return [...document.querySelectorAll('#band-policy .rte__toolbar')]"
+        ".slice(0, 1).flatMap(bar => [...bar.querySelectorAll("
+        "':scope > button, :scope > .rte__menu-wrap > button')]"
+        ".map(el => el.getAttribute('aria-label'))).join('|')")
+        == "Heading level|Bold|Italic|Underline|Bulleted list|Numbered list|"
+           "Text alignment|Insert link|Insert table|Highlight box",
+        "menu triggers missing or mislabelled")
+    r.check("and the menus hide until opened", b.js(
+        "return [...document.querySelectorAll('#band-policy .rte__menu')]"
+        ".every(m => m.hasAttribute('hidden'))"))
+
+    def open_menu(label):
+        b.js("[...document.querySelector('#band-policy .rte__toolbar').querySelectorAll('button')]"
+             ".find("
+             "el => el.getAttribute('aria-label') === " + json.dumps(label)
+             + ").click()")
+        time.sleep(0.4)
+
+    def pick(value):
+        # Two statements, not one chained call: geckodriver's execute throws
+        # SyntaxError on document.querySelector('...:not([hidden])...').click()
+        # in a single expression, while var + click proves the selector parses.
+        b.js("var el = document.querySelector('#band-policy .rte__menu:not([hidden]) "
+             "[role=menuitem][data-value=\"" + value + "\"]'); el.click()")
+        time.sleep(0.4)
 
     # No prompt stubbing: questions are asked in the page's own dialog,
     # which the test drives like a person would -- fill the field, press
@@ -199,12 +225,12 @@ def run(b: Browser, web_port: int, r: Results):
 
     print("\ninline ribbons wrap the selection")
     b.js(sel + "t.value")
-    b.toolbar_button("band-policy", BOLD)
+    b.toolbar_button("band-policy", "Bold")
     r.check("Bold wraps in asterisks", b.js(
         "return document.querySelector('textarea[name=\"policy[body]\"]').value"
         ".includes('**data controller**')"))
     b.js(sel25)
-    b.toolbar_button("band-policy", ITALIC)
+    b.toolbar_button("band-policy", "Italic")
     r.check("Italic nests inside", b.js(
         "var v = document.querySelector('textarea[name=\"policy[body]\"]').value;"
         "return v.indexOf('***data controller***') !== -1"))
@@ -213,7 +239,7 @@ def run(b: Browser, web_port: int, r: Results):
 
     print("\nblock ribbons stand on their own lines")
     b.js(sel)
-    b.toolbar_button("band-policy", NOTE)
+    b.toolbar_button("band-policy", "Highlight box")
     v = b.js("return document.querySelector('textarea[name=\"policy[body]\"]').value")
     r.check("a note wraps the selection on its own lines",
             ":::note\ndata controller\n:::" in v, v[:80])
@@ -221,7 +247,7 @@ def run(b: Browser, web_port: int, r: Results):
     time.sleep(1.5)
 
     b.js(sel)
-    b.toolbar_button("band-policy", TABLE)
+    b.toolbar_button("band-policy", "Insert table")
     r.check("a dialog asks, in the page and not the browser",
             b.js("return document.querySelector('.dialog__input') !== null"))
     answer("3")
@@ -237,7 +263,7 @@ def run(b: Browser, web_port: int, r: Results):
 
     before = b.js("return (document.querySelector('textarea[name=\"policy[body]\"]').value.match(/\\| --- \\|/g) || []).length")
     b.js(sel)
-    b.toolbar_button("band-policy", TABLE)
+    b.toolbar_button("band-policy", "Insert table")
     answer("9")
     r.check("nine columns are refused with words",
             b.js("return [...document.querySelectorAll('.dialog__text')].some("
@@ -249,11 +275,8 @@ def run(b: Browser, web_port: int, r: Results):
 
     print("\nthe dropdowns rewrite whole lines and blocks")
     b.js(sel)
-    b.js("var bar = document.querySelector('#band-policy .rte__toolbar');"
-         "var sel = bar.querySelectorAll('select')[0];"
-         "sel.value = 'h3';"
-         "sel.dispatchEvent(new Event('change', {bubbles: true}));")
-    time.sleep(0.4)
+    open_menu("Heading level")
+    pick("h3")
     r.check("a heading prefixes the whole line", b.js(
         "return document.querySelector('textarea[name=\"policy[body]\"]').value"
         ".includes('### Tech4TIME decides why and how')"))
@@ -261,14 +284,26 @@ def run(b: Browser, web_port: int, r: Results):
     time.sleep(1.5)
 
     b.js(sel)
-    b.js("var bar = document.querySelector('#band-policy .rte__toolbar');"
-         "var sel = bar.querySelectorAll('select')[1];"
-         "sel.value = 'right';"
-         "sel.dispatchEvent(new Event('change', {bubbles: true}));")
-    time.sleep(0.4)
+    open_menu("Text alignment")
+    pick("right")
     r.check("an alignment wraps the selection in fences", b.js(
         "return document.querySelector('textarea[name=\"policy[body]\"]').value"
         ".includes(':::right\\ndata controller\\n:::')"))
+    b.js("location.reload();")
+    time.sleep(1.5)
+
+    print("\nthe menus behave like menus")
+    open_menu("Heading level")
+    r.check("one open at a time",
+            b.js("return document.querySelectorAll('#band-policy .rte__menu:not([hidden])').length") == 1)
+    open_menu("Text alignment")
+    r.check("opening another closes the first",
+            b.js("return document.querySelectorAll('#band-policy .rte__menu:not([hidden])').length") == 1)
+    b.js("var item = document.querySelector('#band-policy .rte__menu:not([hidden]) [role=menuitem]');"
+         "item.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}))")
+    time.sleep(0.3)
+    r.check("Escape closes",
+            b.js("return document.querySelectorAll('#band-policy .rte__menu:not([hidden])').length") == 0)
     b.js("location.reload();")
     time.sleep(1.5)
 
@@ -278,7 +313,7 @@ def run(b: Browser, web_port: int, r: Results):
 
     b.js("var t = document.querySelector('textarea[name=\"policy[body]\"]');"
          "t.focus(); t.setSelectionRange(0, t.value.indexOf('\\n'));")
-    b.toolbar_button("band-policy", BULLETS)
+    b.toolbar_button("band-policy", "Bulleted list")
     r.check("a bullet prefixes the line", b.js(
         "return document.querySelector('textarea[name=\"policy[body]\"]').value"
         ".startsWith('- ## Who is responsible')"))
@@ -286,7 +321,7 @@ def run(b: Browser, web_port: int, r: Results):
     time.sleep(1.5)
 
     b.js(sel)
-    b.toolbar_button("band-policy", LINK)
+    b.toolbar_button("band-policy", "Insert link")
     answer("https://example.example/x")
     r.check("a link wraps with the answered address", b.js(
         "return document.querySelector('textarea[name=\"policy[body]\"]').value"
@@ -296,7 +331,7 @@ def run(b: Browser, web_port: int, r: Results):
 
     print("\na bad address is refused before it reaches the field")
     b.js(sel)
-    b.toolbar_button("band-policy", LINK)
+    b.toolbar_button("band-policy", "Insert link")
     answer("javascript:alert(1)")
     r.check("the guard speaks in the page",
             b.js("return [...document.querySelectorAll('.dialog__text')].some("

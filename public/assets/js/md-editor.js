@@ -91,6 +91,15 @@
     "align-center": svg("0 0 24 24", bars([
       [3, ROWS[0], 18], [6.5, ROWS[1], 11], [3, ROWS[2], 18], [6.5, ROWS[3], 11]
     ])),
+    "align-right": svg("0 0 24 24", bars([
+      [3, ROWS[0], 18], [10, ROWS[1], 11], [3, ROWS[2], 18], [10, ROWS[3], 11]
+    ])),
+    "align-justify": svg("0 0 24 24", bars([
+      [3, ROWS[0], 18], [3, ROWS[1], 18], [3, ROWS[2], 18], [3, ROWS[3], 18]
+    ])),
+    "format-clear": svg("0 0 24 24",
+      '<circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/>' +
+      '<path d="M6.2 6.2l11.6 11.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'),
     "table": svg("0 0 24 24",
       '<rect x="3" y="4" width="18" height="16" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>' +
       '<rect x="3" y="10.5" width="18" height="2"/>' +
@@ -287,9 +296,13 @@
   }
 
   var TOOLS = [
-    { select: "heading", title: "Heading level", glyph: "¶", options: [
-        ["p", "Paragraph"], ["h2", "Heading 2"], ["h3", "Heading 3"],
-        ["h4", "Heading 4"], ["h5", "Heading 5"], ["h6", "Heading 6"]
+    { menu: "heading", title: "Heading level", glyph: "H", items: [
+        { value: "p", glyph: "¶", label: "Paragraph" },
+        { value: "h2", glyph: "H2", label: "Heading 2" },
+        { value: "h3", glyph: "H3", label: "Heading 3" },
+        { value: "h4", glyph: "H4", label: "Heading 4" },
+        { value: "h5", glyph: "H5", label: "Heading 5" },
+        { value: "h6", glyph: "H6", label: "Heading 6" }
       ] },
     { label: "B", title: "Bold", wrap: ["**", "**", "bold words"],
       className: "rte__btn--bold" },
@@ -300,9 +313,12 @@
     { separator: true },
     { icon: "list-ul", title: "Bulleted list", lines: "- " },
     { icon: "list-ol", title: "Numbered list", lines: "1. " },
-    { select: "align", title: "Text alignment", glyphIcon: "align-left", options: [
-        ["none", "Alignment"], ["left", "Left"], ["center", "Center"],
-        ["right", "Right"], ["justify", "Justified"]
+    { menu: "align", title: "Text alignment", glyphIcon: "align-left", items: [
+        { value: "none", icon: "format-clear", label: "No alignment" },
+        { value: "left", icon: "align-left", label: "Left" },
+        { value: "center", icon: "align-center", label: "Center" },
+        { value: "right", icon: "align-right", label: "Right" },
+        { value: "justify", icon: "align-justify", label: "Justified" }
       ] },
     { separator: true },
     { icon: "link", title: "Insert link", link: true },
@@ -310,11 +326,10 @@
     { icon: "note", title: "Highlight box", fence: ":::note" }
   ];
 
-  /* Headings and alignment arrive as native selects, not custom menus:
-     keyboard, screen readers, touch and zoom all work without a line of
-     code here. A select keeps its value; both reset to the neutral option
-     after applying, so the ribbon never claims the caret sits in a level
-     it does not track. */
+  /* Headings and alignment arrive as menus, not selects: an <option> can
+     only ever be text, and this ribbon is icons. The menu applies and
+     closes; it keeps no value, so it never claims the caret sits in a
+     level it does not track. */
   var HEADING_PREFIX = { h2: "## ", h3: "### ", h4: "#### ", h5: "##### ",
                          h6: "###### " };
 
@@ -388,46 +403,153 @@
     textarea.dispatchEvent(new global.Event("input", { bubbles: true }));
   }
 
-  function buildSelect(bar, textarea, tool) {
-    /* A glyph before the control, so the two dropdowns read as ribbon
-       buttons rather than form fields: pilcrow for style, flush-lines for
-       alignment, in the same 24px vocabulary as the icon buttons. Native
-       selects underneath -- keyboard, screen readers and touch all work
-       without a line of code here. */
-    if (tool.glyph || tool.glyphIcon) {
-      var glyph = doc.createElement("span");
-      glyph.className = "rte__glyph";
-      glyph.setAttribute("aria-hidden", "true");
-      if (tool.glyphIcon) {
-        glyph.innerHTML = ICONS[tool.glyphIcon];
-      } else {
-        glyph.textContent = tool.glyph;
-      }
-      bar.appendChild(glyph);
+  /* Dropdown menus: style (paragraph + H2-H6) and alignment. Native
+     <select>s cannot carry icons in their options, and this ribbon is icons
+     or it is text pretending -- so these are buttons opening menus, with
+     the menu contract spelled out: one open at a time, arrows/Home/End
+     travel, Enter/Space activates, Escape and outside-click close with focus
+     back on the trigger, Tab leaves and closes behind it. No focus trap: a
+     menu is dismissed, never modal, unlike admin-dialog.js. */
+  var openMenu = null;
+
+  function closeMenu(refocus) {
+    if (!openMenu) {
+      return;
     }
-    var sel = doc.createElement("select");
-    sel.className = "rte__select";
-    sel.setAttribute("aria-label", tool.title);
-    sel.title = tool.title;
-    tool.options.forEach(function (opt) {
-      var el = doc.createElement("option");
-      el.value = opt[0];
-      el.textContent = opt[1];
-      sel.appendChild(el);
-    });
-    /* No mousedown prevention here, unlike the buttons: preventing it would
-       stop the menu opening, and the textarea's selection offsets survive
-       the blur untouched, so there is nothing to protect. */
-    sel.addEventListener("change", function () {
-      if (tool.select === "heading") {
-        applyHeading(textarea, sel.value);
-      } else {
-        applyAlign(textarea, sel.value);
+    var trigger = openMenu.trigger;
+    openMenu.menu.setAttribute("hidden", "");
+    trigger.setAttribute("aria-expanded", "false");
+    openMenu = null;
+    doc.removeEventListener("pointerdown", outsideClose, true);
+    if (refocus !== false && trigger && trigger.focus) {
+      try {
+        trigger.focus();
+      } catch (error) {
+        /* A trigger removed mid-flight has nowhere to return to. */
       }
-      sel.value = tool.options[0][0];
-      textarea.focus();
+    }
+  }
+
+  function outsideClose(event) {
+    if (openMenu && !openMenu.wrap.contains(event.target)) {
+      closeMenu(true);
+    }
+  }
+
+  function buildMenu(bar, textarea, tool) {
+    var wrap = doc.createElement("span");
+    wrap.className = "rte__menu-wrap";
+
+    var trigger = doc.createElement("button");
+    trigger.type = "button";
+    trigger.className = "rte__btn";
+    trigger.title = tool.title;
+    trigger.setAttribute("aria-label", tool.title);
+    trigger.setAttribute("aria-haspopup", "true");
+    trigger.setAttribute("aria-expanded", "false");
+    if (tool.glyphIcon) {
+      trigger.innerHTML = ICONS[tool.glyphIcon];
+    } else {
+      trigger.textContent = tool.glyph;
+    }
+    trigger.tabIndex = -1;
+
+    var menu = doc.createElement("span");
+    menu.className = "rte__menu";
+    menu.setAttribute("role", "menu");
+    menu.setAttribute("hidden", "");
+
+    tool.items.forEach(function (opt) {
+      var item = doc.createElement("button");
+      item.type = "button";
+      item.className = "rte__menu-item";
+      item.setAttribute("role", "menuitem");
+      item.setAttribute("data-value", opt.value);
+      item.tabIndex = -1;
+      if (opt.icon) {
+        item.innerHTML = ICONS[opt.icon];
+      } else {
+        item.textContent = opt.glyph;
+      }
+      var label = doc.createElement("span");
+      label.className = "visually-hidden";
+      label.textContent = opt.label;
+      item.appendChild(label);
+      item.addEventListener("click", function () {
+        closeMenu(false);
+        if (tool.menu === "heading") {
+          applyHeading(textarea, opt.value);
+        } else {
+          applyAlign(textarea, opt.value);
+        }
+        textarea.focus();
+      });
+      menu.appendChild(item);
     });
-    return sel;
+
+    function items() {
+      return Array.prototype.slice.call(menu.querySelectorAll("[role=menuitem]"));
+    }
+
+    function open() {
+      if (openMenu && openMenu.menu === menu) {
+        closeMenu(true);
+        return;
+      }
+      closeMenu(false);
+      menu.removeAttribute("hidden");
+      trigger.setAttribute("aria-expanded", "true");
+      openMenu = { wrap: wrap, menu: menu, trigger: trigger };
+      doc.addEventListener("pointerdown", outsideClose, true);
+      var first = items()[0];
+      if (first) {
+        first.focus();
+      }
+    }
+
+    trigger.addEventListener("mousedown", function (event) {
+      /* Same reason as the buttons: keep the caret where it is. Unlike a
+         <select>, a custom menu opens on click, so prevention is safe. */
+      event.preventDefault();
+    });
+    trigger.addEventListener("click", open);
+
+    menu.addEventListener("keydown", function (event) {
+      var list = items();
+      var at = list.indexOf(doc.activeElement);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeMenu(true);
+      } else if (event.key === "Tab") {
+        closeMenu(false);
+      } else if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+        event.preventDefault();
+        list[(at + 1 + list.length) % list.length].focus();
+      } else if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
+        event.preventDefault();
+        list[(at - 1 + list.length) % list.length].focus();
+      } else if (event.key === "Home") {
+        event.preventDefault();
+        list[0].focus();
+      } else if (event.key === "End") {
+        event.preventDefault();
+        list[list.length - 1].focus();
+      }
+    });
+
+    /* Toolbar arrows travel controls, not menu contents: moving past the
+       trigger must not strand focus inside a closed menu, and an open one
+       closes first. */
+    wrap.addEventListener("keydown", function (event) {
+      if ((event.key === "ArrowRight" || event.key === "ArrowLeft")
+          && openMenu && openMenu.menu === menu) {
+        closeMenu(true);
+      }
+    });
+
+    wrap.appendChild(trigger);
+    wrap.appendChild(menu);
+    return wrap;
   }
 
   function build(textarea) {
@@ -450,8 +572,8 @@
         bar.appendChild(hr);
         return;
       }
-      if (tool.select) {
-        bar.appendChild(buildSelect(bar, textarea, tool));
+      if (tool.menu) {
+        bar.appendChild(buildMenu(bar, textarea, tool));
         return;
       }
       var button = doc.createElement("button");
@@ -486,10 +608,12 @@
       bar.appendChild(button);
     });
 
-    /* One tab stop for the whole toolbar; arrow keys travel it, selects
-       included -- a dropdown is a toolbar control like the buttons. The
-       first control takes the stop; everything else is reached by arrows. */
-    var first = bar.querySelector("select, button");
+    /* One tab stop for the whole toolbar; arrow keys travel its top-level
+       controls -- plain buttons and menu triggers, never the items inside
+       an open menu (those have their own travel, and the wrap handler above
+       yields to them). The first control takes the stop; everything else is
+       reached by arrows. */
+    var first = bar.querySelector(":scope > button, :scope > .rte__menu-wrap > button");
     if (first) {
       first.tabIndex = 0;
     }
@@ -498,12 +622,15 @@
       if (!(event.key in keys)) {
         return;
       }
-      /* Inside an open select, arrows belong to the menu, not the toolbar. */
-      if (event.target && event.target.nodeName === "SELECT") {
+      /* Inside an open menu, arrows belong to the menu items, not to the
+         toolbar travel below. */
+      if (event.target && event.target.closest
+          && event.target.closest(".rte__menu")) {
         return;
       }
       event.preventDefault();
-      var items = Array.prototype.slice.call(bar.querySelectorAll("select, button"));
+      var items = Array.prototype.slice.call(
+        bar.querySelectorAll(":scope > button, :scope > .rte__menu-wrap > button"));
       var current = items.indexOf(doc.activeElement);
       if (current < 0) {
         current = 0;

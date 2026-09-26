@@ -144,13 +144,17 @@ function privacy_preview_doc(array $data): void
         $upd_line = 'Last updated ' . gmdate('j F Y', $stamp);
     }
 
-    $toc = '';
-    foreach (md_headings((string)($policy['body'] ?? '')) as $i => $heading) {
+    /* Numbered by displayed position, not by heading index: h3 and below
+       never reach the rail, so counting every heading would print 01, 02,
+       07 -- photographed on a real preview, which is how this was found. */
+    $n = 0;
+    foreach (md_headings((string)($policy['body'] ?? '')) as $heading) {
         if ((int)$heading['level'] !== 2) {
             continue;
         }
+        $n++;
         $toc .= '<li><a href="#' . h((string)$heading['id']) . '">'
-              . '<span>' . sprintf('%02d', $i + 1) . '</span> '
+              . '<span>' . sprintf('%02d', $n) . '</span> '
               . h((string)$heading['text']) . '</a></li>' . "\n";
     }
 

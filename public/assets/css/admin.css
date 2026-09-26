@@ -1826,6 +1826,26 @@ html { scroll-padding-block-start: var(--admin-bar-h); }
   outline-offset: 1px;
 }
 
+/* The glyphs prefacing the two dropdowns: pilcrow and flush-lines in the
+   same 24px vocabulary as the icon buttons. Decorative -- both controls
+   carry their own aria-labels -- so pointer events pass straight through
+   to whatever is beneath, and keyboard flow never stops on them. */
+.rte__glyph {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 2rem;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.rte__glyph .rte__icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
 .rte__btn--on:hover {
   color: var(--on-accent);
   background-image: var(--silver-gradient-fill);
@@ -2663,4 +2683,123 @@ html { scroll-padding-block-start: var(--admin-bar-h); }
   vertical-align: top;
   text-align: start;
   border-block-end: var(--border-width) solid var(--border-subtle);
+}
+
+/* The preview reads like the page, not like a form: the rendered legal
+   document gets the visitor's measure and type scale (in admin tokens),
+   so what is reviewed is what ships. Headings, lists, notes, tables and
+   the centred blocks the ::: fences draw. */
+.admin__preview h2 {
+  margin-block: var(--space-lg) var(--space-2xs);
+  font-size: var(--text-2xl);
+  color: var(--text-primary);
+}
+
+.admin__preview h2:first-child {
+  margin-block-start: 0;
+}
+
+.admin__preview h3 {
+  margin-block: var(--space-md) var(--space-2xs);
+  font-size: var(--text-lg);
+  color: var(--accent-text);
+}
+
+.admin__preview h4,
+.admin__preview h5,
+.admin__preview h6 {
+  margin-block: var(--space-sm) var(--space-2xs);
+  font-size: var(--text-base);
+  color: var(--text-primary);
+}
+
+.admin__preview p,
+.admin__preview ul,
+.admin__preview ol {
+  margin-block-end: var(--space-sm);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--text-secondary);
+}
+
+.admin__preview ul,
+.admin__preview ol {
+  padding-inline-start: var(--space-md);
+}
+
+.admin__preview li::marker {
+  color: var(--silver-accent-mid);
+}
+
+.admin__preview strong {
+  color: var(--text-primary);
+}
+
+.admin__preview a {
+  color: var(--accent-text);
+}
+
+.admin__preview .legal__notice {
+  padding: var(--space-md) var(--space-lg);
+  margin-block: var(--space-md);
+  background-color: var(--bg-surface);
+  border: var(--border-width) solid var(--border-subtle);
+  border-inline-start: 4px solid var(--silver-accent-mid);
+  border-radius: var(--radius);
+}
+
+.admin__preview .ta-left {
+  text-align: left;
+}
+
+.admin__preview .ta-center {
+  text-align: center;
+}
+
+.admin__preview .ta-right {
+  text-align: right;
+}
+
+.admin__preview .ta-justify {
+  text-align: justify;
+}
+
+/* The standalone preview document (Privacy → Preview in new tab): centred
+   measure, page furniture, same tokens as the pane above. */
+.admin__preview-doc {
+  max-width: 76ch;
+  margin-inline: auto;
+  padding: var(--space-xl) var(--space-md);
+}
+
+.admin__preview-doc .legal__eyebrow {
+  display: inline-block;
+  margin-block-end: var(--space-md);
+  padding: var(--space-2xs) var(--space-sm);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  border: var(--border-width) solid var(--border-subtle);
+  border-radius: var(--radius);
+}
+
+.admin__preview-doc h1 {
+  font-size: var(--text-3xl);
+  color: var(--text-primary);
+}
+
+.admin__preview-doc nav ol {
+  list-style: none;
+  margin: 0 0 var(--space-lg);
+  padding: 0;
+}
+
+.admin__preview-doc nav li {
+  padding-block: var(--space-2xs);
+}
+
+.admin__preview-doc nav a {
+  color: var(--accent-text);
 }

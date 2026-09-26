@@ -21,14 +21,15 @@
    THE TOOLBAR IS CLOSED
    One button per construct the dialect knows (see
    tech4time-website-frontend/plans/legal-markdown-syntax.md): bold, italic,
-   underline, link, two lists, table, note, centre. A button for anything
-   else would write text the renderer shows literally -- alignment beyond
-   centre, headings, raw HTML -- so there is no button for those. Left is
-   the default alignment and needs no ribbon; right and justify have no
-   syntax and therefore no button.
+   underline, link, two lists, table, note, and the two dropdowns. A button
+   for anything else would write text the renderer shows literally --
+   headings beyond h6, right and justify outside the alignment menu, raw
+   HTML -- so there is no button for those. Left is
+   the default alignment and needs no ribbon; the menu holds left, center,
+   right and justified.
 
    ICONS
-   Letterforms for B/I/U and the list, link and centre glyphs mirror
+   Letterforms for B/I/U and the list, link and alignment glyphs mirror
    editor.js's ICONS, which stays the master: same 24px grid, same bar
    weights, same Font Awesome link path. Table and note are drawn here in
    that style because editor.js has no such buttons. If a shared glyph ever
@@ -74,6 +75,9 @@
   var ROWS = [4, 8.5, 13, 17.5];
 
   var ICONS = {
+    "align-left": svg("0 0 24 24", bars([
+      [3, ROWS[0], 18], [3, ROWS[1], 11], [3, ROWS[2], 18], [3, ROWS[3], 11]
+    ])),
     "list-ul": svg("0 0 24 24",
       '<circle cx="4.5" cy="6" r="1.75"/><circle cx="4.5" cy="12" r="1.75"/>' +
       '<circle cx="4.5" cy="18" r="1.75"/>' +
@@ -283,15 +287,10 @@
   }
 
   var TOOLS = [
-    { select: "heading", title: "Heading level", options: [
+    { select: "heading", title: "Heading level", glyph: "¶", options: [
         ["p", "Paragraph"], ["h2", "Heading 2"], ["h3", "Heading 3"],
         ["h4", "Heading 4"], ["h5", "Heading 5"], ["h6", "Heading 6"]
       ] },
-    { select: "align", title: "Text alignment", options: [
-        ["none", "Alignment"], ["left", "Left"], ["center", "Center"],
-        ["right", "Right"], ["justify", "Justified"]
-      ] },
-    { separator: true },
     { label: "B", title: "Bold", wrap: ["**", "**", "bold words"],
       className: "rte__btn--bold" },
     { label: "I", title: "Italic", wrap: ["*", "*", "emphasised words"],
@@ -301,11 +300,14 @@
     { separator: true },
     { icon: "list-ul", title: "Bulleted list", lines: "- " },
     { icon: "list-ol", title: "Numbered list", lines: "1. " },
-    { icon: "link", title: "Insert link", link: true },
+    { select: "align", title: "Text alignment", glyphIcon: "align-left", options: [
+        ["none", "Alignment"], ["left", "Left"], ["center", "Center"],
+        ["right", "Right"], ["justify", "Justified"]
+      ] },
     { separator: true },
+    { icon: "link", title: "Insert link", link: true },
     { icon: "table", title: "Insert table", table: true },
-    { icon: "note", title: "Highlight box", fence: ":::note" },
-    { icon: "align-center", title: "Centre block", fence: ":::center" }
+    { icon: "note", title: "Highlight box", fence: ":::note" }
   ];
 
   /* Headings and alignment arrive as native selects, not custom menus:
@@ -387,6 +389,22 @@
   }
 
   function buildSelect(bar, textarea, tool) {
+    /* A glyph before the control, so the two dropdowns read as ribbon
+       buttons rather than form fields: pilcrow for style, flush-lines for
+       alignment, in the same 24px vocabulary as the icon buttons. Native
+       selects underneath -- keyboard, screen readers and touch all work
+       without a line of code here. */
+    if (tool.glyph || tool.glyphIcon) {
+      var glyph = doc.createElement("span");
+      glyph.className = "rte__glyph";
+      glyph.setAttribute("aria-hidden", "true");
+      if (tool.glyphIcon) {
+        glyph.innerHTML = ICONS[tool.glyphIcon];
+      } else {
+        glyph.textContent = tool.glyph;
+      }
+      bar.appendChild(glyph);
+    }
     var sel = doc.createElement("select");
     sel.className = "rte__select";
     sel.setAttribute("aria-label", tool.title);

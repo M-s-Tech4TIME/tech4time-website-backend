@@ -561,6 +561,14 @@
       var submitter = event.submitter || pressed;
       pressed = null;
 
+      /* A button asking for a new tab (the full-page preview) is left to the
+         browser: fetching a whole document to swap into #admin-main would
+         print a page inside the page. */
+      if (submitter && submitter.getAttribute
+          && submitter.getAttribute("formtarget") === "_blank") {
+        return;
+      }
+
       event.preventDefault();
       send(form, submitter);
     });

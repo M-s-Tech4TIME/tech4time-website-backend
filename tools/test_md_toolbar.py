@@ -149,7 +149,7 @@ class Browser:
 
 # Buttons in the first toolbar, in TOOLS order: B I U | ul ol link | table
 # note centre. Separator spans carry no button.
-BOLD, ITALIC, UNDERLINE, BULLETS, NUMBERED, LINK, TABLE, NOTE, CENTRE = range(9)
+BOLD, ITALIC, UNDERLINE, BULLETS, NUMBERED, LINK, TABLE, NOTE = range(8)
 
 
 def run(b: Browser, web_port: int, r: Results):

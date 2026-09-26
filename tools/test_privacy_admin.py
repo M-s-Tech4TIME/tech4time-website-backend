@@ -339,6 +339,23 @@ def run(client, r, site):
             "preview wrote the file -- it is a save wearing a different label")
     r.check("saying so out loud", "nothing was saved" in body)
 
+    print("\nthe new-tab preview is a whole document that writes nothing")
+
+    _status, page = client.get(ADMIN)
+    fields = form_fields(page)
+    before = json.loads(DATA.read_bytes())["revision"]
+    fields["policy[body]"] = "## Tab head {#tab-head}\n\nTab marker **T9**."
+    status, headers, body = client.post(ADMIN, {**fields, "do": "preview-tab"})
+    r.check("a standalone document comes back", status == 200, f"status {status}")
+    r.check("as HTML, not a screen fragment",
+            "<!DOCTYPE html>" in body and "Preview — " in body)
+    r.check("with the posted words rendered in it",
+            '<h2 class="legal__heading" id="tab-head">Tab head</h2>' in body
+            and "<strong>T9</strong>" in body)
+    r.check("and the revision on disk did not move",
+            json.loads(DATA.read_bytes())["revision"] == before,
+            "a preview wrote the file")
+
     print("\nwhat the editor refuses, and what it does not")
 
     _status, page = client.get(ADMIN)

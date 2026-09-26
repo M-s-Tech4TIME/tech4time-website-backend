@@ -96,7 +96,8 @@ function privacy_from_post(array $current): array
 }
 
 /**
- * Render the posted document the way the public page will print it.
+ * Render the posted body the way the public page will print it, for the
+ * in-place pane.
  *
  * The body through the shared renderer, nothing else -- the twin of the
  * frontend's page loop, kept deliberately small. If this grows past that,
@@ -105,6 +106,89 @@ function privacy_from_post(array $current): array
 function privacy_preview_html(array $data): string
 {
     return trim(md_render((string)($data['policy']['body'] ?? '')));
+}
+
+/**
+ * The whole posted document as a standalone page, in a new tab.
+ *
+ * Same renderer, same content as the pane and the public page: hero title,
+ * date chips, rail, callout, body, closing band. Admin dress, not frontend
+ * dress -- the frontend's stylesheets cannot load here (CSP style-src
+ * 'self'), and duplicating them would fork the visual truth. What this
+ * proves over the pane is structure at page scale: heading order, rail
+ * numbering, the chips beside the title.
+ *
+ * Never saved, never published: it exits before the shell prints.
+ */
+function privacy_preview_doc(array $data): void
+{
+    $policy = $data['policy'] ?? [];
+    $hero = $data['hero'] ?? [];
+    $cta = $data['cta'] ?? [];
+    $effective = trim((string)($policy['effective'] ?? ''));
+    $updated = trim((string)($data['updated'] ?? ''));
+
+    /* Twin of the frontend's date chips (lib/privacy.php): ISO in, dated
+       line out, blank when it will not read. Two implementations of four
+       lines each is the documented exception, not a second renderer -- the
+       words still come from md_render() alone. */
+    $eff_line = '';
+    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $effective, $m)
+        && checkdate((int)$m[2], (int)$m[3], (int)$m[1])
+        && ($stamp = strtotime($m[1] . '-' . $m[2] . '-' . $m[3] . ' UTC')) !== false
+    ) {
+        $eff_line = 'Effective ' . gmdate('j F Y', $stamp);
+    }
+    $upd_line = '';
+    if ($updated !== '' && ($stamp = strtotime($updated)) !== false) {
+        $upd_line = 'Last updated ' . gmdate('j F Y', $stamp);
+    }
+
+    $toc = '';
+    foreach (md_headings((string)($policy['body'] ?? '')) as $i => $heading) {
+        if ((int)$heading['level'] !== 2) {
+            continue;
+        }
+        $toc .= '<li><a href="#' . h((string)$heading['id']) . '">'
+              . '<span>' . sprintf('%02d', $i + 1) . '</span> '
+              . h((string)$heading['text']) . '</a></li>' . "\n";
+    }
+
+    $callout = $policy['callout'] ?? [];
+    $buttons = '';
+    foreach (($cta['items'] ?? []) as $button) {
+        if (($button['status'] ?? 'shown') === 'hidden') {
+            continue;
+        }
+        $buttons .= '<a class="btn btn--' . h($button['style'] === 'ghost' ? 'secondary' : 'primary')
+                  . '" href="' . h((string)($button['href'] ?? '')) . '">'
+                  . h((string)($button['label'] ?? '')) . '</a>' . "\n";
+    }
+
+    header('Content-Type: text/html; charset=utf-8');
+    header('X-Robots-Tag: noindex, nofollow');
+    echo '<!DOCTYPE html>', "\n",
+        '<html lang="en"><head><meta charset="utf-8">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1">',
+        '<meta name="robots" content="noindex, nofollow">',
+        '<title>Preview — ' . h((string)($hero['title'] ?? 'Privacy Policy')) . '</title>',
+        '<link rel="stylesheet" href="' . h(admin_asset('/assets/css/base.css')) . '">',
+        '<link rel="stylesheet" href="' . h(admin_asset('/assets/css/theme.css')) . '">',
+        '<link rel="stylesheet" href="' . h(admin_asset('/assets/css/admin.css')) . '">',
+        '</head><body class="page"><main class="admin__preview-doc">',
+        '<p class="legal__eyebrow">Legal · preview, not published</p>',
+        '<h1>' . h((string)($hero['title'] ?? '')) . '</h1>',
+        '<p>' . h((string)($hero['subtitle'] ?? '')) . '</p>',
+        '<p>' . h(trim($eff_line . ' · ' . $upd_line, ' ·')) . '</p>',
+        $toc !== '' ? '<nav aria-label="On this page"><ol>' . "\n" . $toc . '</ol></nav>' : '',
+        '<h2>' . h((string)($callout['title'] ?? '')) . '</h2>',
+        md_render((string)($callout['note'] ?? '')),
+        md_render((string)($policy['body'] ?? '')),
+        '<h2>' . h((string)($cta['title'] ?? '')) . '</h2>',
+        '<p>' . h((string)($cta['text'] ?? '')) . '</p>',
+        $buttons,
+        '</main></body></html>';
+    exit;
 }
 
 /* ---------------------------------------------------------------- actions */
@@ -160,6 +244,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $preview = privacy_preview_html($posted);
         $pending = 'Preview below — nothing was saved.';
         $data = $posted;
+    } elseif ($do === 'preview-tab') {
+        /* The whole document in a new tab (formtarget="_blank" on the
+           button): same render, standalone page, then stop before the shell
+           prints. Saves and publishes nothing, like the pane. */
+        privacy_preview_doc($posted);
     } elseif ($do !== 'nothing') {
         $applied = privacy_apply_row_action($posted, $do);
         $data = $applied[0] ?? $posted;
@@ -363,6 +452,11 @@ if (!$errors && $pending !== '') {
       . 'now. Rendered by the same code that prints the page — previewing '
       . 'saves nothing and publishes nothing.',
         ['do' => 'preview:0', 'label' => 'Preview']); ?>
+
+    <p>
+      <button class="btn btn--secondary" type="submit" name="do" value="preview-tab"
+              formtarget="_blank">Preview in new tab</button>
+    </p>
 
 <?php if ($preview !== ''): ?>
     <div class="admin__preview">

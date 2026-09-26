@@ -39,7 +39,24 @@ Both private stores need the **same** `publish.key`, or every publish is refused
 python3 tools/preview.py            # opens a browser, already signed in
 python3 tools/preview.py --no-browser
 python3 tools/preview.py 8124       # a different port
+python3 tools/preview.py legal      # land on the legal hub instead
 ```
+
+For watching a publish land, the sibling tool is `preview_e2e.py`:
+
+```bash
+python3 tools/preview_e2e.py              # backend :8125, frontend :8126
+python3 tools/preview_e2e.py legal        # land on the legal hub
+python3 tools/preview_e2e.py 8135 8136 privacy
+```
+
+One throwaway signing key minted fresh per run, shared between two throwaway
+private stores; both servers on loopback only (no argument can name another
+host); both `content/` trees copied out and back. Save in the admin and watch
+it arrive on the public site within a second — then close up and both halves
+stop, both stores vanish, both trees restore. Not a suite (that is
+`test_end_to_end.py`, which asserts) and not a deploy: three tools, three
+jobs — look, prove, watch.
 
 For reviewing the editors rather than using them. `serve.py` gives you the admin behind its real
 password and its real second factor, which is right — and means the cost of looking at a change to

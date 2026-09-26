@@ -316,6 +316,12 @@
     if (api && api.editor) {
       api.editor.init();
     }
+    /* Beside the HTML editor, for the same reason: the Markdown ribbons live
+       inside the swapped region too, and a rail-clicked navigation that left
+       thirteen plain textareas was exactly how this was found. */
+    if (api && api.mdEditor) {
+      api.mdEditor.init();
+    }
     if (api && api.adminOutline) {
       api.adminOutline.init();
     }

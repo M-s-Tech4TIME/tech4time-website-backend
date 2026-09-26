@@ -234,6 +234,27 @@ def run(b: Browser, web_port: int, r: Results):
     r.check("no navigation happened pressing any of it",
             b.js("return location.search") == "?s=privacy")
 
+    print("\narriving by rail-click builds them too, not just direct loads")
+
+    b.go(f"http://127.0.0.1:{web_port}/?s=company")
+    r.check("no Markdown fields on the way in",
+            b.js("return document.querySelectorAll('textarea[data-md]').length") == 0)
+    # The rail lists the hub, not the editor: Legal -> Edit -> privacy screen,
+    # every step swapped in place rather than loaded. The failure this guards
+    # against built toolbars on direct loads and none on swapped ones, because
+    # the swap re-ran every init except the new one.
+    b.js("document.querySelector('.rail a[href=\"?s=legal\"]').click();")
+    time.sleep(2.0)
+    r.check("the hub swapped in",
+            b.js("return location.search") == "?s=legal")
+    b.js("document.querySelector('#admin-body a[href=\"?s=privacy\"]').click();")
+    time.sleep(2.0)
+    r.check("the editor swapped in after it",
+            b.js("return location.search") == "?s=privacy")
+    n = b.js("return document.querySelectorAll('#admin-body .rte__toolbar').length")
+    r.check("the twice-swapped screen carries its ribbons", n >= 13,
+            f"{n} toolbars after the swaps")
+
 
 def stop(proc):
     for attempt in (proc.terminate, proc.kill):

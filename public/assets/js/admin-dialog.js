@@ -164,10 +164,158 @@
     });
   }
 
+  /**
+   * Ask for a line of text. Answers a promise for the string, or null.
+   *
+   * askInput({ title: "Insert table", message: "How many columns?",
+   *            value: "2", confirm: "Insert" })
+   *
+   * The input dialog prompt() cannot be: prompt() leaves the page for a
+   * browser box, and whatever dismissed it dismissed the flow with it. This
+   * stays in the page, under the same focus trap and backdrop as ask().
+   * Without <dialog> it falls back to window.prompt(), which is the same
+   * bargain ask() strikes with confirm().
+   */
+  function askInput(options) {
+    var opts = options || {};
+
+    if (!usable()) {
+      var fallback = global.prompt(
+        (opts.title ? opts.title + "\n\n" : "") + (opts.message || ""),
+        opts.value || ""
+      );
+      return {
+        then: function (fn) { fn(fallback); return this; }
+      };
+    }
+
+    return new global.Promise(function (resolve) {
+      var dialog = doc.createElement("dialog");
+      dialog.className = "dialog";
+
+      var card = doc.createElement("div");
+      card.className = "dialog__card";
+
+      if (opts.title) {
+        var heading = doc.createElement("h2");
+        heading.className = "dialog__title";
+        heading.textContent = opts.title;
+        card.appendChild(heading);
+      }
+
+      /* textContent throughout, like build(): a question box handed markup
+         is one that will one day be handed a field value. */
+      if (opts.message) {
+        var text = doc.createElement("p");
+        text.className = "dialog__text";
+        text.textContent = opts.message;
+        card.appendChild(text);
+      }
+
+      var label = doc.createElement("label");
+      label.className = "dialog__label";
+      label.textContent = opts.label || opts.message || "Value";
+      var input = doc.createElement("input");
+      input.className = "admin__input dialog__input";
+      input.type = "text";
+      input.value = opts.value || "";
+      input.setAttribute("autocomplete", "off");
+      input.setAttribute("spellcheck", "false");
+      label.appendChild(input);
+      card.appendChild(label);
+
+      var actions = doc.createElement("div");
+      actions.className = "dialog__actions";
+
+      var no = doc.createElement("button");
+      no.className = "btn btn--ghost";
+      no.type = "button";
+      no.textContent = opts.cancel || "Cancel";
+
+      var yes = doc.createElement("button");
+      yes.className = "btn btn--primary";
+      yes.type = "button";
+      yes.textContent = opts.confirm || "Continue";
+
+      actions.appendChild(no);
+      actions.appendChild(yes);
+      card.appendChild(actions);
+      dialog.appendChild(card);
+
+      var settled = false;
+      function finish(value) {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        try {
+          dialog.close();
+        } catch (error) {
+          /* Already closed by Escape: the cancel handler below ran first. */
+        }
+        if (dialog.parentNode) {
+          dialog.parentNode.removeChild(dialog);
+        }
+        resolve(value);
+      }
+
+      yes.addEventListener("click", function () { finish(input.value); });
+      no.addEventListener("click", function () { finish(null); });
+      dialog.addEventListener("cancel", function (event) {
+        event.preventDefault();
+        finish(null);
+      });
+      dialog.addEventListener("close", function () { finish(null); });
+      dialog.addEventListener("click", function (event) {
+        if (event.target === dialog) {
+          finish(null);
+        }
+      });
+      /* Enter confirms from the field, the way a prompt's does. */
+      input.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          finish(input.value);
+        }
+      });
+
+      doc.body.appendChild(dialog);
+      dialog.showModal();
+      input.focus();
+      input.select();
+    });
+  }
+
+  /**
+   * Tell, without asking. Answers a promise that resolves when dismissed.
+   *
+   * notify("Links must start with https://, mailto: or /") — the same words
+   * the old window.alert() said, in the page's own box instead of the
+   * browser's. Falls back to alert() where <dialog> is absent.
+   */
+  function notify(options) {
+    var opts = typeof options === "string" ? { message: options } : (options || {});
+
+    if (!usable()) {
+      global.alert(
+        (opts.title ? opts.title + "\n\n" : "") + (opts.message || "")
+      );
+      return {
+        then: function (fn) { fn(); return this; }
+      };
+    }
+
+    return ask({ title: opts.title, message: opts.message, confirm: "OK" }).then(
+      function () {}
+    );
+  }
+
   var api = (global.Tech4Time = global.Tech4Time || {});
 
   api.adminDialog = {
     ask: ask,
+    askInput: askInput,
+    notify: notify,
     usable: usable
   };
 })(window);

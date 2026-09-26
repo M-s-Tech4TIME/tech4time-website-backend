@@ -14,7 +14,9 @@ over HTTP -- but the ribbons are JavaScript, and HTTP never runs them. A
 button that inserts the wrong syntax writes text the renderer shows
 literally, which is a silent corruption of a legal document: the words are
 all there and the meaning is subtly not. So every ribbon is pressed here, in
-a signed-in browser, against the real privacy screen.
+a signed-in browser, against the real privacy screen -- including the table
+and link dialogs, which are driven like a person drives them, and the guards
+on bad answers.
 
 WHAT IT DOES NOT DO
 Preview. That posts the form and renders server-side, which needs no script
@@ -161,14 +163,26 @@ def run(b: Browser, web_port: int, r: Results):
     r.check("the HTML editor left them alone", b.js(
         "return [...document.querySelectorAll('textarea[data-md]')]"
         ".every(t => !t.hasAttribute('hidden'))"))
-    # The prompts for link addresses and table widths would block headless
-    # Firefox mid-click -- and a reload wipes the stub, so it is set again
-    # after each one. Stubbing is honest here: what is under test is what
-    # the toolbar DOES with the answer, and the guard on a bad answer is
-    # proved over HTTP by posting one.
-    stub = ("window.prompt = function(msg, def) {"
-            "  return /column/i.test(msg) ? '3' : 'https://example.example/x'; };")
-    b.js(stub)
+    r.check("ribbon and field read as one box", b.js(
+        "var t = document.querySelector('textarea[name=\"sections[0][body]\"]');"
+        "return t.parentNode.classList.contains('md')"))
+    r.check("with icon buttons, not text ones", b.js(
+        "return [...document.querySelectorAll('#band-sections .rte__toolbar button')]"
+        ".slice(0, 9).every((btn, i) => i < 3 ? btn.textContent.trim().length === 1"
+        " : btn.querySelector('svg') !== null)"))
+
+    # No prompt stubbing: questions are asked in the page's own dialog,
+    # which the test drives like a person would -- fill the field, press
+    # the primary button, or dismiss with Cancel/Escape.
+    def answer(text):
+        b.js("document.querySelector('.dialog__input').value = "
+             + json.dumps(text) + ";")
+        b.js("document.querySelector('.dialog .btn--primary').click();")
+        time.sleep(0.5)
+
+    def dismiss():
+        b.js("document.querySelector('.dialog .btn--ghost').click();")
+        time.sleep(0.4)
 
     # The first 21 characters are "Tech4TIME decides why".
     sel = ("var t = document.querySelector('textarea[name=\"sections[0][body]\"]');"
@@ -189,7 +203,6 @@ def run(b: Browser, web_port: int, r: Results):
         "return v.indexOf('***Tech4TIME decides why***') === 0"))
     b.js("location.reload();")
     time.sleep(1.5)
-    b.js(stub)
 
     print("\nblock ribbons stand on their own lines")
     b.js(sel)
@@ -199,20 +212,36 @@ def run(b: Browser, web_port: int, r: Results):
             v.startswith(":::note\nTech4TIME decides why\n:::\n"), v[:60])
     b.js("location.reload();")
     time.sleep(1.5)
-    b.js(stub)
 
     b.js(sel)
     b.toolbar_button("band-sections", TABLE)
+    r.check("a dialog asks, in the page and not the browser",
+            b.js("return document.querySelector('.dialog__input') !== null"))
+    answer("3")
     v = b.js("return document.querySelector('textarea[name=\"sections[0][body]\"]').value")
     r.check("a table arrives square: header, rule, one row",
             "| --- | --- | --- |" in v
             and len([ln for ln in v.split("\n") if ln.strip().startswith("|")]) >= 3,
             v[:120])
 
-    print("\nlists take whole lines, links take the prompt's answer")
+    print("\na bad column count is refused in the same dialog")
     b.js("location.reload();")
     time.sleep(1.5)
-    b.js(stub)
+
+    b.js(sel)
+    b.toolbar_button("band-sections", TABLE)
+    answer("9")
+    r.check("nine columns are refused with words",
+            b.js("return [...document.querySelectorAll('.dialog__text')].some("
+                 "el => el.textContent.indexOf('2 to 6') !== -1)"))
+    dismiss()
+    r.check("and nothing was inserted",
+            b.js("return document.querySelector('textarea[name=\"sections[0][body]\"]').value"
+                 ".indexOf('| --- |') === -1"))
+
+    print("\nlists take whole lines, links take the dialog's answer")
+    b.js("location.reload();")
+    time.sleep(1.5)
 
     b.js("var t = document.querySelector('textarea[name=\"sections[0][body]\"]');"
          "t.focus(); t.setSelectionRange(0, t.value.indexOf('\\n'));")
@@ -222,13 +251,27 @@ def run(b: Browser, web_port: int, r: Results):
         ".startsWith('- Tech4TIME decides why')"))
     b.js("location.reload();")
     time.sleep(1.5)
-    b.js(stub)
 
     b.js(sel)
     b.toolbar_button("band-sections", LINK)
+    answer("https://example.example/x")
     r.check("a link wraps with the answered address", b.js(
         "return document.querySelector('textarea[name=\"sections[0][body]\"]').value"
         ".startsWith('[Tech4TIME decides why](https://example.example/x)')"))
+    b.js("location.reload();")
+    time.sleep(1.5)
+
+    print("\na bad address is refused before it reaches the field")
+    b.js(sel)
+    b.toolbar_button("band-sections", LINK)
+    answer("javascript:alert(1)")
+    r.check("the guard speaks in the page",
+            b.js("return [...document.querySelectorAll('.dialog__text')].some("
+                 "el => el.textContent.indexOf('https://') !== -1)"))
+    dismiss()
+    r.check("and the field is untouched",
+            b.js("return document.querySelector('textarea[name=\"sections[0][body]\"]').value"
+                 ".indexOf('[Tech4TIME') === -1"))
 
     print("\nthe field still saves what the ribbons wrote")
     r.check("no navigation happened pressing any of it",

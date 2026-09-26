@@ -2026,6 +2026,20 @@ html { scroll-padding-block-start: var(--admin-bar-h); }
   margin-block-start: var(--space-lg);
 }
 
+/* An input dialog asks for a line of text: the label names it, the admin
+   input styles it, and the block margin separates it from the question the
+   same way the actions are separated from it. */
+.dialog__label {
+  display: block;
+  margin-block-start: var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.dialog__input {
+  margin-block-start: var(--space-2xs);
+}
+
 /* --------------------------------------------------------------------------
    5. Signing in
 
@@ -2536,6 +2550,45 @@ html { scroll-padding-block-start: var(--admin-bar-h); }
   .admin__grid--account {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* --------------------------------------------------------------------------
+   Markdown ribbons
+   md-editor.js wraps each Markdown textarea and its ribbon in one bordered
+   box, the way .rte fuses toolbar and surface above: a ribbon floating over
+   a separate field reads as a control for something else. Without the script
+   the textarea stands alone and still saves, so nothing here is required for
+   the form to work.
+   -------------------------------------------------------------------------- */
+
+.md {
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-base);
+}
+
+/* The ribbon draws the ring for the whole box, so a focused field does not
+   ring twice: once here around both, and never on the field inside it. */
+.md:focus-within {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+  border-color: var(--accent-text);
+}
+
+.md .rte__toolbar {
+  border-start-start-radius: var(--radius-sm);
+  border-start-end-radius: var(--radius-sm);
+}
+
+.md textarea.admin__input {
+  border: 0;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  background-color: transparent;
+}
+
+.md textarea.admin__input:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 /* The editors' forms lay their fields out in a grid, which supplies the
